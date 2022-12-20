@@ -130,9 +130,9 @@ StorageDisaggregated::RequestAndRegionIDs StorageDisaggregated::buildDispatchMPP
         {
             auto * req_table_region = dispatch_req->add_table_regions();
             req_table_region->set_physical_table_id(table_region.physical_table_id);
-            auto * region = req_table_region->add_regions();
             for (const auto & region_info : table_region.region_infos)
             {
+                auto * region = req_table_region->add_regions();
                 region_ids.push_back(region_info.region_id);
                 region->set_region_id(region_info.region_id.id);
                 region->mutable_region_epoch()->set_version(region_info.region_id.ver);
