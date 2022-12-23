@@ -302,7 +302,6 @@ void GRPCReceiverContext::cancelMPPTaskOnTiFlashStorageNode(LoggerPtr log)
         }
         auto cancel_req = std::make_shared<mpp::CancelTaskRequest>();
         cancel_req->set_allocated_meta(sender_task.release());
-        auto rpc_call = std::make_shared<pingcap::kv::RpcCall<mpp::CancelTaskRequest>>(cancel_req);
         thread_manager->schedule(/*propagate_memory_tracker=*/false, "", [cancel_req, log, this] {
             try
             {
