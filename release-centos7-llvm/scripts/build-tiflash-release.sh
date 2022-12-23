@@ -47,15 +47,7 @@ ENABLE_PCH=${ENABLE_PCH:-ON}
 INSTALL_DIR="${SRCPATH}/release-centos7-llvm/tiflash"
 rm -rf ${INSTALL_DIR} && mkdir -p ${INSTALL_DIR}
 
-if [ $CMAKE_BUILD_TYPE == "RELWITHDEBINFO" ]; then
-  BUILD_DIR="$SRCPATH/release-centos7-llvm/build-release"
-  ENABLE_FAILPOINTS="OFF"
-  JEMALLOC_NARENAS="-1"
-else
-  BUILD_DIR="$SRCPATH/release-centos7-llvm/build-debug"
-  ENABLE_FAILPOINTS="ON"
-  JEMALLOC_NARENAS="40"
-fi
+BUILD_DIR="${SRCPATH}/release-centos7-llvm/build-release"
 rm -rf ${BUILD_DIR} && mkdir -p ${BUILD_DIR} && cd ${BUILD_DIR}
 
 cmake -S "${SRCPATH}" \
@@ -63,11 +55,8 @@ cmake -S "${SRCPATH}" \
   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
   -DENABLE_TESTING=OFF \
   -DENABLE_TESTS=OFF \
-  -DENABLE_FAILPOINTS=${ENABLE_FAILPOINTS} \
-  -DJEMALLOC_NARENAS=${JEMALLOC_NARENAS} \
   -Wno-dev \
   -DUSE_CCACHE=OFF \
-  -DUSE_INTERNAL_SSL_LIBRARY=ON \
   -DRUN_HAVE_STD_REGEX=0 \
   -DENABLE_THINLTO=${ENABLE_THINLTO} \
   -DTHINLTO_JOBS=${NPROC} \
