@@ -1312,7 +1312,7 @@ int Server::main(const std::vector<std::string> & /*args*/)
         if (proxy_conf.is_proxy_runnable)
         {
             LOG_INFO(log, "Waiting for TiKV cluster to be bootstrapped");
-            while (!(tmt_context.getPDClient()->isClusterBootstrapped()))
+            while (!tmt_context.getPDClient()->isClusterBootstrapped())
             {
                 const int wait_seconds = 3;
                 LOG_ERROR(
