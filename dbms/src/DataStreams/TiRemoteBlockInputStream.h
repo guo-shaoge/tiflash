@@ -65,6 +65,7 @@ class TiRemoteBlockInputStream : public IProfilingBlockInputStream
 
     bool fetchRemoteResult()
     {
+        int i = 0;
         while (true)
         {
             auto result = remote_reader->nextResult(block_queue, sample_block, stream_id, decoder_ptr);
@@ -104,6 +105,11 @@ class TiRemoteBlockInputStream : public IProfilingBlockInputStream
                 result.req_info,
                 total_rows);
 
+            if (i < 1000)
+            {
+                LOG_INFO(log, "gjt debug TiRemoteBlockInputStream loop read {}", i);
+                continue;
+            }
             if (decode_detail.rows > 0)
                 return true;
             // else continue

@@ -59,8 +59,12 @@ void BroadcastOrPassThroughWriter<ExchangeWriterPtr>::write(const Block & block)
         blocks.push_back(block);
     }
 
-    if (static_cast<Int64>(rows_in_blocks) > batch_send_min_limit)
-        writeBlocks();
+    for (int i = 0; i < 1000; ++i)
+    {
+        LOG_INFO(log, "gjt debug BroadcastOrPassThroughWriter loop write {}", i);
+        if (static_cast<Int64>(rows_in_blocks) > batch_send_min_limit)
+            writeBlocks();
+    }
 }
 
 template <class ExchangeWriterPtr>
