@@ -221,10 +221,14 @@ private:
             scan_context->total_user_read_bytes += bytes;
 
             if (scan_context->enable_resource_control)
+            {
+                auto log = Logger::get();
+                LOG_INFO(log, "consume read bytes ru: {}", bytesToRU(bytes));
                 LocalAdmissionController::global_instance->consumeResource(
                     scan_context->resource_group_name,
                     bytesToRU(bytes),
                     0);
+            }
         }
     }
     BlockInputStreams::iterator current_stream;
