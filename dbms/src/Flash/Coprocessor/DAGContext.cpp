@@ -51,7 +51,7 @@ DAGContext::DAGContext(
     const String & resource_group_name_,
     LoggerPtr log_)
     : dag_request(&dag_request_)
-    , dummy_query_string(dag_request->DebugString())
+    , dummy_query_string(dag_request->ShortDebugString())
     , dummy_ast(makeDummyQuery())
     , tidb_host(tidb_host_)
     , collect_execution_summaries(
@@ -76,7 +76,7 @@ DAGContext::DAGContext(
 // for mpp
 DAGContext::DAGContext(tipb::DAGRequest & dag_request_, const mpp::TaskMeta & meta_, bool is_root_mpp_task_)
     : dag_request(&dag_request_)
-    , dummy_query_string(dag_request->DebugString())
+    , dummy_query_string(dag_request->ShortDebugString())
     , dummy_ast(makeDummyQuery())
     , collect_execution_summaries(
           dag_request->has_collect_execution_summaries() && dag_request->collect_execution_summaries())
@@ -106,7 +106,7 @@ DAGContext::DAGContext(
     const String & compute_node_host_,
     LoggerPtr log_)
     : dag_request(&dag_request_)
-    , dummy_query_string(dag_request->DebugString())
+    , dummy_query_string(dag_request->ShortDebugString())
     , dummy_ast(makeDummyQuery())
     , tidb_host(compute_node_host_)
     , collect_execution_summaries(
@@ -146,7 +146,7 @@ DAGContext::DAGContext(UInt64 max_error_count_)
 // for tests need to run query tasks.
 DAGContext::DAGContext(tipb::DAGRequest & dag_request_, String log_identifier, size_t concurrency)
     : dag_request(&dag_request_)
-    , dummy_query_string(dag_request->DebugString())
+    , dummy_query_string(dag_request->ShortDebugString())
     , dummy_ast(makeDummyQuery())
     , initialize_concurrency(concurrency)
     , collect_execution_summaries(
