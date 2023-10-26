@@ -485,6 +485,19 @@ private:
             if (thread.joinable())
                 thread.join();
         }
+        LOG_DEBUG(log, "background threads joined");
+
+        // Report final RU consumption before stop to avoid RU consumption omission.
+        // This can happend when disagg CN is scaled-in/out frequently.
+        std::vector<AcquireTokenInfo> acquire_infos;
+        for (const auto & resource_group : resource_groups)
+        {
+            const auto delta = resource_group.second->getAndCleanConsumptionDelta();
+            if (delta == 0.0)
+                continue;
+            acquire_infos.push_back({.resource_group_name = resource_group.first, .ru_consumption_delta = delta});
+        }
+        fetchTokensFromGAC(acquire_infos, "before stop");
 
         if (need_reset_unique_client_id.load())
         {
