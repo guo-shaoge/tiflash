@@ -86,18 +86,22 @@ void LocalAdmissionController::startBackgroudJob()
             std::unique_lock<std::mutex> lock(mu);
 
             auto now = std::chrono::steady_clock::now();
+            LOG_DEBUG(log, "gjt debug before collect metrics");
             if (now - last_metric_time_point >= COLLECT_METRIC_INTERVAL)
             {
                 last_metric_time_point = now;
                 for (const auto & resource_group : resource_groups)
                     resource_group.second->collectMetrics();
             }
+            LOG_DEBUG(log, "gjt debug collect metrics done");
 
             if (low_token_resource_groups.empty())
             {
                 fetch_token_periodically = true;
+                LOG_DEBUG(log, "gjt debug before sleep");
                 if (cv.wait_for(lock, DEFAULT_FETCH_GAC_INTERVAL, [this]() { return stopped.load(); }))
                     return;
+                LOG_DEBUG(log, "gjt debug sleep done");
             }
         }
 
@@ -107,6 +111,7 @@ void LocalAdmissionController::startBackgroudJob()
                 fetchTokensForAllResourceGroups();
             else
                 fetchTokensForLowTokenResourceGroups();
+            LOG_DEBUG(log, "gjt debug fetch tokens for all rg done");
 
             {
                 // Need lock here to avoid RCQ has already been destroied.
@@ -115,7 +120,10 @@ void LocalAdmissionController::startBackgroudJob()
                     refill_token_callback();
             }
 
+            LOG_DEBUG(log, "gjt debug refill done");
             checkDegradeMode();
+
+            LOG_DEBUG(log, "gjt debug check degrade mode done");
         }
         catch (...)
         {
