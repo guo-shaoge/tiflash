@@ -211,6 +211,9 @@ target_link_libraries (dbms
     kvstore
 )
 
+add_executable(lac_test ${CMAKE_CURRENT_SOURCE_DIR}/src/Flash/ResourceControl/tests/lacCmd.cpp)
+target_link_libraries(lac_test PUBLIC kv_client fmt)
+
 # always add GmSSL include dir to the include path for static analysis
 target_include_directories(dbms PRIVATE ${TiFlash_SOURCE_DIR}/contrib/GmSSL/include)
 if (USE_GM_SSL)
