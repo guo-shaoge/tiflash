@@ -460,6 +460,32 @@ public:
         }
     }
 
+    void consumeResource(const std::string & name, double ru, uint64_t cpu_time_in_ns)
+    {
+        assert(!stopped);
+
+        // When tidb_enable_resource_control is disabled, resource group name is empty.
+        if (name.empty())
+            return;
+
+        ResourceGroupPtr group = findResourceGroup(name);
+        if unlikely (!group)
+        {
+            LOG_INFO(log, "cannot consume ru for {}, maybe it has been deleted", name);
+            return;
+        }
+
+        group->consumeResource(ru, cpu_time_in_ns);
+        if (group->lowToken() || group->trickleModeLeaseExpire(SteadyClock::now()))
+        {
+            {
+                std::lock_guard lock(mu);
+                low_token_resource_groups.insert(name);
+            }
+            cv.notify_one();
+        }
+    }
+
     std::optional<uint64_t> getPriority(const std::string & name)
     {
         assert(!stopped);
