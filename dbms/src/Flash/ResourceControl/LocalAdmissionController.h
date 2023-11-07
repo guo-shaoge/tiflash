@@ -110,11 +110,12 @@ private:
 
     std::string getName() const { return name; }
 
-    void consumeResource(double ru, uint64_t cpu_time_in_ns_)
+    void consumeResource(LoggerPtr log, const std::string & desc_str,  double ru, uint64_t cpu_time_in_ns_)
     {
         std::lock_guard lock(mu);
         cpu_time_in_ns += cpu_time_in_ns_;
         ru_consumption_delta += ru;
+        LOG_INFO(log, "gjt debug desc: {}, addru: {}, newru: {}, rg: {}", desc_str, ru, ru_consumption_delta, name);
         if (!burstable)
             bucket->consume(ru);
     }
@@ -448,8 +449,7 @@ public:
             return;
         }
 
-        group->consumeResource(ru, cpu_time_in_ns);
-        LOG_INFO(log, "gjt debug desc: {}, addru: {}, newru: {}, rg: {}", desc_str, ru, group->ru_consumption_delta, name);
+        group->consumeResource(log, desc_str, ru, cpu_time_in_ns);
         if (group->lowToken() || group->trickleModeLeaseExpire(SteadyClock::now()))
         {
             {
