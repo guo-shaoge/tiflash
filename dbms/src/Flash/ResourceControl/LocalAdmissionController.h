@@ -110,7 +110,7 @@ private:
 
     std::string getName() const { return name; }
 
-    void consumeResource(double ru, uint64_t cpu_time_in_ns_)
+    void consumeResource(uint64_t ru, uint64_t cpu_time_in_ns_)
     {
         std::lock_guard lock(mu);
         cpu_time_in_ns += cpu_time_in_ns_;
@@ -404,7 +404,7 @@ private:
     uint64_t fetch_tokens_from_gac_count = 0;
     double total_ru_consumption = 0.0;
 
-    double ru_consumption_delta = 0.0;
+    uint64_t ru_consumption_delta = 0.0;
     double ru_consumption_speed = 0.0;
     SteadyClock::time_point last_update_ru_consumption_timepoint = SteadyClock::now();
 };
