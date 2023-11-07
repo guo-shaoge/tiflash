@@ -433,7 +433,7 @@ public:
 
     ~LocalAdmissionController() { stop(); }
 
-    void consumeResource(const std::string & name, double ru, uint64_t cpu_time_in_ns)
+    void consumeResource(const std::string & name, double ru, uint64_t cpu_time_in_ns, const std::string & desc_str)
     {
         assert(!stopped);
 
@@ -449,6 +449,7 @@ public:
         }
 
         group->consumeResource(ru, cpu_time_in_ns);
+        LOG_INFO(log, "gjt debug desc: {}, addru: {}, newru: {}, rg: {}", desc_str, ru, group->ru_consumption_delta, name);
         if (group->lowToken() || group->trickleModeLeaseExpire(SteadyClock::now()))
         {
             {
@@ -687,26 +688,26 @@ public:
     ~LACBytesCollector()
     {
         if (delta_bytes != 0)
-            consume();
+            consume("storage last commit");
     }
 
-    void collect(uint64_t bytes)
+    void collect(uint64_t bytes, const std::string & desc_str)
     {
         delta_bytes += bytes;
         // Call LAC::consumeResource() when accumulated to `bytes_of_one_hundred_ru` to avoid lock contension.
         if (delta_bytes >= bytes_of_one_hundred_ru)
         {
-            consume();
+            consume(desc_str);
             delta_bytes = 0;
         }
     }
 
 private:
-    void consume()
+    void consume(const std::string & desc_str)
     {
         assert(delta_bytes != 0);
         if (!resource_group_name.empty())
-            LocalAdmissionController::global_instance->consumeResource(resource_group_name, bytesToRU(delta_bytes), 0);
+            LocalAdmissionController::global_instance->consumeResource(resource_group_name, bytesToRU(delta_bytes), 0, desc_str);
     }
 
     const std::string resource_group_name;
