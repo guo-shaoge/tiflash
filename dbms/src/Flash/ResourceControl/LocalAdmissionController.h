@@ -721,11 +721,20 @@ private:
     {
         assert(delta_bytes != 0);
         if (!resource_group_name.empty())
-            LocalAdmissionController::global_instance->consumeResource(resource_group_name, bytesToRU(delta_bytes), 0);
+        {
+            double ru = bytesToRU(delta_bytes);
+            static const double threshold = 1148914691236.0;
+            if unlikely (ru > threshold)
+            {
+                LOG_INFO(log, "gjt debug delta_bytes: {}, ru: {}", delta_bytes, ru);
+            }
+            LocalAdmissionController::global_instance->consumeResource(resource_group_name, ru, 0);
+        }
     }
 
     const std::string resource_group_name;
     uint64_t delta_bytes;
+    const LoggerPtr log = Logger::get("gjt debug lac_bytes_collector");
 };
 using LACBytesCollectorPtr = std::unique_ptr<LACBytesCollector>;
 } // namespace DB
