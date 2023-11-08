@@ -53,6 +53,11 @@ class Stopwatch
 public:
     using SteadyClock = std::chrono::steady_clock;
 
+    Stopwatch()
+    {
+        start();
+    }
+
     // The parameter is useless, just be compatible with the older implementation.
     explicit Stopwatch(clockid_t)
     {
