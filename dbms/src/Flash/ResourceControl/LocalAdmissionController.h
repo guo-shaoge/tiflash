@@ -31,6 +31,7 @@
 #include <magic_enum.hpp>
 #include <memory>
 #include <mutex>
+#include <cfenv>
 
 namespace DB
 {

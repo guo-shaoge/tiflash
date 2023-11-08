@@ -18,7 +18,7 @@
 #include <Flash/Pipeline/Schedule/TaskQueues/MultiLevelFeedbackQueue.h>
 #include <Flash/Pipeline/Schedule/TaskQueues/ResourceControlQueue.h>
 #include <Flash/Pipeline/Schedule/Tasks/TaskHelper.h>
-#include <fenv>
+#include <cfenv>
 
 namespace DB
 {
