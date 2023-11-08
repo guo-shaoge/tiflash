@@ -111,24 +111,12 @@ private:
 
     std::string getName() const { return name; }
 
-    void consumeResource(const LoggerPtr & log, double ru, uint64_t cpu_time_in_ns_)
+    void consumeResource(double ru, uint64_t cpu_time_in_ns_)
     {
         std::lock_guard lock(mu);
         cpu_time_in_ns += cpu_time_in_ns_;
         ru_consumption_delta += ru;
         logs.push_back(std::make_pair(ru, ru_consumption_delta));
-        static constexpr int logbatch = 50000;
-        if (logs.size() >= logbatch)
-        {
-            std::string str;
-            for (const auto & p : logs)
-            {
-                str += fmt::format("{},{};", p.first, p.second);
-            }
-            LOG_INFO(log, str);
-            logs.clear();
-            logs.reserve(logbatch);
-        }
         if (!burstable)
             bucket->consume(ru);
     }
@@ -342,6 +330,17 @@ private:
             info.updated = true;
 
             ru_consumption_delta = 0;
+            LOG_INFO(log, "gjt debug in updateConsumptionSpeedInfoIfNecessary {}, {}", info.delta, ru_consumption_delta);
+            {
+                std::string str;
+                for (const auto & p : logs)
+                {
+                    str += fmt::format("{},{};", p.first, p.second);
+                }
+                LOG_INFO(log, str);
+                logs.clear();
+                logs.reserve(50000);
+            }
             last_update_ru_consumption_timepoint = now;
         }
 
@@ -411,8 +410,6 @@ private:
 
     TokenBucketMode bucket_mode = TokenBucketMode::normal_mode;
 
-    LoggerPtr log;
-
     SteadyClock::time_point last_fetch_tokens_from_gac_timepoint = SteadyClock::now();
     SteadyClock::time_point stop_trickle_timepoint = SteadyClock::now();
     uint64_t fetch_tokens_from_gac_count = 0;
@@ -423,6 +420,8 @@ private:
     SteadyClock::time_point last_update_ru_consumption_timepoint = SteadyClock::now();
 
     std::vector<std::pair<double, double>> logs;
+    SteadyClock::time_point last_logs = SteadyClock::now();
+    const LoggerPtr log = Logger::get("gjt debug");
 };
 
 using ResourceGroupPtr = std::shared_ptr<ResourceGroup>;
@@ -464,7 +463,7 @@ public:
             return;
         }
 
-        group->consumeResource(log, ru, cpu_time_in_ns);
+        group->consumeResource(ru, cpu_time_in_ns);
         if (group->lowToken() || group->trickleModeLeaseExpire(SteadyClock::now()))
         {
             {
