@@ -240,7 +240,7 @@ void LocalAdmissionController::fetchTokensFromGAC(
         auto * single_group_req = gac_req.add_requests();
         single_group_req->set_resource_group_name(info.resource_group_name);
         assert(info.acquire_tokens > 0.0 || info.ru_consumption_delta > 0.0);
-        if (info.acquire_tokens > 0.0)
+        if (info.acquire_tokens > 0.0 || desc_str == FINAL_REPORT_DESC_STR)
         {
             auto * ru_items = single_group_req->mutable_ru_items();
             auto * req_ru = ru_items->add_request_r_u();
@@ -561,5 +561,6 @@ std::unique_ptr<LocalAdmissionController> LocalAdmissionController::global_insta
 // Defined in PD resource_manager_client.go.
 const std::string LocalAdmissionController::GAC_RESOURCE_GROUP_ETCD_PATH = "resource_group/settings";
 const std::string LocalAdmissionController::WATCH_GAC_ERR_PREFIX = "watch resource group event failed: ";
+const std::string LocalAdmissionController::FINAL_REPORT_DESC_STR = "before stop!";
 
 } // namespace DB

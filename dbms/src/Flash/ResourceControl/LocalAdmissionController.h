@@ -537,14 +537,13 @@ private:
                 SteadyClock::time_point::max(),
                 std::chrono::seconds(0));
             assert(consumption_update_info.updated);
-            if (consumption_update_info.delta == 0.0)
-                continue;
+
             acquire_infos.push_back(
                 {.resource_group_name = resource_group.first,
                  .acquire_tokens = 0,
                  .ru_consumption_delta = consumption_update_info.delta});
         }
-        fetchTokensFromGAC(acquire_infos, "before stop");
+        fetchTokensFromGAC(acquire_infos, FINAL_REPORT_DESC_STR);
 
         if (need_reset_unique_client_id.load())
         {
@@ -574,6 +573,7 @@ private:
 
     static const std::string GAC_RESOURCE_GROUP_ETCD_PATH;
     static const std::string WATCH_GAC_ERR_PREFIX;
+    static const std::string FINAL_REPORT_DESC_STR;
 
     // findResourceGroup() should be private,
     // this is to avoid user call member function of ResourceGroup directly.
