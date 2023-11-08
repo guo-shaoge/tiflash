@@ -111,7 +111,7 @@ private:
 
     std::string getName() const { return name; }
 
-    void consumeResource(LoggerPtr & log, double ru, uint64_t cpu_time_in_ns_)
+    void consumeResource(const LoggerPtr & log, double ru, uint64_t cpu_time_in_ns_)
     {
         std::lock_guard lock(mu);
         cpu_time_in_ns += cpu_time_in_ns_;
