@@ -58,6 +58,7 @@ public:
         resetResourceGroup(group_pb_);
         const auto & setting = group_pb.r_u_settings().r_u().settings();
         initStaticTokenBucket(setting.burst_limit());
+        logs.reserve(50000);
     }
 
 #ifdef DBMS_PUBLIC_GTEST
@@ -110,11 +111,24 @@ private:
 
     std::string getName() const { return name; }
 
-    void consumeResource(double ru, uint64_t cpu_time_in_ns_)
+    void consumeResource(LoggerPtr & log, double ru, uint64_t cpu_time_in_ns_)
     {
         std::lock_guard lock(mu);
         cpu_time_in_ns += cpu_time_in_ns_;
         ru_consumption_delta += ru;
+        logs.push_back(std::make_pair(ru, ru_consumption_delta));
+        static constexpr int logbatch = 50000;
+        if (logs.size() >= logbatch)
+        {
+            std::string str;
+            for (const auto & p : logs)
+            {
+                str += fmt::format("{},{};", p.first, p.second);
+            }
+            LOG_INFO(log, str);
+            logs.clear();
+            logs.reserve(logbatch);
+        }
         if (!burstable)
             bucket->consume(ru);
     }
@@ -407,6 +421,8 @@ private:
     double ru_consumption_delta = 0.0;
     double ru_consumption_speed = 0.0;
     SteadyClock::time_point last_update_ru_consumption_timepoint = SteadyClock::now();
+
+    std::vector<std::pair<double, double>> logs;
 };
 
 using ResourceGroupPtr = std::shared_ptr<ResourceGroup>;
@@ -448,7 +464,7 @@ public:
             return;
         }
 
-        group->consumeResource(ru, cpu_time_in_ns);
+        group->consumeResource(log, ru, cpu_time_in_ns);
         if (group->lowToken() || group->trickleModeLeaseExpire(SteadyClock::now()))
         {
             {
