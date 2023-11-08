@@ -19,6 +19,7 @@
 #include <time.h>
 
 #include <atomic>
+#include <chrono>
 
 #ifdef __APPLE__
 #include <common/apple_rt.h>
@@ -47,74 +48,92 @@ inline UInt64 clock_gettime_ns_adjusted(UInt64 prev_time, clockid_t clock_type =
     return prev_time;
 }
 
-/** Differs from Poco::Stopwatch only by using 'clock_gettime' instead of 'gettimeofday',
-  *  returns nanoseconds instead of microseconds, and also by other minor differencies.
-  */
 class Stopwatch
 {
 public:
-    /** CLOCK_MONOTONIC works relatively efficient (~15 million calls/sec) and doesn't lead to syscall.
-      * Pass CLOCK_MONOTONIC_COARSE, if you need better performance with acceptable cost of several milliseconds of inaccuracy.
-      */
-    explicit Stopwatch(clockid_t clock_type_ = CLOCK_MONOTONIC)
-        : clock_type(clock_type_)
+    using SteadyClock = std::chrono::steady_clock;
+
+    // The parameter is useless, just be compatible with the older implementation.
+    explicit Stopwatch(clockid_t)
     {
         start();
     }
 
     void start()
     {
-        start_ns = nanoseconds();
-        last_ns = start_ns;
+        start_tp = SteadyClock::now();
+        last_tp = start_tp;
         is_running = true;
     }
 
     void stop()
     {
-        stop_ns = nanoseconds();
+        stop_tp = SteadyClock::now();
         is_running = false;
     }
 
     void reset()
     {
-        start_ns = 0;
-        stop_ns = 0;
-        last_ns = 0;
+        start_tp = SteadyClock::time_point::min();
+        stop_tp = SteadyClock::time_point::min();
+        last_tp = SteadyClock::time_point::min();
         is_running = false;
     }
+
     void restart() { start(); }
-    UInt64 elapsed() const { return is_running ? nanoseconds() - start_ns : stop_ns - start_ns; }
-    UInt64 elapsedMilliseconds() const { return elapsed() / 1000000UL; }
-    double elapsedSeconds() const { return static_cast<double>(elapsed()) / 1000000000ULL; }
+
+    UInt64 elapsed() const
+    {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(elapsedDuration()).count();
+    }
+    UInt64 elapsedMilliseconds() const
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(elapsedDuration()).count();
+    }
+    UInt64 elapsedSeconds() const
+    {
+        return std::chrono::duration_cast<std::chrono::seconds>(elapsedDuration()).count();
+    }
 
     UInt64 elapsedFromLastTime()
     {
-        const auto now_ns = nanoseconds();
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(elapsedFromLastTimeDuration()).count();
+    }
+    UInt64 elapsedMillisecondsFromLastTime()
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(elapsedFromLastTimeDuration()).count();
+    }
+    UInt64 elapsedSecondsFromLastTime()
+    {
+        return std::chrono::duration_cast<std::chrono::seconds>(elapsedFromLastTimeDuration()).count();
+    }
+
+private:
+    SteadyClock::duration elapsedDuration() const
+    {
+        return is_running ? SteadyClock::now() - start_tp : stop_tp - start_tp;
+    }
+    SteadyClock::duration elapsedFromLastTimeDuration()
+    {
         if (is_running)
         {
-            auto rc = now_ns - last_ns;
-            last_ns = now_ns;
-            return rc;
+            const auto now = SteadyClock::now();
+            const auto elapsed = now - last_tp;
+            last_tp = now;
+            return elapsed;
         }
         else
         {
-            return stop_ns - last_ns;
+            return stop_tp - last_tp;
         }
-    };
+    }
 
-    UInt64 elapsedMillisecondsFromLastTime() { return elapsedFromLastTime() / 1000000UL; }
-    double elapsedSecondsFromLastTime() { return static_cast<double>(elapsedFromLastTime()) / 1000000000ULL; }
+    SteadyClock::time_point start_tp = SteadyClock::time_point::min();
+    SteadyClock::time_point stop_tp = SteadyClock::time_point::min();
+    SteadyClock::time_point last_tp = SteadyClock::time_point::min();
 
-private:
-    UInt64 start_ns = 0;
-    UInt64 stop_ns = 0;
-    UInt64 last_ns = 0;
-    clockid_t clock_type;
     bool is_running = false;
-
-    UInt64 nanoseconds() const { return clock_gettime_ns_adjusted(start_ns, clock_type); }
 };
-
 
 class AtomicStopwatch
 {
@@ -210,6 +229,7 @@ private:
     clockid_t clock_type;
 
     /// Most significant bit is a lock. When it is set, compareAndRestartDeferred method will return false.
+    /// todo: we may use stead_clock instead
     UInt64 nanoseconds(UInt64 prev_time) const
     {
         return clock_gettime_ns_adjusted(prev_time, clock_type) & 0x7FFFFFFFFFFFFFFFULL;
