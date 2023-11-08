@@ -117,12 +117,13 @@ private:
         ru_consumption_delta += ru;
         const auto tmplog = fmt::format("gjt debug desc: {}, addru: {}, newru: {}, rg: {}", desc_str, ru, ru_consumption_delta, name);
         logs.push_back(tmplog);
-        if (logs.size() % 500 == 0)
+        static constexpr int logbatch = 5000;
+        if (logs.size() >= logbatch)
         {
             for (size_t i = 0; i < logs.size(); ++i)
                 LOG_INFO(log, logs[i]);
             logs.clear();
-            logs.reserve(500);
+            logs.reserve(logbatch);
         }
         if (!burstable)
             bucket->consume(ru);
