@@ -115,7 +115,15 @@ private:
         std::lock_guard lock(mu);
         cpu_time_in_ns += cpu_time_in_ns_;
         ru_consumption_delta += ru;
-        LOG_INFO(log, "gjt debug desc: {}, addru: {}, newru: {}, rg: {}", desc_str, ru, ru_consumption_delta, name);
+        const auto tmplog = fmt::format("gjt debug desc: {}, addru: {}, newru: {}, rg: {}", desc_str, ru, ru_consumption_delta, name);
+        logs.push_back(tmplog);
+        if (logs.size() % 500 == 0)
+        {
+            for (size_t i = 0; i < logs.size(); ++i)
+                LOG_INFO(log, logs[i]);
+            logs.clear();
+            logs.reserve(500);
+        }
         if (!burstable)
             bucket->consume(ru);
     }
@@ -408,6 +416,8 @@ private:
     double ru_consumption_delta = 0.0;
     double ru_consumption_speed = 0.0;
     SteadyClock::time_point last_update_ru_consumption_timepoint = SteadyClock::now();
+
+    std::vector<std::string> logs;
 };
 
 using ResourceGroupPtr = std::shared_ptr<ResourceGroup>;
