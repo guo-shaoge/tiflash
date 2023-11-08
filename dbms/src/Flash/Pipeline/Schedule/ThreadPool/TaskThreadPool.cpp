@@ -101,7 +101,11 @@ void TaskThreadPool<Impl>::handleTask(TaskPtr & task)
     while (true)
     {
         status_after_exec = Impl::exec(task);
-        total_time_spent += task->profile_info.elapsedFromPrev();
+        const auto tmp = task->profile_info.elapsedFromPrev();
+        if likely(tmp >= 0)
+        {
+            total_time_spent += task->profile_info.elapsedFromPrev();
+        }
         // The executing task should yield if it takes more than `YIELD_MAX_TIME_SPENT_NS`.
         if (!Impl::isTargetStatus(status_after_exec) || total_time_spent >= YIELD_MAX_TIME_SPENT_NS)
             break;
