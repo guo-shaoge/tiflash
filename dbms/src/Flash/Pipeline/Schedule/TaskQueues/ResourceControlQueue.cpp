@@ -18,6 +18,7 @@
 #include <Flash/Pipeline/Schedule/TaskQueues/MultiLevelFeedbackQueue.h>
 #include <Flash/Pipeline/Schedule/TaskQueues/ResourceControlQueue.h>
 #include <Flash/Pipeline/Schedule/Tasks/TaskHelper.h>
+#include <fenv>
 
 namespace DB
 {
@@ -150,10 +151,15 @@ template <typename NestedTaskQueueType>
 void ResourceControlQueue<NestedTaskQueueType>::updateStatistics(const TaskPtr & task, ExecTaskStatus, UInt64 inc_value)
 {
     assert(task);
+    feclearexcept(FE_ALL_EXCEPT);
     auto ru = cpuTimeToRU(inc_value);
     const String & name = task->getResourceGroupName();
     LOG_TRACE(logger, "resource group {} will consume {} RU(or {} cpu time in ns)", name, ru, inc_value);
     LocalAdmissionController::global_instance->consumeResource(name, ru, inc_value);
+    if unlikely (fetestexcept(FE_ALL_EXCEPT))
+    {
+        LOG_INFO(logger, "gjt debug name{}, ru: {}, inc_value: {}", name, ru, inc_value);
+    }
 }
 
 template <typename NestedTaskQueueType>

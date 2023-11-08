@@ -705,12 +705,20 @@ private:
     void consume()
     {
         assert(delta_bytes != 0);
+        feclearexcept(FE_ALL_EXCEPT);
+        const double ru = bytesToRU(delta_bytes);
         if (!resource_group_name.empty())
-            LocalAdmissionController::global_instance->consumeResource(resource_group_name, bytesToRU(delta_bytes), 0);
+            LocalAdmissionController::global_instance->consumeResource(resource_group_name, ru, 0);
+
+        if unlikely (fetestexcept(FE_ALL_EXCEPT))
+        {
+            LOG_INFO(logger, "gjt debug name{}, ru: {}, delta_bytes: {}", resource_group_name, ru, delta_bytes);
+        }
     }
 
     const std::string resource_group_name;
     uint64_t delta_bytes;
+    const LoggerPtr logger = Logger::get();
 };
 using LACBytesCollectorPtr = std::unique_ptr<LACBytesCollector>;
 } // namespace DB
