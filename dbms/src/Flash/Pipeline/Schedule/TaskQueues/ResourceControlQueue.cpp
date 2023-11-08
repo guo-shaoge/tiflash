@@ -154,7 +154,7 @@ void ResourceControlQueue<NestedTaskQueueType>::updateStatistics(const TaskPtr &
     static const double threshold = 1148914691236.0;
     if unlikely (ru > threshold)
     {
-        LOG_INFO(logger, "gjt debug RCQ inc_value: {}, ms: {}, ns/1M: {}, ceil: {}, ru: {}", inc_value, toCPUTimeMillisecond(cpu_time_ns), static_cast<double>(cpu_time_ns) / 1'000'000L, ceil(static_cast<double>(cpu_time_ns) / 1'000'000L), ru);
+        LOG_INFO(logger, "gjt debug RCQ inc_value: {}, ms: {}, ns/1M: {}, ceil: {}, ceil/3: {}, ru: {}", inc_value, toCPUTimeMillisecond(inc_value), static_cast<double>(inc_value) / 1'000'000L, ceil(static_cast<double>(inc_value) / 1'000'000L), ceil(static_cast<double>(inc_value) / 1'000'000L)/3, ru);
     }
     const String & name = task->getResourceGroupName();
     LOG_TRACE(logger, "resource group {} will consume {} RU(or {} cpu time in ns)", name, ru, inc_value);
