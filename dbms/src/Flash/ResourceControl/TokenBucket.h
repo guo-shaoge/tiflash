@@ -96,7 +96,7 @@ public:
     }
 
 private:
-    static constexpr auto LOW_TOKEN_THRESHOLD_RATE = 0.3;
+    static constexpr auto LOW_TOKEN_THRESHOLD_RATE = 0.1;
     static constexpr auto MIN_COMPACT_INTERVAL = std::chrono::milliseconds(10);
 
     // Merge dynamic token into static token.
