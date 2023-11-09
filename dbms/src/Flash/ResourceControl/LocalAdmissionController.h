@@ -199,7 +199,7 @@ private:
         acquire_num -= remaining_ru;
         acquire_num = (acquire_num > 0.0 ? acquire_num : 0.0);
 
-        LOG_TRACE(
+        LOG_DEBUG(
             log,
             "acquire num for rg {}: avg_speed: {}, remaining_ru: {}, base: {}, amplification: {}, "
             "acquire num: {}",
@@ -321,7 +321,7 @@ private:
             if unlikely(ru_consumption_delta >= 50'000'000L)
             {
                 ru_consumption_delta = 0;
-                LOG_FATAL(log, "too much ru consumption({}), reset it as zero!", ru_consumption_delta);
+                LOG_ERROR(log, "too much ru consumption({}), reset it as zero!", ru_consumption_delta);
                 return {.speed = ru_consumption_speed, .delta = ru_consumption_delta, .updated = false};
             }
 
@@ -339,6 +339,7 @@ private:
             ru_consumption_delta = 0;
             last_update_ru_consumption_timepoint = now;
 
+            LOG_DEBUG(log, "consumption info updated speed: speed: {}, delta: {}", info.speed, info.delta);
         }
 
         GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_avg_speed, name).Set(info.speed);
