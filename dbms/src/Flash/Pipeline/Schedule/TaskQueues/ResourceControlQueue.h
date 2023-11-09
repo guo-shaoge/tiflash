@@ -104,5 +104,8 @@ private:
     // Store tasks whose resource group info is not found in LAC,
     // it will be cancelled in take().
     std::deque<TaskPtr> error_task_queue;
+
+    std::mutex delta_mu;
+    std::atomic<uint64_t> cpu_ns_delta{0};
 };
 } // namespace DB

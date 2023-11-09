@@ -150,10 +150,17 @@ template <typename NestedTaskQueueType>
 void ResourceControlQueue<NestedTaskQueueType>::updateStatistics(const TaskPtr & task, ExecTaskStatus, UInt64 inc_value)
 {
     assert(task);
-    auto ru = cpuTimeToRU(inc_value);
-    const String & name = task->getResourceGroupName();
-    LOG_TRACE(logger, "resource group {} will consume {} RU(or {} cpu time in ns)", name, ru, inc_value);
-    LocalAdmissionController::global_instance->consumeResource(name, ru, inc_value);
+    cpu_ns_delta.fetch_add(inc_value);
+    if (cpu_ns_delta.load() > cpu_ns_of_ninety_ru)
+    {
+        std::lock_guard lock(delta_mu);
+        if (cpu_ns_delta.load() > cpu_ns_of_ninety_ru)
+        {
+            const String & name = task->getResourceGroupName();
+            LocalAdmissionController::global_instance->consumeResource(name, cpuTimeToRU(cpu_ns_delta.load()), cpu_ns_delta.load());
+            cpu_ns_delta = 0;
+        }
+    }
 }
 
 template <typename NestedTaskQueueType>
