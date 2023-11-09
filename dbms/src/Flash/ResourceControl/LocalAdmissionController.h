@@ -316,6 +316,15 @@ private:
             const auto elapsed
                 = std::chrono::duration_cast<std::chrono::seconds>(now - last_update_ru_consumption_timepoint);
 
+            // TODO: Add this to avoid bug that cause RU usage is very large. Remove it after tiflash resource control is stable.
+            // For serverless tier, the fillrate is 2M, so set it as 2M*5sec, and multiple 5 to avoid limit speed.
+            if unlikely(ru_consumption_delta >= 50'000'000L)
+            {
+                ru_consumption_delta = 0;
+                LOG_FATAL(log, "too much ru consumption({}), reset it as zero!", ru_consumption_delta);
+                return {.speed = ru_consumption_speed, .delta = ru_consumption_delta, .updated = false};
+            }
+
             if (elapsed < dura)
                 return {.speed = ru_consumption_speed, .delta = ru_consumption_delta, .updated = false};
 
