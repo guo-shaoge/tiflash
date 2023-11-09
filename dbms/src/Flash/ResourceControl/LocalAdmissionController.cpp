@@ -104,9 +104,15 @@ void LocalAdmissionController::startBackgroudJob()
         try
         {
             if (fetch_token_periodically)
+            {
+                LOG_INFO(log, "ru_exhausted_cnt: {}", ru_exhausted_cnt.load());
+                ru_exhausted_cnt = 0;
                 fetchTokensForAllResourceGroups();
+            }
             else
+            {
                 fetchTokensForLowTokenResourceGroups();
+            }
 
             {
                 // Need lock here to avoid RCQ has already been destroied.
@@ -182,11 +188,17 @@ std::optional<LocalAdmissionController::AcquireTokenInfo> LocalAdmissionControll
 
         // To avoid periodically_token_fetch after low_token_fetch immediately
         if (is_periodically_fetch && !resource_group->needFetchTokenPeridically(now, DEFAULT_FETCH_GAC_INTERVAL))
+        {
+            LOG_DEBUG(log, "ignore fetch because too early: {}", std::chrono::duration_cast<std::chrono::seconds>(now - last_fetch_tokens_from_gac_timepoint).count());
             return;
+        }
 
         // During trickle mode, no need to fetch tokens from GAC.
         if (resource_group->inTrickleModeLease(now))
+        {
+            LOG_DEBUG(log, "ignore fetch because in trickle lease");
             return;
+        }
 
         acquire_tokens = resource_group->getAcquireRUNum(
             consumption_update_info.speed,

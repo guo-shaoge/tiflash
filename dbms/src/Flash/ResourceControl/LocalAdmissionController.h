@@ -338,6 +338,7 @@ private:
 
             ru_consumption_delta = 0;
             last_update_ru_consumption_timepoint = now;
+
         }
 
         GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_avg_speed, name).Set(info.speed);
@@ -348,7 +349,7 @@ private:
     bool needFetchTokenPeridically(const SteadyClock::time_point & now, const std::chrono::seconds & dura) const
     {
         std::lock_guard lock(mu);
-        return std::chrono::duration_cast<std::chrono::seconds>(now - last_fetch_tokens_from_gac_timepoint) > dura;
+        return std::chrono::duration_cast<std::chrono::seconds>(now - last_fetch_tokens_from_gac_timepoint) >= dura;
     }
 
     void updateFetchTokenTimepoint(const SteadyClock::time_point & tp)
@@ -489,7 +490,11 @@ public:
     // Throw exception if got error when fetching from GAC.
     void warmupResourceGroupInfoCache(const std::string & name);
 
-    static bool isRUExhausted(uint64_t priority) { return priority == std::numeric_limits<uint64_t>::max(); }
+    bool isRUExhausted(uint64_t priority)
+    {
+        ru_exhausted_cnt++;
+        return priority == std::numeric_limits<uint64_t>::max();
+    }
 
     void registerRefillTokenCallback(const std::function<void()> & cb)
     {
@@ -553,6 +558,7 @@ private:
                  .ru_consumption_delta = consumption_update_info.delta});
         }
         fetchTokensFromGAC(acquire_infos, FINAL_REPORT_DESC_STR);
+        LOG_DEBUG(log, "final report done({})", acquire_infos.size());
 
         if (need_reset_unique_client_id.load())
         {
@@ -680,6 +686,8 @@ private:
     std::function<void()> refill_token_callback;
 
     const LoggerPtr log = Logger::get("LocalAdmissionController");
+
+    std::atomic<uint64_t> ru_exhausted_cnt{0};
 };
 
 // This is to reduce the calling frequence of LAC::consumeResource() to avoid lock contension.

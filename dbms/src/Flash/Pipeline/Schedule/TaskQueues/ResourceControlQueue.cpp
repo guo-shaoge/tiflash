@@ -117,7 +117,7 @@ bool ResourceControlQueue<NestedTaskQueueType>::take(TaskPtr & task)
         if (!resource_group_infos.empty())
         {
             const ResourceGroupInfo & group_info = resource_group_infos.top();
-            const bool ru_exhausted = LocalAdmissionController::isRUExhausted(group_info.priority);
+            const bool ru_exhausted = LocalAdmissionController::global_instance->isRUExhausted(group_info.priority);
 
             LOG_TRACE(
                 logger,
