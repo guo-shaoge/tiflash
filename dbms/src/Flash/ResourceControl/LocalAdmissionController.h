@@ -151,7 +151,7 @@ private:
 
         uint64_t priority = (((static_cast<uint64_t>(user_priority) - 1) << 60) | virtual_time);
 
-        LOG_TRACE(
+        LOG_DEBUG(
             log,
             "getPriority detailed info: resource group name: {}, weight: {}, virtual_time: {}, user_priority: {}, "
             "priority: {}, remaining_token: {}",
