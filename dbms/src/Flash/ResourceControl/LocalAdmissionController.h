@@ -129,7 +129,8 @@ private:
             }
             catch (...)
             {
-                LOG_INFO(log,"gjt debug big ru {}, {}, {}, {}, {}, {}, {}, {}", is_compute, cpu_time_in_ns_, storage_bytes, debug_cpu_ns, debug_storage_bytes, ru, ru_consumption_delta, getCurrentExceptionMessage(true));
+                LOG_INFO(log,"gjt debug big ru {}, {}, {}, {}, {}, {}, {}", is_compute, cpu_time_in_ns_, storage_bytes, debug_cpu_ns, debug_storage_bytes, ru, ru_consumption_delta);
+                LOG_INFO(log, "gjt debug stack {}", getCurrentExceptionMessage(true));
             }
         }
         if (!burstable)
