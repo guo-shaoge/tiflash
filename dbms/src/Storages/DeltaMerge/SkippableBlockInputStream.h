@@ -167,6 +167,7 @@ public:
             }
             else
             {
+                lac_bytes_collector.forceCollect();
                 (*current_stream)->readSuffix();
                 precede_stream_rows += rows[current_stream - children.begin()];
                 ++current_stream;
@@ -195,6 +196,7 @@ public:
             }
             else
             {
+                lac_bytes_collector.forceCollect();
                 (*current_stream)->readSuffix();
                 precede_stream_rows += rows[current_stream - children.begin()];
                 ++current_stream;

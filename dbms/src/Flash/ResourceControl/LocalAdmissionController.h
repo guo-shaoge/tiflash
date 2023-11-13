@@ -115,7 +115,7 @@ private:
     void consumeResource(double ru, uint64_t cpu_time_in_ns_, const SteadyClock::time_point & now)
     {
         if unlikely (!consumeResourceNoExcept(ru, cpu_time_in_ns_, now))
-            throw ::DB::Exception(fmt::format("Exceeded resource group quota limitation: ", name));
+            throw ::DB::Exception(fmt::format("Exceeded resource group quota limitation: {}", name));
     }
 
     // Return true if consume succeed.
@@ -124,7 +124,7 @@ private:
         std::lock_guard lock(mu);
         if (!burstable)
         {
-            if unlikely (bucket->willBeThrottled(ru, user_ru_per_sec, now, MAX_THROTTLE_DURATION_SEC))
+            if unlikely (bucket->willBeThrottled(ru, user_ru_per_sec, MAX_THROTTLE_DURATION_SEC))
                 return false;
             bucket->consume(ru);
         }
@@ -704,7 +704,7 @@ public:
         , delta_bytes(0)
     {}
 
-    ~LACBytesCollector()
+    void forceCollect()
     {
         if (delta_bytes != 0)
             consume();
