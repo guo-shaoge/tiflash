@@ -102,6 +102,7 @@ public:
         if (fill_rate > 0)
         {
             auto num = peek(now) - n;
+            LOG_INFO(log, "gjt debug num: {}, fill_rate: {}, dura_sec: {}", num, fill_rate, dura_sec);
             if (num < 0 && ((-num) / fill_rate) > dura_sec)
                 return true;
         }
