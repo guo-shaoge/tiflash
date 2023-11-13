@@ -97,16 +97,15 @@ public:
     }
 
     // Return true if wll be throttled, a.k.a. when the future dura_sec tokens cannot cover.
-    bool willBeThrottled(double n, const TimePoint & now, uint64_t dura_sec) const
+    bool willBeThrottled(double n, uint64_t user_ru_per_sec, const TimePoint & now, uint64_t dura_sec) const
     {
-        if (fill_rate > 0)
-        {
-            auto num = peek(now) - n;
-            LOG_INFO(log, "gjt debug num: {}, fill_rate: {}, dura_sec: {}", num, fill_rate, dura_sec);
-            if (num < 0 && ((-num) / fill_rate) > dura_sec)
-                return true;
-        }
-        return false;
+        double tmp_fill_rate = fill_rate;
+        if (tmp_fill_rate <= 0.0)
+            tmp_fill_rate = user_ru_per_sec;
+
+        auto num = peek(now) - n;
+        LOG_INFO(log, "gjt debug num: {}, fill_rate: {}, dura_sec: {}", num, fill_rate, dura_sec);
+        return (num < 0 && ((-num) / fill_rate) > dura_sec);
     }
 
 private:
