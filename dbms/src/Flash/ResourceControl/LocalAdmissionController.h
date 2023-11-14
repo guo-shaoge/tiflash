@@ -121,6 +121,7 @@ private:
         else
             debug_storage_ru += ru;
         ru_consumption_delta += ru;
+        LOG_INFO(log,"gjt debug  ru metrics {}, {}, {}, {}, {}, {}, {}", is_compute, cpu_time_in_ns_, storage_bytes, debug_cpu_ns, debug_storage_bytes, ru, ru_consumption_delta);
         if unlikely(ru_consumption_delta > 1000000)
         {
             try
