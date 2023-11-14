@@ -684,7 +684,7 @@ private:
         std::string & err_msg);
 
     std::shared_mutex mu;
-    std::condition_variable cv;
+    std::condition_variable_any cv;
 
     std::atomic<bool> stopped = false;
 
