@@ -354,7 +354,7 @@ bool SegmentReadTaskPool::isRUExhausted()
     if (ru_is_exhausted && ms - last_time_check_ru <= check_ru_interval_ms)
         return false;
 
-    if (read_bytes_after_last_check < bytes_of_five_thousand_ru)
+    if (read_bytes_after_last_check < bytes_of_five_hundred_ru)
     {
         return ru_is_exhausted; // Return result of last time.
     }
@@ -363,7 +363,7 @@ bool SegmentReadTaskPool::isRUExhausted()
     // If last thread has check is ru exhausted, use the result of last thread.
     // Attention: `read_bytes_after_last_check` can be written concurrently in `pushBlock`.
     ms = currentMS();
-    if (read_bytes_after_last_check < bytes_of_five_thousand_ru)
+    if (read_bytes_after_last_check < bytes_of_five_hundred_ru)
     {
         return ru_is_exhausted; // Return result of last time.
     }
