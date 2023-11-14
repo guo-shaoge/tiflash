@@ -105,7 +105,7 @@ public:
 
         auto num = peek() - n;
         LOG_INFO(log, "gjt debug num: {}, fill_rate: {}, dura_sec: {}", num, fill_rate, dura_sec);
-        return (num < 0 && ((-num) / fill_rate) > dura_sec);
+        return (num < 0 && ((-num) / tmp_fill_rate) > dura_sec);
     }
 
 private:
