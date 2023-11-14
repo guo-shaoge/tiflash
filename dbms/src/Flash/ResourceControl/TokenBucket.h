@@ -104,7 +104,7 @@ public:
             tmp_fill_rate = user_ru_per_sec;
 
         auto num = peek() - n;
-        LOG_INFO(log, "gjt debug num: {}, fill_rate: {}, dura_sec: {}", num, fill_rate, dura_sec);
+        LOG_INFO(log, "gjt debug num: {}, fill_rate: {}, user_ru_per_sec_: {}, tmp_fill_rate: {}, dura_sec: {}", num, fill_rate, user_ru_per_sec, tmp_fill_rate, dura_sec);
         return (num < 0 && ((-num) / tmp_fill_rate) > dura_sec);
     }
 
