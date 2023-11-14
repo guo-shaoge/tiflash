@@ -52,12 +52,12 @@ protected:
 };
 using TaskQueuePtr = std::unique_ptr<TaskQueue>;
 
-template <typename Queue>
-bool popTask(Queue & queue, TaskPtr & task)
+template <typename Queue, typename Element>
+bool popTask(Queue & queue, Element & ele)
 {
     if (!queue.empty())
     {
-        task = std::move(queue.front());
+        ele = std::move(queue.front());
         queue.pop_front();
         return true;
     }

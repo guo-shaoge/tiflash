@@ -71,7 +71,7 @@ void ResourceControlQueue<NestedTaskQueueType>::submitWithoutLock(TaskPtr && tas
         auto priority = LocalAdmissionController::global_instance->getPriority(name);
         if unlikely (!priority.has_value())
         {
-            error_task_queue.push_back(std::move(task));
+            error_task_queue.push_back(std::make_unique<ErrorTaskInfo>(std::move(task), ErrorType::NOT_FOUND));
             return;
         }
 
@@ -88,12 +88,13 @@ template <typename NestedTaskQueueType>
 bool ResourceControlQueue<NestedTaskQueueType>::take(TaskPtr & task)
 {
     assert(!task);
-    bool is_error_task = false;
+    std::unique_ptr<ErrorTaskInfo> error_task_info = nullptr;
     SCOPE_EXIT({
-        if unlikely (is_error_task)
+        if unlikely (error_task_info)
         {
-            assert(task);
-            task->onErrorOccurred(fmt::format(error_template, task->getResourceGroupName()));
+            assert(error_task_info->task);
+            error_task_info->task->onErrorOccurred(getErrorMsg(*error_task_info));
+            task = std::move(error_task_info->task);
         }
     });
     std::unique_lock lock(mu);
@@ -105,11 +106,8 @@ bool ResourceControlQueue<NestedTaskQueueType>::take(TaskPtr & task)
         if (popTask(cancel_task_queue, task))
             return true;
 
-        if unlikely (popTask(error_task_queue, task))
-        {
-            is_error_task = true;
+        if unlikely (popTask(error_task_queue, error_task_info))
             return true;
-        }
 
         if unlikely (updateResourceGroupInfosWithoutLock())
             continue;
@@ -180,21 +178,36 @@ bool ResourceControlQueue<NestedTaskQueueType>::updateResourceGroupInfosWithoutL
             auto new_priority = LocalAdmissionController::global_instance->getPriority(group_info.name);
             if unlikely (!new_priority.has_value())
             {
-                // resource group has been deleted, take all tasks and erase this group info.
-                TaskPtr task;
-                while (!group_info.task_queue->empty())
-                {
-                    RUNTIME_CHECK(group_info.task_queue->take(task));
-                    error_task_queue.push_back(std::move(task));
-                }
-                mustEraseResourceGroupInfoWithoutLock(group_info.name);
+                handleGroupDeleted(group_info);
+                continue;
             }
-            else
+
+            const auto throttled = LocalAdmissionController::global_instance->throttled(group_info.name);
+            if unlikely (!throttled.has_value())
             {
-                // resource group ok, reorder group info by priority.
-                new_resource_group_infos.push({group_info.name, new_priority.value(), group_info.task_queue});
-                resource_group_infos.pop();
+                handleGroupDeleted(group_info);
+                continue;
             }
+
+            if (throttled.value())
+            {
+                if (!group_info.task_queue->empty())
+                {
+                    TaskPtr task;
+                    RUNTIME_CHECK(group_info.task_queue->take(task));
+                    error_task_queue.push_back(std::make_unique<ErrorTaskInfo>(std::move(task), ErrorType::THROTTLED));
+                }
+
+                if (group_info.task_queue->empty())
+                {
+                    mustEraseResourceGroupInfoWithoutLock(group_info.name);
+                    continue;
+                }
+            }
+
+            // resource group ok, reorder group info by priority.
+            new_resource_group_infos.push({group_info.name, new_priority.value(), group_info.task_queue});
+            resource_group_infos.pop();
         }
         else
         {
@@ -203,6 +216,34 @@ bool ResourceControlQueue<NestedTaskQueueType>::updateResourceGroupInfosWithoutL
     }
     resource_group_infos = new_resource_group_infos;
     return !error_task_queue.empty();
+}
+
+template <typename NestedTaskQueueType>
+void ResourceControlQueue<NestedTaskQueueType>::handleGroupDeleted(const ResourceGroupInfo & group_info)
+{
+    // resource group has been deleted, take all tasks and erase this group info.
+    TaskPtr task;
+    while (!group_info.task_queue->empty())
+    {
+        RUNTIME_CHECK(group_info.task_queue->take(task));
+        error_task_queue.push_back(std::make_unique<ErrorTaskInfo>(std::move(task), ErrorType::NOT_FOUND));
+    }
+    mustEraseResourceGroupInfoWithoutLock(group_info.name);
+}
+
+template <typename NestedTaskQueueType>
+String ResourceControlQueue<NestedTaskQueueType>::getErrorMsg(const ErrorTaskInfo & info) const
+{
+    const auto & name = info.task->getResourceGroupName();
+    switch (info.error)
+    {
+    case ErrorType::NOT_FOUND:
+        return fmt::format("resource group {} not found, maybe has been deleted", name);
+    case ErrorType::THROTTLED:
+        return fmt::format(RESOURCE_GROUP_THROTTLED_ERR, name);
+    default:
+        RUNTIME_ASSERT(0);
+    };
 }
 
 template <typename NestedTaskQueueType>

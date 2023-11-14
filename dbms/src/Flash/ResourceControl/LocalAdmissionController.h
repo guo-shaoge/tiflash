@@ -36,6 +36,8 @@ namespace DB
 {
 class LocalAdmissionController;
 
+static constexpr const char * RESOURCE_GROUP_THROTTLED_ERR = "Exceeded resource group quota limitation: {}";
+
 // gac_resp.burst_limit < 0: resource group is burstable, and will not use bucket at all.
 // gac_resp.burst_limit >= 0: resource group is not burstable, will use bucket to limit the speed of the resource group.
 //     1. normal_mode: bucket is static(a.k.a. bucket.fill_rate is zero), LAC will fetch tokens from GAC to fill bucket.
@@ -115,7 +117,13 @@ private:
     void consumeResource(double ru, uint64_t cpu_time_in_ns_, const SteadyClock::time_point & now)
     {
         if unlikely (!consumeResourceNoExcept(ru, cpu_time_in_ns_, now))
-            throw ::DB::Exception(fmt::format("Exceeded resource group quota limitation: {}", name));
+            throw ::DB::Exception(fmt::format(RESOURCE_GROUP_THROTTLED_ERR, name));
+    }
+
+    bool throttled() const
+    {
+        std::lock_guard lock(mu);
+        return !burstable && bucket->willBeThrottled(0, user_ru_per_sec, MAX_THROTTLE_DURATION_SEC);
     }
 
     // Return true if consume succeed.
@@ -496,6 +504,23 @@ public:
     // Fetch resource group info from GAC if necessary and store in local cache.
     // Throw exception if got error when fetching from GAC.
     void warmupResourceGroupInfoCache(const std::string & name);
+
+    std::optional<bool> throttled(const std::string & name)
+    {
+        assert(!stopped);
+
+        if (name.empty())
+            return {false};
+
+        ResourceGroupPtr group = findResourceGroup(name);
+        if unlikely (!group)
+        {
+            LOG_INFO(log, "cannot check if throttled for {}, may be it has been deleted", name);
+            return std::nullopt;
+        }
+
+        return {group->throttled()};
+    }
 
     static bool isRUExhausted(uint64_t priority) { return priority == std::numeric_limits<uint64_t>::max(); }
 

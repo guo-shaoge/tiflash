@@ -80,7 +80,24 @@ private:
         }
     };
 
-    static constexpr const char * error_template = "resource group {} not found, maybe has been deleted";
+    enum ErrorType
+    {
+        NOT_FOUND = 0,
+        THROTTLED = 1,
+    };
+    struct ErrorTaskInfo
+    {
+        ErrorTaskInfo(TaskPtr && task_, ErrorType error_)
+            : task(std::move(task_))
+            , error(error_)
+        {}
+
+        TaskPtr task;
+        ErrorType error;
+    };
+
+    void handleGroupDeleted(const ResourceGroupInfo & group_info);
+    String getErrorMsg(const ErrorTaskInfo & info) const;
 
     // Update resource_group_infos, will reorder resource group by priority.
     // Return true if got error resource group.
@@ -103,6 +120,6 @@ private:
 
     // Store tasks whose resource group info is not found in LAC,
     // it will be cancelled in take().
-    std::deque<TaskPtr> error_task_queue;
+    std::deque<std::unique_ptr<ErrorTaskInfo>> error_task_queue;
 };
 } // namespace DB
