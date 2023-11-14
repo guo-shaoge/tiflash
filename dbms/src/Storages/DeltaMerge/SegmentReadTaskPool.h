@@ -252,7 +252,7 @@ private:
     inline static std::atomic<uint64_t> pool_id_gen{1};
     inline static BlockStat global_blk_stat;
     static uint64_t nextPoolId() { return pool_id_gen.fetch_add(1, std::memory_order_relaxed); }
-    inline static constexpr Int64 check_ru_interval_ms = 100;
+    inline static constexpr Int64 check_ru_interval_ms = 1000;
 };
 
 using SegmentReadTaskPoolPtr = std::shared_ptr<SegmentReadTaskPool>;

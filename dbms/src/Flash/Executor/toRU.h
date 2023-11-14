@@ -29,4 +29,5 @@ RU bytesToRU(UInt64 bytes);
 
 static constexpr UInt64 bytes_of_one_ru = 1024 * 64;
 static constexpr UInt64 bytes_of_one_hundred_ru = 100 * bytes_of_one_ru;
+static constexpr UInt64 bytes_of_five_hundred_ru = 500 * bytes_of_one_ru;
 } // namespace DB

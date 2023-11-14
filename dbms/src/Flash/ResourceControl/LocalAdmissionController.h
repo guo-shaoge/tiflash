@@ -31,6 +31,7 @@
 #include <magic_enum.hpp>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 
 namespace DB
 {
@@ -142,7 +143,7 @@ private:
     // Zero priority means has no RU left, should not schedule this resource group at all.
     uint64_t getPriority(uint64_t max_ru_per_sec) const
     {
-        std::lock_guard lock(mu);
+        std::shared_lock lock(mu);
 
         const auto remaining_token = bucket->peek();
         if (!burstable && remaining_token <= 0.0)
@@ -414,7 +415,7 @@ private:
 
     resource_manager::ResourceGroup group_pb;
 
-    mutable std::mutex mu;
+    mutable std::shared_mutex mu;
 
     // Local token bucket.
     TokenBucketPtr bucket;
@@ -612,7 +613,7 @@ private:
     // So we can avoid dead lock.
     ResourceGroupPtr findResourceGroup(const std::string & name)
     {
-        std::lock_guard lock(mu);
+        std::shared_lock lock(mu);
         auto iter = resource_groups.find(name);
         return iter == resource_groups.end() ? nullptr : iter->second;
     }
@@ -682,7 +683,7 @@ private:
         std::string & parsed_rg_name,
         std::string & err_msg);
 
-    std::mutex mu;
+    std::shared_mutex mu;
     std::condition_variable cv;
 
     std::atomic<bool> stopped = false;

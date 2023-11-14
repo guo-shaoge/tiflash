@@ -347,11 +347,14 @@ bool SegmentReadTaskPool::isRUExhausted()
     }
 
     // To reduce lock contention in resource control,
-    // check if RU is exhuasted every `bytes_of_one_hundred_ru` or every `100ms`.
+    // check if RU is exhuasted every `bytes_of_one_thousand_ru` or every `100ms`.
 
     // Fast path.
     Int64 ms = currentMS();
-    if (read_bytes_after_last_check < bytes_of_one_hundred_ru || ms - last_time_check_ru < check_ru_interval_ms)
+    if (ru_is_exhausted && ms - last_time_check_ru <= check_ru_interval_ms)
+        return false;
+
+    if (read_bytes_after_last_check < bytes_of_five_thousand_ru)
     {
         return ru_is_exhausted; // Return result of last time.
     }
@@ -360,7 +363,7 @@ bool SegmentReadTaskPool::isRUExhausted()
     // If last thread has check is ru exhausted, use the result of last thread.
     // Attention: `read_bytes_after_last_check` can be written concurrently in `pushBlock`.
     ms = currentMS();
-    if (read_bytes_after_last_check < bytes_of_one_hundred_ru || ms - last_time_check_ru < check_ru_interval_ms)
+    if (read_bytes_after_last_check < bytes_of_five_thousand_ru)
     {
         return ru_is_exhausted; // Return result of last time.
     }
