@@ -122,8 +122,8 @@ private:
         else
             debug_storage_ru += ru;
         ru_consumption_delta += ru;
-        LOG_INFO(log,"gjt debug  ru metrics {}, {}, {}, {}, {}, {}, {}", is_compute, cpu_time_in_ns_, storage_bytes, debug_cpu_ns, debug_storage_bytes, ru, ru_consumption_delta);
-        if unlikely(ru_consumption_delta > 1000000)
+        LOG_INFO(log,"gjt debug  ru metrics {}, {}, {}, {}, {}, {}, {}, {}", name, is_compute, cpu_time_in_ns_, storage_bytes, debug_cpu_ns, debug_storage_bytes, ru, ru_consumption_delta);
+        if unlikely(ru_consumption_delta > 30000)
         {
             try
             {
@@ -131,7 +131,7 @@ private:
             }
             catch (...)
             {
-                LOG_INFO(log,"gjt debug big ru {}, {}, {}, {}, {}, {}, {}", is_compute, cpu_time_in_ns_, storage_bytes, debug_cpu_ns, debug_storage_bytes, ru, ru_consumption_delta);
+                LOG_INFO(log,"gjt debug big ru {}, {}, {}, {}, {}, {}, {}, {}", name, is_compute, cpu_time_in_ns_, storage_bytes, debug_cpu_ns, debug_storage_bytes, ru, ru_consumption_delta);
                 LOG_INFO(log, "gjt debug stack {}", getCurrentExceptionMessage(true));
             }
         }
@@ -163,7 +163,7 @@ private:
 
         LOG_DEBUG(
             log,
-            "getPriority detailed info: resource group name: {}, weight: {}, virtual_time: {}, user_priority: {}, "
+            "gjt debug getPriority detailed info: resource group name: {}, weight: {}, virtual_time: {}, user_priority: {}, "
             "priority: {}, remaining_token: {}",
             name,
             weight,
