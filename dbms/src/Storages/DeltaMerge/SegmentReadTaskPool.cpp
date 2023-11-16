@@ -341,6 +341,16 @@ static bool checkIsRUExhausted(const String & res_group_name)
 
 bool SegmentReadTaskPool::isRUExhausted()
 {
+    auto res = isRUExhaustedImpl();
+    if (res)
+    {
+        GET_METRIC(tiflash_storage_read_thread_counter, type_ru_exhausted).Increment();
+    }
+    return res;
+}
+
+bool SegmentReadTaskPool::isRUExhaustedImpl()
+{
     if (unlikely(res_group_name.empty() || LocalAdmissionController::global_instance == nullptr))
     {
         return false;
@@ -351,10 +361,7 @@ bool SegmentReadTaskPool::isRUExhausted()
 
     // Fast path.
     Int64 ms = currentMS();
-    if (ru_is_exhausted && ms - last_time_check_ru <= check_ru_interval_ms)
-        return false;
-
-    if (read_bytes_after_last_check < bytes_of_five_hundred_ru)
+    if (read_bytes_after_last_check < bytes_of_one_hundred_ru && ms - last_time_check_ru < check_ru_interval_ms)
     {
         return ru_is_exhausted; // Return result of last time.
     }
@@ -363,7 +370,7 @@ bool SegmentReadTaskPool::isRUExhausted()
     // If last thread has check is ru exhausted, use the result of last thread.
     // Attention: `read_bytes_after_last_check` can be written concurrently in `pushBlock`.
     ms = currentMS();
-    if (read_bytes_after_last_check < bytes_of_five_hundred_ru)
+    if (read_bytes_after_last_check < bytes_of_one_hundred_ru && ms - last_time_check_ru < check_ru_interval_ms)
     {
         return ru_is_exhausted; // Return result of last time.
     }
@@ -371,7 +378,7 @@ bool SegmentReadTaskPool::isRUExhausted()
     // Check and reset everything.
     read_bytes_after_last_check = 0;
     ru_is_exhausted = checkIsRUExhausted(res_group_name);
-    last_time_check_ru = currentMS();
+    last_time_check_ru = ms;
     return ru_is_exhausted;
 }
 
