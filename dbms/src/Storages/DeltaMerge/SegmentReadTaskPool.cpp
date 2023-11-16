@@ -362,7 +362,7 @@ bool SegmentReadTaskPool::isRUExhaustedImpl()
     // Fast path.
     Int64 ms = currentMS();
     if (ru_is_exhausted && ms - last_time_check_ru < 10 * check_ru_interval_ms)
-	return false;
+        return true;
 
     if (read_bytes_after_last_check < bytes_of_five_hundred_ru)
     {
