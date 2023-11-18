@@ -189,6 +189,9 @@ target_link_libraries (tiflash_common_io
     ${RE2_ST_LIBRARY}
 )
 
+add_executable(lac_test ${CMAKE_CURRENT_SOURCE_DIR}/src/Flash/ResourceControl/tests/lacCmd.cpp)
+target_link_libraries(lac_test PUBLIC kv_client fmt)
+
 target_include_directories (tiflash_common_io BEFORE PRIVATE ${kvClient_SOURCE_DIR}/include)
 target_compile_definitions(tiflash_common_io PUBLIC -DTIFLASH_SOURCE_PREFIX=\"${TiFlash_SOURCE_DIR}\")
 target_link_libraries (dbms
