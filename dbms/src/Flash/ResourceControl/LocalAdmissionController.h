@@ -119,20 +119,29 @@ private:
             bucket->consume(ru);
         GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_remaining_tokens, name).Set(bucket->peek());
         if (cpu_time_in_ns_ == 0)
+        {
+            LOG_DEBUG(log, "gjt debug consumeResource storage name: {}, ru: {}, delta: {}", name, ru, ru_consumption_delta);
             GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_compute_ru_consumption, name).Set(ru);
+        }
         else
+        {
+            LOG_DEBUG(log, "gjt debug consumeResource compute name: {}, ru: {}, delta: {}", name, ru, ru_consumption_delta);
             GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_storage_ru_consumption, name).Set(ru);
+        }
     }
 
     // Priority greater than zero: Less number means higher priority.
     // Zero priority means has no RU left, should not schedule this resource group at all.
-    uint64_t getPriority(uint64_t max_ru_per_sec) const
+    uint64_t getPriority(uint64_t max_ru_per_sec, bool is_compute) const
     {
         std::lock_guard lock(mu);
 
         const auto remaining_token = bucket->peek();
         if (!burstable && remaining_token <= 0.0)
+        {
+            LOG_DEBUG(log, "gjt debug getPriority exhausted: is_compute: {}, remaining_token: {}", is_compute, remaining_token);
             return std::numeric_limits<uint64_t>::max();
+        }
 
         // This should not happens because tidb will check except for unittest(test static token bucket).
         if unlikely (user_ru_per_sec == 0)
@@ -146,16 +155,16 @@ private:
 
         uint64_t priority = (((static_cast<uint64_t>(user_priority) - 1) << 60) | virtual_time);
 
-        LOG_TRACE(
+        LOG_DEBUG(
             log,
-            "getPriority detailed info: resource group name: {}, weight: {}, virtual_time: {}, user_priority: {}, "
-            "priority: {}, remaining_token: {}",
+            "gjt debug getPriority detailed info: resource group name: {}, weight: {}, virtual_time: {}, user_priority: {}, "
+            "priority: {}, remaining_token: {}, is_compute: {}",
             name,
             weight,
             virtual_time,
             user_priority,
             priority,
-            remaining_token);
+            remaining_token, is_compute);
         return priority;
     }
 
@@ -474,7 +483,7 @@ public:
         }
     }
 
-    std::optional<uint64_t> getPriority(const std::string & name)
+    std::optional<uint64_t> getPriority(const std::string & name, bool is_compute)
     {
         assert(!stopped);
 
@@ -488,7 +497,7 @@ public:
             return std::nullopt;
         }
 
-        return {group->getPriority(max_ru_per_sec.load())};
+        return {group->getPriority(max_ru_per_sec.load(), is_compute)};
     }
 
     // Fetch resource group info from GAC if necessary and store in local cache.

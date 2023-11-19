@@ -342,7 +342,7 @@ static Int64 currentMS()
 
 static bool checkIsRUExhausted(const String & res_group_name)
 {
-    auto priority = LocalAdmissionController::global_instance->getPriority(res_group_name);
+    auto priority = LocalAdmissionController::global_instance->getPriority(res_group_name, false);
     if (unlikely(!priority.has_value()))
     {
         return false;

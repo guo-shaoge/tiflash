@@ -68,7 +68,7 @@ void ResourceControlQueue<NestedTaskQueueType>::submitWithoutLock(TaskPtr && tas
     if (iter == resource_group_task_queues.end())
     {
         auto task_queue = std::make_shared<NestedTaskQueueType>();
-        auto priority = LocalAdmissionController::global_instance->getPriority(name);
+        auto priority = LocalAdmissionController::global_instance->getPriority(name, true);
         if unlikely (!priority.has_value())
         {
             error_task_queue.push_back(std::move(task));
@@ -170,7 +170,7 @@ bool ResourceControlQueue<NestedTaskQueueType>::updateResourceGroupInfosWithoutL
         const ResourceGroupInfo & group_info = resource_group_infos.top();
         if (!group_info.task_queue->empty())
         {
-            auto new_priority = LocalAdmissionController::global_instance->getPriority(group_info.name);
+            auto new_priority = LocalAdmissionController::global_instance->getPriority(group_info.name, true);
             if unlikely (!new_priority.has_value())
             {
                 // resource group has been deleted, take all tasks and erase this group info.
