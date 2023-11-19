@@ -89,7 +89,7 @@ private:
         std::lock_guard lock(mu);
         // If token bucket is normal mode, it's static, so fill_rate is zero.
         const double init_fill_rate = 0.0;
-        const double init_tokens = user_ru_per_sec;
+        const double init_tokens = static_cast<double>(user_ru_per_sec) / 4;
         int64_t init_cap = capacity;
         if (capacity < 0)
             init_cap = std::numeric_limits<int64_t>::max();
