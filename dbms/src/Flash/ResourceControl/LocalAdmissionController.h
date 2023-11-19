@@ -327,20 +327,6 @@ private:
         std::lock_guard lock(mu);
         assert(last_fetch_tokens_from_gac_timepoint <= tp);
         last_fetch_tokens_from_gac_timepoint = tp;
-        ++fetch_tokens_from_gac_count;
-    }
-
-    void collectMetrics() const
-    {
-        TokenBucket::TokenBucketConfig local_config;
-        uint64_t local_fetch_count = 0;
-        {
-            std::lock_guard lock(mu);
-            local_config = bucket->getConfig();
-            local_fetch_count = fetch_tokens_from_gac_count;
-        }
-        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_fetch_tokens_from_gac_count, name)
-            .Set(local_fetch_count);
     }
 
     const std::string name;
@@ -365,7 +351,6 @@ private:
     LoggerPtr log;
 
     SteadyClock::time_point last_fetch_tokens_from_gac_timepoint = SteadyClock::now();
-    uint64_t fetch_tokens_from_gac_count = 0;
     double total_ru_consumption = 0.0;
 
     double ru_consumption_delta = 0.0;

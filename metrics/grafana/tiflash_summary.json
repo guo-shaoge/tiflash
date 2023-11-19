@@ -16958,14 +16958,6 @@
               "interval": "",
               "legendFormat": "bucket_capacity-{{instance}}-{{resource_group}}",
               "refId": "E"
-            },
-            {
-              "exemplar": true,
-              "expr": "max(tiflash_resource_group{k8s_cluster=\"$k8s_cluster\", tidb_cluster=\"$tidb_cluster\", type=\"fetch_tokens_from_gac_count\", instance=~\"$instance\"}) by (instance,resource_group)",
-              "hide": true,
-              "interval": "",
-              "legendFormat": "fetch_tokens_from_gac_count-{{instance}}-{{resource_group}}",
-              "refId": "F"
             }
           ],
           "thresholds": [],

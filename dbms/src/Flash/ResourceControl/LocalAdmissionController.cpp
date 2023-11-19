@@ -182,11 +182,11 @@ std::optional<LocalAdmissionController::AcquireTokenInfo> LocalAdmissionControll
         if (resource_group->burstable)
             return;
 
-        // To avoid periodically_token_fetch after low_token_fetch immediately
+        // To avoid periodically_token_fetch after low_token_fetch immediately.
         if (is_periodically_fetch && !resource_group->needFetchToken(now, DEFAULT_FETCH_GAC_INTERVAL))
             return;
 
-        // To avoid low token fetch too freqeuent
+        // To avoid low token fetch too freqeuent.
         if (!is_periodically_fetch && !resource_group->needFetchToken(now, std::chrono::duration_cast<std::chrono::seconds>(DEFAULT_LOW_TOKEN_FETCH_INTERVAL)))
             return;
 
@@ -374,7 +374,6 @@ std::vector<std::string> LocalAdmissionController::handleTokenBucketsResp(
 
         // GAC has enough tokens for LAC.
         resource_group->updateNormalMode(added_tokens, capacity);
-        // todo del?
         resource_group->updateFetchTokenTimepoint(now);
     }
     return handled_resource_group_names;
