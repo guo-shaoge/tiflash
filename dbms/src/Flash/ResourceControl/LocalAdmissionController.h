@@ -598,7 +598,7 @@ private:
         std::string & parsed_rg_name,
         std::string & err_msg);
 
-    std::shared_mutex mu;
+    mutable std::shared_mutex mu;
     std::condition_variable_any cv;
 
     std::atomic<bool> stopped = false;
