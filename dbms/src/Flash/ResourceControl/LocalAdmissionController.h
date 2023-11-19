@@ -389,7 +389,7 @@ private:
         return info;
     }
 
-    bool needFetchTokenPeridically(const SteadyClock::time_point & now, const std::chrono::seconds & dura) const
+    bool needFetchToken(const SteadyClock::time_point & now, const std::chrono::seconds & dura) const
     {
         std::lock_guard lock(mu);
         return std::chrono::duration_cast<std::chrono::seconds>(now - last_fetch_tokens_from_gac_timepoint) >= dura;
