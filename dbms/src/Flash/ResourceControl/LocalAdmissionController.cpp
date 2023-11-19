@@ -83,7 +83,7 @@ void LocalAdmissionController::startBackgroudJob()
         bool fetch_token_periodically = false;
 
         {
-            std::unique_lock<std::shared_mutex> lock(mu);
+            std::unique_lock<std::mutex> lock(mu);
 
             auto now = SteadyClock::now();
             if (now - last_metric_time_point >= COLLECT_METRIC_INTERVAL)
