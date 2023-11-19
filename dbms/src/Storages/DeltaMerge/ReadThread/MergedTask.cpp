@@ -47,9 +47,9 @@ void MergedTask::initOnce()
             setStreamFinished(cur_idx);
             continue;
         }
-        if (pool->isRUExhausted())
+        while (pool->isRUExhausted())
         {
-            continue;
+            std::this_thread::sleep_for(std::chrono::milliseconds(110));
         }
         stream = pool->buildInputStream(task);
         fiu_do_on(FailPoints::exception_in_merged_task_init, {
@@ -78,9 +78,13 @@ int MergedTask::readOneBlock()
             continue;
         }
 
-        if (pool->getFreeBlockSlots() <= 0 || pool->isRUExhausted())
+        if (pool->getFreeBlockSlots() <= 0)
         {
             continue;
+        }
+        while (pool->isRUExhausted())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(110));
         }
 
         if (stream == nullptr)
