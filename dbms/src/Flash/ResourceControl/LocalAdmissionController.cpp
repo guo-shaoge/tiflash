@@ -188,18 +188,18 @@ std::optional<LocalAdmissionController::AcquireTokenInfo> LocalAdmissionControll
         if (resource_group->inTrickleModeLease(now))
             return;
 
-        if (resource_group->trickleModeLeaseExpire(now))
-        {
-            acquire_tokens = consumption_update_info.speed * DEFAULT_FETCH_GAC_INTERVAL.count() * ACQUIRE_RU_AMPLIFICATION;
-            LOG_DEBUG(log, "trickle lease expire: speed: {}, acquire_tokens: {}", consumption_update_info.speed, acquire_tokens);
-        }
-        else
-        {
+        // if (resource_group->trickleModeLeaseExpire(now))
+        // {
+        //     acquire_tokens = consumption_update_info.speed * DEFAULT_FETCH_GAC_INTERVAL.count() * ACQUIRE_RU_AMPLIFICATION;
+        //     LOG_DEBUG(log, "trickle lease expire: speed: {}, acquire_tokens: {}", consumption_update_info.speed, acquire_tokens);
+        // }
+        // else
+        // {
             acquire_tokens = resource_group->getAcquireRUNum(
                 consumption_update_info.speed,
                 DEFAULT_FETCH_GAC_INTERVAL.count(),
                 ACQUIRE_RU_AMPLIFICATION);
-        }
+        // }
 
         assert(acquire_tokens >= 0.0);
     };

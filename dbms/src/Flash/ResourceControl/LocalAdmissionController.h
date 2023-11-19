@@ -258,42 +258,68 @@ private:
 
     void updateTrickleMode(double add_tokens, double new_capacity, int64_t trickle_ms)
     {
-        assert(add_tokens > 0.0);
-        assert(trickle_ms > 0);
+        assert(add_tokens >= 0);
 
         std::lock_guard lock(mu);
+        bucket_mode = TokenBucketMode::trickle_mode;
         if (new_capacity <= 0.0)
         {
             burstable = true;
             return;
         }
-
-        bucket_mode = TokenBucketMode::trickle_mode;
-
-        const double trickle_sec = static_cast<double>(trickle_ms) / 1000;
-        const double new_fill_rate = add_tokens / trickle_sec;
-        RUNTIME_CHECK_MSG(
-            new_fill_rate > 0.0,
-            "token bucket of {} reconfig to trickle mode failed. add_tokens: {} trickle_ms: {}, trickle_sec: {}",
-            name,
-            add_tokens,
-            trickle_ms,
-            trickle_sec);
-
+        auto config = bucket->getConfig();
         std::string ori_bucket_info = bucket->toString();
-        const auto ori_tokens = bucket->peek();
-        bucket->reConfig(TokenBucket::TokenBucketConfig(ori_tokens, new_fill_rate, new_capacity));
-        stop_trickle_timepoint = SteadyClock::now() + std::chrono::milliseconds(trickle_ms);
+
+        config.tokens += add_tokens;
+        config.fill_rate = 0;
+        config.capacity = new_capacity;
+        bucket->reConfig(config);
         LOG_DEBUG(
             log,
-            "token bucket of rg {} reconfig to trickle mode: from: {}, to: {}",
+            "token bucket of rg {} reconfig to trickle mode. from: {}, to: {}",
             name,
             ori_bucket_info,
             bucket->toString());
 
-        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_bucket_fill_rate, name).Set(new_fill_rate);
-        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_bucket_capacity, name).Set(new_capacity);
-        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_remaining_tokens, name).Set(ori_tokens);
+        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_bucket_fill_rate, name).Set(config.fill_rate);
+        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_bucket_capacity, name).Set(config.capacity);
+        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_remaining_tokens, name).Set(config.tokens);
+        // assert(add_tokens > 0.0);
+        // assert(trickle_ms > 0);
+
+        // std::lock_guard lock(mu);
+        // if (new_capacity <= 0.0)
+        // {
+        //     burstable = true;
+        //     return;
+        // }
+
+        // bucket_mode = TokenBucketMode::trickle_mode;
+
+        // const double trickle_sec = static_cast<double>(trickle_ms) / 1000;
+        // const double new_fill_rate = add_tokens / trickle_sec;
+        // RUNTIME_CHECK_MSG(
+        //     new_fill_rate > 0.0,
+        //     "token bucket of {} reconfig to trickle mode failed. add_tokens: {} trickle_ms: {}, trickle_sec: {}",
+        //     name,
+        //     add_tokens,
+        //     trickle_ms,
+        //     trickle_sec);
+
+        // std::string ori_bucket_info = bucket->toString();
+        // const auto ori_tokens = bucket->peek();
+        // bucket->reConfig(TokenBucket::TokenBucketConfig(ori_tokens, new_fill_rate, new_capacity));
+        // stop_trickle_timepoint = SteadyClock::now() + std::chrono::milliseconds(trickle_ms);
+        // LOG_DEBUG(
+        //     log,
+        //     "token bucket of rg {} reconfig to trickle mode: from: {}, to: {}",
+        //     name,
+        //     ori_bucket_info,
+        //     bucket->toString());
+
+        // GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_bucket_fill_rate, name).Set(new_fill_rate);
+        // GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_bucket_capacity, name).Set(new_capacity);
+        // GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_remaining_tokens, name).Set(ori_tokens);
     }
 
     // If we have network problem with GAC, enter degrade mode.
