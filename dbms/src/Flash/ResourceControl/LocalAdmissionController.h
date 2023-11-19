@@ -366,7 +366,7 @@ private:
     bool needFetchTokenPeridically(const SteadyClock::time_point & now, const std::chrono::seconds & dura) const
     {
         std::lock_guard lock(mu);
-        return std::chrono::duration_cast<std::chrono::seconds>(now - last_fetch_tokens_from_gac_timepoint) > dura;
+        return std::chrono::duration_cast<std::chrono::seconds>(now - last_fetch_tokens_from_gac_timepoint) >= dura;
     }
 
     void updateFetchTokenTimepoint(const SteadyClock::time_point & tp)
@@ -594,7 +594,7 @@ private:
     static constexpr auto DEGRADE_MODE_DURATION = std::chrono::seconds(120);
     static constexpr auto TARGET_REQUEST_PERIOD_MS = std::chrono::milliseconds(5000);
     static constexpr auto COLLECT_METRIC_INTERVAL = std::chrono::seconds(5);
-    static constexpr double ACQUIRE_RU_AMPLIFICATION = 1.5;
+    static constexpr double ACQUIRE_RU_AMPLIFICATION = 1.1;
 
     static const std::string GAC_RESOURCE_GROUP_ETCD_PATH;
     static const std::string WATCH_GAC_ERR_PREFIX;

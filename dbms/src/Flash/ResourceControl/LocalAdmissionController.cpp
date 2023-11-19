@@ -390,6 +390,7 @@ std::vector<std::string> LocalAdmissionController::handleTokenBucketsResp(
             // GAC doesn't have enough tokens for LAC, start to trickle.
             resource_group->updateTrickleMode(added_tokens, capacity, trickle_ms);
         }
+        // todo del?
         resource_group->updateFetchTokenTimepoint(now);
     }
     return handled_resource_group_names;
