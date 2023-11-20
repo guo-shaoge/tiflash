@@ -184,22 +184,13 @@ std::optional<LocalAdmissionController::AcquireTokenInfo> LocalAdmissionControll
         if (is_periodically_fetch && !resource_group->needFetchTokenPeridically(now, DEFAULT_FETCH_GAC_INTERVAL))
             return;
 
-        // During trickle mode, no need to fetch tokens from GAC.
-        if (resource_group->inTrickleModeLease(now))
+        if (!is_periodically_fetch && !resource_group->needFetchTokenPeridically(now, std::chrono::duration_cast<std::chrono::seconds>(std::chrono::milliseconds(100))))
             return;
 
-        if (resource_group->trickleModeLeaseExpire(now))
-        {
-            acquire_tokens = consumption_update_info.speed * DEFAULT_FETCH_GAC_INTERVAL.count() * ACQUIRE_RU_AMPLIFICATION;
-            LOG_DEBUG(log, "trickle lease expire: speed: {}, acquire_tokens: {}", consumption_update_info.speed, acquire_tokens);
-        }
-        else
-        {
-            acquire_tokens = resource_group->getAcquireRUNum(
+        acquire_tokens = resource_group->getAcquireRUNum(
                 consumption_update_info.speed,
                 DEFAULT_FETCH_GAC_INTERVAL.count(),
                 ACQUIRE_RU_AMPLIFICATION);
-        }
 
         assert(acquire_tokens >= 0.0);
     };
@@ -365,9 +356,6 @@ std::vector<std::string> LocalAdmissionController::handleTokenBucketsResp(
             continue;
         }
 
-        int64_t trickle_ms = granted_token_bucket.trickle_time_ms();
-        RUNTIME_CHECK(trickle_ms >= 0);
-
         double added_tokens = granted_token_bucket.granted_tokens().tokens();
         RUNTIME_CHECK(added_tokens >= 0);
 
@@ -381,16 +369,7 @@ std::vector<std::string> LocalAdmissionController::handleTokenBucketsResp(
         // fill_rate should never be setted.
         RUNTIME_CHECK(granted_token_bucket.granted_tokens().settings().fill_rate() == 0);
 
-        if (trickle_ms == 0)
-        {
-            // GAC has enough tokens for LAC.
-            resource_group->updateNormalMode(added_tokens, capacity);
-        }
-        else
-        {
-            // GAC doesn't have enough tokens for LAC, start to trickle.
-            resource_group->updateTrickleMode(added_tokens, capacity, trickle_ms);
-        }
+        resource_group->updateNormalMode(added_tokens, capacity);
         resource_group->updateFetchTokenTimepoint(now);
     }
     return handled_resource_group_names;
