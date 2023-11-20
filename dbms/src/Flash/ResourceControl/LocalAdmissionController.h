@@ -578,12 +578,12 @@ private:
     }
 
     // Interval of fetch from GAC periodically.
-    static constexpr auto DEFAULT_FETCH_GAC_INTERVAL = std::chrono::seconds(5);
+    static constexpr auto DEFAULT_FETCH_GAC_INTERVAL = std::chrono::seconds(10);
     // If we cannot get GAC resp for DEGRADE_MODE_DURATION seconds, enter degrade mode.
     static constexpr auto DEGRADE_MODE_DURATION = std::chrono::seconds(120);
     static constexpr auto TARGET_REQUEST_PERIOD_MS = std::chrono::milliseconds(5000);
     static constexpr auto COLLECT_METRIC_INTERVAL = std::chrono::seconds(5);
-    static constexpr double ACQUIRE_RU_AMPLIFICATION = 1.5;
+    static constexpr double ACQUIRE_RU_AMPLIFICATION = 1.1;
 
     static const std::string GAC_RESOURCE_GROUP_ETCD_PATH;
     static const std::string WATCH_GAC_ERR_PREFIX;
