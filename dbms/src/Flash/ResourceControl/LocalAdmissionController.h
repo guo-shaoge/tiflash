@@ -514,6 +514,12 @@ public:
         refill_token_callback = nullptr;
     }
 
+#ifdef DBMS_PUBLIC_GTEST
+    static std::unique_ptr<MockLocalAdmissionController> global_instance;
+#else
+    static std::unique_ptr<LocalAdmissionController> global_instance;
+#endif
+
     void stop()
     {
         if (stopped)
@@ -572,18 +578,7 @@ public:
         LOG_INFO(log, "LAC stopped done: final report size: {}", acquire_infos.size());
     }
 
-#ifdef DBMS_PUBLIC_GTEST
-    static std::unique_ptr<MockLocalAdmissionController> global_instance;
-#else
-    static std::unique_ptr<LocalAdmissionController> global_instance;
-#endif
-
-    // Interval of fetch from GAC periodically.
-    static constexpr auto DEFAULT_FETCH_GAC_INTERVAL = std::chrono::seconds(5);
-    static constexpr auto DEFAULT_FETCH_GAC_INTERVAL_MS = 5000;
-
 private:
-
     // Interval of fetch from GAC periodically.
     static constexpr auto DEFAULT_FETCH_GAC_INTERVAL = std::chrono::seconds(5);
     // If we cannot get GAC resp for DEGRADE_MODE_DURATION seconds, enter degrade mode.
