@@ -514,12 +514,6 @@ public:
         refill_token_callback = nullptr;
     }
 
-#ifdef DBMS_PUBLIC_GTEST
-    static std::unique_ptr<MockLocalAdmissionController> global_instance;
-#else
-    static std::unique_ptr<LocalAdmissionController> global_instance;
-#endif
-
     void stop()
     {
         if (stopped)
