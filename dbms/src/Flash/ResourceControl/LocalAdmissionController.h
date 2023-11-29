@@ -444,7 +444,8 @@ public:
 
     void consumeResource(const std::string & name, double ru, uint64_t cpu_time_in_ns)
     {
-        assert(!stopped);
+        if (unlikely(stopped))
+            return;
 
         // When tidb_enable_resource_control is disabled, resource group name is empty.
         if (name.empty())
@@ -506,7 +507,8 @@ public:
     }
     void unregisterRefillTokenCallback()
     {
-        assert(!stopped);
+        if (unlikely(stopped))
+            return;
         std::lock_guard lock(mu);
         RUNTIME_CHECK_MSG(refill_token_callback != nullptr, "callback cannot be nullptr before unregistering");
         refill_token_callback = nullptr;
@@ -518,7 +520,6 @@ public:
     static std::unique_ptr<LocalAdmissionController> global_instance;
 #endif
 
-private:
     void stop()
     {
         if (stopped)
@@ -588,32 +589,6 @@ private:
     static constexpr auto DEFAULT_FETCH_GAC_INTERVAL_MS = 5000;
 
 private:
-    void consumeResource(const std::string & name, double ru, uint64_t cpu_time_in_ns)
-    {
-        if (unlikely(stopped))
-            return;
-
-        // When tidb_enable_resource_control is disabled, resource group name is empty.
-        if (name.empty())
-            return;
-
-        ResourceGroupPtr group = findResourceGroup(name);
-        if unlikely (!group)
-        {
-            LOG_INFO(log, "cannot consume ru for {}, maybe it has been deleted", name);
-            return;
-        }
-
-        group->consumeResource(ru, cpu_time_in_ns);
-        if (group->lowToken() || group->trickleModeLeaseExpire(SteadyClock::now()))
-        {
-            {
-                std::lock_guard lock(mu);
-                low_token_resource_groups.insert(name);
-            }
-            cv.notify_one();
-        }
-    }
 
     // Interval of fetch from GAC periodically.
     static constexpr auto DEFAULT_FETCH_GAC_INTERVAL = std::chrono::seconds(5);
