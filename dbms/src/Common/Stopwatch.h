@@ -81,12 +81,13 @@ public:
         stop_ns = 0;
         last_ns = 0;
         is_running = false;
+        acc_ns = 0;
     }
 
     void stopAndAddElapsed()
     {
         stop();
-        acc_ns = elapsed();
+        acc_ns += elapsed();
     }
     UInt64 getAccNs() const
     {

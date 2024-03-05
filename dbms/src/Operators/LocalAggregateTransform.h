@@ -34,8 +34,8 @@ public:
     virtual ~LocalAggregateTransform()
     {
         auto log = Logger::get();
-        LOG_DEBUG(log, "gjt debug build watch: {}ms, convergent watch: {}ms",
-                (double)watch.getAccNs()/1,000,000, (double)convergent_watch.getAccNs()/1,000,000);
+        LOG_DEBUG(log, "gjt debug build watch: {}ns, convergent watch: {}ns",
+                watch.getAccNs(), convergent_watch.getAccNs());
     }
 
     String getName() const override { return "LocalAggregateTransform"; }
