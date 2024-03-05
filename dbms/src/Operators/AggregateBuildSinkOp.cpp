@@ -21,7 +21,8 @@ OperatorStatus AggregateBuildSinkOp::prepareImpl()
 {
     while (agg_context->hasLocalDataToBuild(index))
     {
-        agg_context->buildOnLocalData(index);
+        Stopwatch watch;
+        agg_context->buildOnLocalData(index, watch);
         if (agg_context->needSpill(index))
             return OperatorStatus::IO_OUT;
     }
@@ -40,7 +41,8 @@ OperatorStatus AggregateBuildSinkOp::writeImpl(Block && block)
         }
         return OperatorStatus::FINISHED;
     }
-    agg_context->buildOnBlock(index, block);
+    Stopwatch watch;
+    agg_context->buildOnBlock(index, block, watch);
     return agg_context->needSpill(index) ? OperatorStatus::IO_OUT : OperatorStatus::NEED_INPUT;
 }
 

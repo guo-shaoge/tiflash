@@ -83,6 +83,16 @@ public:
         is_running = false;
     }
 
+    void stopAndAddElapsed()
+    {
+        stop();
+        acc_ns = elapsed();
+    }
+    UInt64 getAccNs() const
+    {
+        return acc_ns;
+    }
+
     void restart() { start(); }
 
     UInt64 elapsed() const { return is_running ? nanosecondsWithBound(start_ns) - start_ns : stop_ns - start_ns; }
@@ -113,6 +123,7 @@ private:
     UInt64 last_ns = 0;
     clockid_t clock_type;
     bool is_running = false;
+    UInt64 acc_ns = 0;
 
     // Get current nano seconds, ensuring the return value is not
     // less than `lower_bound`.

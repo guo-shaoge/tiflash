@@ -36,7 +36,11 @@ public:
     Block getHeader() const override { return merging_buckets->getHeader(); }
 
 protected:
-    Block readImpl() override { return merging_buckets->getData(concurrency_index); }
+    Block readImpl() override
+    {
+        Stopwatch watch;
+        return merging_buckets->getData(concurrency_index, watch);
+    }
 
 private:
     MergingBucketsPtr merging_buckets;

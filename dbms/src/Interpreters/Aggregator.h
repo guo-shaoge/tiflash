@@ -35,6 +35,7 @@
 #include <TiDB/Collation/Collator.h>
 #include <common/StringRef.h>
 #include <common/logger_useful.h>
+#include <Common/Stopwatch.h>
 
 #include <functional>
 #include <memory>
@@ -991,7 +992,7 @@ public:
 
     Block getHeader() const;
 
-    Block getData(size_t concurrency_index);
+    Block getData(size_t concurrency_index, Stopwatch & watch);
 
     size_t getConcurrency() const { return concurrency; }
 
@@ -1181,7 +1182,8 @@ public:
     };
 
     /// Process one block. Return false if the processing should be aborted.
-    bool executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num);
+    bool executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num,
+            Stopwatch & watch);
 
     /** Merge several aggregation data structures and output the MergingBucketsPtr used to merge.
       * Return nullptr if there are no non empty data_variant.

@@ -37,6 +37,8 @@ LocalAggregateTransform::LocalAggregateTransform(
     , params(params_)
     , agg_context(req_id)
 {
+    watch.reset();
+    convergent_watch.reset();
     agg_context.initBuild(
         params,
         local_concurrency,
@@ -61,7 +63,7 @@ OperatorStatus LocalAggregateTransform::transformImpl(Block & block)
                 ? fromBuildToFinalSpillOrRestore()
                 : fromBuildToConvergent(block);
         }
-        agg_context.buildOnBlock(task_index, block);
+        agg_context.buildOnBlock(task_index, block, watch);
         return tryFromBuildToSpill();
     default:
         throw Exception(fmt::format("Unexpected status: {}", magic_enum::enum_name(status)));
@@ -75,7 +77,7 @@ OperatorStatus LocalAggregateTransform::fromBuildToConvergent(Block & block)
     status = LocalAggStatus::convergent;
     agg_context.initConvergent();
     RUNTIME_CHECK(agg_context.getConvergentConcurrency() == local_concurrency);
-    block = agg_context.readForConvergent(task_index);
+    block = agg_context.readForConvergent(task_index, convergent_watch);
     return OperatorStatus::HAS_OUTPUT;
 }
 
@@ -113,13 +115,13 @@ OperatorStatus LocalAggregateTransform::tryOutputImpl(Block & block)
     case LocalAggStatus::build:
         while (agg_context.hasLocalDataToBuild(task_index))
         {
-            agg_context.buildOnLocalData(task_index);
+            agg_context.buildOnLocalData(task_index, watch);
             if (tryFromBuildToSpill() == OperatorStatus::IO_OUT)
                 return OperatorStatus::IO_OUT;
         }
         return agg_context.isTaskMarkedForSpill(task_index) ? tryFromBuildToSpill() : OperatorStatus::NEED_INPUT;
     case LocalAggStatus::convergent:
-        block = agg_context.readForConvergent(task_index);
+        block = agg_context.readForConvergent(task_index, convergent_watch);
         return OperatorStatus::HAS_OUTPUT;
     case LocalAggStatus::restore:
         return restorer->tryPop(block) ? OperatorStatus::HAS_OUTPUT : OperatorStatus::IO_IN;

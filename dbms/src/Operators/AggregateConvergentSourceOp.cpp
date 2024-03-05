@@ -31,7 +31,8 @@ AggregateConvergentSourceOp::AggregateConvergentSourceOp(
 
 OperatorStatus AggregateConvergentSourceOp::readImpl(Block & block)
 {
-    block = agg_context->readForConvergent(index);
+    Stopwatch watch;
+    block = agg_context->readForConvergent(index, watch);
     total_rows += block.rows();
     return OperatorStatus::HAS_OUTPUT;
 }

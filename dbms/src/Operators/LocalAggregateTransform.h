@@ -17,6 +17,7 @@
 #include <Core/FineGrainedOperatorSpillContext.h>
 #include <Operators/AggregateContext.h>
 #include <Operators/Operator.h>
+#include <Common/Stopwatch.h>
 
 namespace DB
 {
@@ -29,6 +30,13 @@ public:
         const String & req_id,
         const Aggregator::Params & params_,
         const std::shared_ptr<FineGrainedOperatorSpillContext> & fine_grained_spill_context);
+
+    virtual ~LocalAggregateTransform()
+    {
+        auto log = Logger::get();
+        LOG_DEBUG(log, "gjt debug build watch: {}ms, convergent watch: {}ms",
+                (double)watch.getAccNs()/1,000,000, (double)convergent_watch.getAccNs()/1,000,000);
+    }
 
     String getName() const override { return "LocalAggregateTransform"; }
 
@@ -75,5 +83,7 @@ private:
     LocalAggStatus status{LocalAggStatus::build};
 
     LocalAggregateRestorerPtr restorer;
+    Stopwatch watch;
+    Stopwatch convergent_watch;
 };
 } // namespace DB

@@ -42,10 +42,10 @@ void AggregateContext::initBuild(
     LOG_TRACE(log, "Aggregate Context inited");
 }
 
-void AggregateContext::buildOnLocalData(size_t task_index)
+void AggregateContext::buildOnLocalData(size_t task_index, Stopwatch & watch)
 {
     auto & agg_process_info = threads_data[task_index]->agg_process_info;
-    aggregator->executeOnBlock(agg_process_info, *many_data[task_index], task_index);
+    aggregator->executeOnBlock(agg_process_info, *many_data[task_index], task_index, watch);
     if likely (agg_process_info.allBlockDataHandled())
     {
         threads_data[task_index]->src_bytes += agg_process_info.block.bytes();
@@ -70,12 +70,12 @@ bool AggregateContext::hasLocalDataToBuild(size_t task_index)
     return !threads_data[task_index]->agg_process_info.allBlockDataHandled();
 }
 
-void AggregateContext::buildOnBlock(size_t task_index, const Block & block)
+void AggregateContext::buildOnBlock(size_t task_index, const Block & block, Stopwatch & watch)
 {
     assert(status.load() == AggStatus::build);
     auto & agg_process_info = threads_data[task_index]->agg_process_info;
     agg_process_info.resetBlock(block);
-    buildOnLocalData(task_index);
+    buildOnLocalData(task_index, watch);
 }
 
 bool AggregateContext::hasSpilledData() const
@@ -159,9 +159,10 @@ void AggregateContext::initConvergentPrefix()
 
     if (total_src_rows == 0 && keys_size == 0 && !empty_result_for_aggregation_by_empty_set)
     {
+        Stopwatch watch;
         auto & agg_process_info = threads_data[0]->agg_process_info;
         agg_process_info.resetBlock(this->getHeader());
-        aggregator->executeOnBlock(agg_process_info, *many_data[0], 0);
+        aggregator->executeOnBlock(agg_process_info, *many_data[0], 0, watch);
         /// Since this won't consume a lot of memory,
         /// even if it triggers marking need spill due to a low threshold setting,
         /// it's still reasonable not to spill disk.
@@ -194,11 +195,11 @@ Block AggregateContext::getHeader() const
     return aggregator->getHeader(true);
 }
 
-Block AggregateContext::readForConvergent(size_t index)
+Block AggregateContext::readForConvergent(size_t index, Stopwatch & watch)
 {
     assert(status.load() == AggStatus::convergent);
     if unlikely (!merging_buckets)
         return {};
-    return merging_buckets->getData(index);
+    return merging_buckets->getData(index, watch);
 }
 } // namespace DB

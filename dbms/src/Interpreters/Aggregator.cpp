@@ -24,6 +24,7 @@
 #include <DataTypes/DataTypeNullable.h>
 #include <Interpreters/Aggregator.h>
 
+#include <ext/scope_guard.h>
 #include <array>
 #include <cassert>
 
@@ -899,8 +900,13 @@ void Aggregator::AggProcessInfo::prepareForAgg()
     prepare_for_agg_done = true;
 }
 
-bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num)
+bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num,
+        Stopwatch & watch)
 {
+    watch.start();
+    SCOPE_EXIT({
+        watch.stopAndAddElapsed();
+    });
     assert(!result.need_spill);
 
     if (is_cancelled())
@@ -1149,6 +1155,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
     size_t src_bytes = 0;
     AggProcessInfo agg_process_info(this);
 
+    Stopwatch tmp_watch;
     /// Read all the data
     while (Block block = stream->read())
     {
@@ -1158,7 +1165,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
         {
             if unlikely (is_cancelled())
                 return;
-            if (!executeOnBlock(agg_process_info, result, thread_num))
+            if (!executeOnBlock(agg_process_info, result, thread_num, tmp_watch))
             {
                 should_stop = true;
                 break;
@@ -1179,7 +1186,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
     if (result.empty() && params.keys_size == 0 && !params.empty_result_for_aggregation_by_empty_set)
     {
         agg_process_info.resetBlock(stream->getHeader());
-        executeOnBlock(agg_process_info, result, thread_num);
+        executeOnBlock(agg_process_info, result, thread_num, tmp_watch);
         if (result.need_spill)
             spill(result, thread_num);
         assert(agg_process_info.allBlockDataHandled());
@@ -2441,7 +2448,7 @@ Block MergingBuckets::getHeader() const
     return aggregator.getHeader(final);
 }
 
-Block MergingBuckets::getData(size_t concurrency_index)
+Block MergingBuckets::getData(size_t concurrency_index, Stopwatch & watch)
 {
     assert(concurrency_index < concurrency);
 
@@ -2450,6 +2457,10 @@ Block MergingBuckets::getData(size_t concurrency_index)
 
     FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_aggregate_merge_failpoint);
 
+    watch.start();
+    SCOPE_EXIT({
+            watch.stopAndAddElapsed();
+    });
     return is_two_level ? getDataForTwoLevel(concurrency_index) : getDataForSingleLevel();
 }
 
