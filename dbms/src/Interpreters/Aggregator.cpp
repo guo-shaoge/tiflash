@@ -1515,6 +1515,7 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     Stopwatch tmpwatch;
     SCOPE_EXIT({
         tmpwatch.stopAndConvertToBlocks();
+        watch.addConvertToBlocks(tmpwatch.getConvertToBlocks());
     });
     data.forEachValue([&](const auto & key, auto & mapped) {
         size_t key_columns_vec_index = data_index / params.max_block_size;
@@ -1535,7 +1536,6 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
         }
         ++data_index;
     });
-    watch.addConvertToBlocks(tmpwatch.getConvertToBlocks());
 }
 
 template <typename Method, typename Table>
