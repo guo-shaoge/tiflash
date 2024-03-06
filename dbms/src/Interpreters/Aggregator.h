@@ -603,6 +603,8 @@ struct AggregatedDataVariants : private boost::noncopyable
       */
     AggregatedDataWithoutKey without_key = nullptr;
 
+    // AggregationMethodOneNumber<FieldType, TData, consecutive_keys_optimization>
+    // TData -> FixedHashMap<UInt8, AggregateDataPtr>
     using AggregationMethod_key8 = AggregationMethodOneNumber<UInt8, AggregatedDataWithUInt8Key, false>;
     using AggregationMethod_key16 = AggregationMethodOneNumber<UInt16, AggregatedDataWithUInt16Key, false>;
     using AggregationMethod_key32 = AggregationMethodOneNumber<UInt32, AggregatedDataWithUInt64Key>;
@@ -620,6 +622,8 @@ struct AggregatedDataVariants : private boost::noncopyable
     using AggregationMethod_keys128 = AggregationMethodKeysFixed<AggregatedDataWithKeys128>;
     using AggregationMethod_keys256 = AggregationMethodKeysFixed<AggregatedDataWithKeys256>;
     using AggregationMethod_serialized = AggregationMethodSerialized<AggregatedDataWithStringKey>;
+    // AggregationMethodOneNumber<FieldType->UInt32, TData->AggregatedDataWithUInt64KeyTwoLevel>
+    // AggregatedDataWithUInt64KeyTwoLevel -> TwoLevelHashMap<UInt64, AggregateDataPtr>
     using AggregationMethod_key32_two_level = AggregationMethodOneNumber<UInt32, AggregatedDataWithUInt64KeyTwoLevel>;
     using AggregationMethod_key64_two_level = AggregationMethodOneNumber<UInt64, AggregatedDataWithUInt64KeyTwoLevel>;
     using AggregationMethod_key_int256_two_level

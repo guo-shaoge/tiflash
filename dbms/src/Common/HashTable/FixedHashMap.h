@@ -122,14 +122,16 @@ struct FixedHashMapImplicitZeroCell
 
 
 template <
-    typename Key,
-    typename Mapped,
-    typename Cell = FixedHashMapCell<Key, Mapped>,
+    typename TKey,
+    typename TMapped,
+    typename Cell = FixedHashMapCell<TKey, TMapped>,
     typename Size = FixedHashTableStoredSize<Cell>,
     typename Allocator = HashTableAllocator>
-class FixedHashMap : public FixedHashTable<Key, Cell, Size, Allocator>
+class FixedHashMap : public FixedHashTable<TKey, Cell, Size, Allocator>
 {
 public:
+    using Key = TKey;
+    using Mapped = typename Cell::Mapped;
     using Base = FixedHashTable<Key, Cell, Size, Allocator>;
     using Self = FixedHashMap;
     using LookupResult = typename Base::LookupResult;

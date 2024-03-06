@@ -1448,6 +1448,14 @@ struct AggregatorMethodInitKeyColumnHelper<AggregationMethodOneKeyStringNoCache<
     }
 };
 
+// DB::Aggregator::convertToBlockImplFinal<DB::AggregationMethodOneKeyStringNoCache<true, TwoLevelStringHashMap<char *>>, StringHashMap<char *>>
+// DB::Aggregator::convertToBlockImplFinal<DB::AggregationMethodFastPathTwoKeysNoCache<DB::ColumnsHashing::KeyDescStringBinPadding, DB::ColumnsHashing::KeyDescStringBinPadding, TwoLevelHashMapTable<StringRef, HashMapCellWithSavedHash<StringRef, char *, DefaultHash<StringRef>>>>,
+//                                         HashMapTable<StringRef, HashMapCellWithSavedHash<StringRef, char *, DefaultHash<StringRef>>, DefaultHash<StringRef>, TwoLevelHashTableGrower<8>>>
+// DB::Aggregator::convertToBlockImplFinal<DB::AggregationMethodFastPathTwoKeysNoCache<
+//                                             DB::ColumnsHashing::KeyDescStringBinPadding,
+//                                             DB::ColumnsHashing::KeyDescStringBinPadding,
+//                                             TwoLevelHashMapTable<StringRef, HashMapCellWithSavedHash<StringRef, char *, DefaultHash<StringRef>>>>,
+//                                         HashMapTable<StringRef, HashMapCellWithSavedHash<StringRef, char *, DefaultHash<StringRef>>, DefaultHash<StringRef>, TwoLevelHashTableGrower<8>>>
 template <typename Method, typename Table>
 void NO_INLINE Aggregator::convertToBlockImplFinal(
     Method & method,
@@ -1462,10 +1470,25 @@ void NO_INLINE Aggregator::convertToBlockImplFinal(
     AggregatorMethodInitKeyColumnHelper<Method> agg_keys_helper{method};
     agg_keys_helper.initAggKeys(data.size(), key_columns);
 
+    std::vector<const typename Table::Key *> keys;
+    keys.reserve(data.size());
+    std::vector<typename Table::Mapped> values;
+    values.reserve(data.size());
     data.forEachValue([&](const auto & key, auto & mapped) {
-        agg_keys_helper.insertKeyIntoColumns(key, key_columns, key_sizes_ref, params.collators);
-        insertAggregatesIntoColumns(mapped, final_aggregate_columns, arena);
+        // agg_keys_helper.insertKeyIntoColumns(key, key_columns, key_sizes_ref, params.collators);
+        // insertAggregatesIntoColumns(mapped, final_aggregate_columns, arena);
+        keys.push_back(&key);
+        values.push_back(mapped);
     });
+
+    for (const auto * key : keys)
+    {
+        agg_keys_helper.insertKeyIntoColumns(*key, key_columns, key_sizes_ref, params.collators);
+    }
+    for (auto & mapped : values)
+    {
+        insertAggregatesIntoColumns(mapped, final_aggregate_columns, arena);
+    }
 }
 
 namespace
@@ -1520,31 +1543,73 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
 
     auto agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
 
-    size_t data_index = 0;
     Stopwatch tmpwatch;
     SCOPE_EXIT({
         tmpwatch.stopAndConvertToBlocks();
         watch.addConvertToBlocks(tmpwatch.getConvertToBlocks());
     });
-    data.forEachValue([&](const auto & key, auto & mapped) {
-        size_t key_columns_vec_index = data_index / params.max_block_size;
+    // FixedHashMap<unsigned char, char *, FixedHashMapImplicitZeroCell<unsigned char, char *>, FixedHashTableCalculatedSize<FixedHashMapImplicitZeroCell<unsigned char, char *>>>
+    std::vector<const typename Table::Key *> keys;
+    keys.reserve(data.size());
+    std::vector<typename Table::Mapped *> values;
+    values.reserve(data.size());
+
+    {
+        watch.start();
+        SCOPE_EXIT({
+            watch.stopAndIterHashMap();
+        });
+        data.forEachValue([&](const auto & key, auto & mapped) {
+            keys.push_back(&key);
+            values.push_back(&mapped);
+        });
+    }
+    {
+        watch.start();
+        SCOPE_EXIT({
+            watch.stopAndInsertKeyColumns();
+        });
+        size_t data_index = 0;
+        for (const auto * key : keys)
         {
-            watch.start();
-            SCOPE_EXIT({
-                watch.stopAndInsertKeyColumns();
-            });
+            size_t key_columns_vec_index = data_index / params.max_block_size;
             agg_keys_helpers[key_columns_vec_index]
-                ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+                ->insertKeyIntoColumns(*key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
         }
+    }
+    {
+        watch.start();
+        SCOPE_EXIT({
+            watch.stopAndInsertAggVals();
+        });
+        size_t data_index = 0;
+        for (auto * mapped : values)
         {
-            watch.start();
-            SCOPE_EXIT({
-                watch.stopAndInsertAggVals();
-            });
-            insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+            size_t key_columns_vec_index = data_index / params.max_block_size;
+            insertAggregatesIntoColumns(*mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+            ++data_index;
         }
-        ++data_index;
-    });
+    }
+
+    // data.forEachValue([&](const auto & key, auto & mapped) {
+    //     size_t key_columns_vec_index = data_index / params.max_block_size;
+    //     {
+    //         watch.start();
+    //         SCOPE_EXIT({
+    //             watch.stopAndInsertKeyColumns();
+    //         });
+    //         agg_keys_helpers[key_columns_vec_index]
+    //             ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+    //     }
+    //     {
+    //         watch.start();
+    //         SCOPE_EXIT({
+    //             watch.stopAndInsertAggVals();
+    //         });
+    //         insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+    //     }
+    //     ++data_index;
+    // });
 }
 
 template <typename Method, typename Table>

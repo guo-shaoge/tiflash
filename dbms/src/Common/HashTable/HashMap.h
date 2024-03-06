@@ -230,6 +230,7 @@ public:
     using key_type = Key;
     using mapped_type = typename Cell::Mapped;
     using value_type = typename Cell::value_type;
+    using Mapped = mapped_type;
 
     using Self = HashMapTable;
     using Base = HashTable<Key, Cell, Hash, Grower, Allocator>;

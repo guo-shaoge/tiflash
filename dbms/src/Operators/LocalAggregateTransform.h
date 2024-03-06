@@ -34,11 +34,12 @@ public:
     virtual ~LocalAggregateTransform()
     {
         auto log = Logger::get();
-        LOG_DEBUG(log, "gjt debug AggBuild: {}, EmplaceHashMap: {}, CreateAggState: {}, ComputeAggState: {}, AllocAggState: {}, AggConvert: {}, ConvertToBlocks: {}, IterHashTable: {}, InsertKeyColumns: {}, InsertAggVals: {}",
+        LOG_DEBUG(log, "gjt debug AggBuild: {}, EmplaceHashMap: {}, CreateAggState: {}, ComputeAggState: {}, AllocAggState: {}, AggConvert: {}, ConvertToBlocks: {}, computed IterHashTable: {}, IterHashTable: {}, InsertKeyColumns: {}, InsertAggVals: {}",
                 watch.getAggBuild(), watch.getEmplaceHashMap(), watch.getCreateAggState(), watch.getComputeAggState(), watch.getAllocAggState(),
                 convergent_watch.getAggConvergent(),  
                 convergent_watch.getConvertToBlocks(),  
                 convergent_watch.getConvertToBlocks() - convergent_watch.getInsertKeyColumns() - convergent_watch.getInsertAggVals(),
+                convergent_watch.getIterHashMap(),
                 convergent_watch.getInsertKeyColumns(),  
                 convergent_watch.getInsertAggVals());
     }

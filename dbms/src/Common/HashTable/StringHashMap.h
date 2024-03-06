@@ -122,6 +122,7 @@ class StringHashMap : public StringHashTable<StringHashMapSubMaps<TMapped, Alloc
 {
 public:
     using Key = StringRef;
+    using Mapped = TMapped;
     using Base = StringHashTable<StringHashMapSubMaps<TMapped, Allocator>>;
     using Self = StringHashMap;
     using LookupResult = typename Base::LookupResult;

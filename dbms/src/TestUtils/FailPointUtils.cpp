@@ -29,7 +29,7 @@ void initRandomFailPoint(const std::string & config_str)
 void disableRandomFailPoint(const std::string & config_str)
 {
     auto config = loadConfigFromString(config_str);
-    FailPointHelper::disableRandomFailPoints(*config, Logger::get("test"));
+    // FailPointHelper::disableRandomFailPoints(*config, Logger::get("test"));
 }
 
 } // namespace tests

@@ -70,5 +70,27 @@ try
 }
 CATCH
 
+TEST_F(TestColumnDecimal, add)
+    try
+{
+    const size_t size = 400000000;
+    std::vector<Decimal<Int128>> vs;
+    vs.reserve(size);
+    for (size_t i = 0; i < size; ++i)
+    {
+        vs.push_back(i);
+    }
+
+    Stopwatch w;
+    Decimal<Int128> v1 = 10;
+    for (size_t i = 0; i < size; i += 100)
+    {
+        v1 += vs[i];
+    }
+    w.stop();
+    std::cout << "gjt debug: " << w.elapsed() << std::endl;
+}
+CATCH
+
 } // namespace tests
 } // namespace DB
