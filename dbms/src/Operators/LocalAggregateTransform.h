@@ -34,8 +34,14 @@ public:
     virtual ~LocalAggregateTransform()
     {
         auto log = Logger::get();
-        LOG_DEBUG(log, "gjt debug build watch: {}ns, convergent watch: {}ns",
-                watch.getAccNs(), convergent_watch.getAccNs());
+        LOG_DEBUG(log, "gjt debug AggBuild: {}, EmplaceHashMap: {}, CreateAggState: {}, ComputeAggState: {}\
+                AggConvert: {}, ConvertToBlocks: {}, IterHashTable: {}, InsertKeyColumns: {}, InsertAggVals: {}",
+                watch.getAggBuild(), watch.getEmplaceHashMap(), watch.getCreateAggState(), watch.getComputeAggState(),
+                convergent_watch.getAggConvergent(),  
+                convergent_watch.getConvertToBlocks(),  
+                convergent_watch.getIterHashMap(),  
+                convergent_watch.getInsertKeyColumns(),  
+                convergent_watch.getInsertAggVals());
     }
 
     String getName() const override { return "LocalAggregateTransform"; }

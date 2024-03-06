@@ -657,11 +657,12 @@ void NO_INLINE Aggregator::executeImpl(
     Method & method,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
-    TiDB::TiDBCollators & collators) const
+    TiDB::TiDBCollators & collators,
+    Stopwatch & watch) const
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    executeImplBatch(method, state, aggregates_pool, agg_process_info);
+    executeImplBatch(method, state, aggregates_pool, agg_process_info, watch);
 }
 
 template <typename Method>
@@ -687,7 +688,8 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     Method & method,
     typename Method::State & state,
     Arena * aggregates_pool,
-    AggProcessInfo & agg_process_info) const
+    AggProcessInfo & agg_process_info,
+    Stopwatch & watch) const
 {
     std::vector<std::string> sort_key_containers;
     sort_key_containers.resize(params.keys_size, "");
@@ -749,39 +751,58 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[agg_size]);
     std::optional<size_t> processed_rows;
 
-    for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
     {
-        AggregateDataPtr aggregate_data = nullptr;
-
-        auto emplace_result_holder = emplaceKey(method, state, i, *aggregates_pool, sort_key_containers);
-        if unlikely (!emplace_result_holder.has_value())
+        watch.start();
+        SCOPE_EXIT({
+            watch.stopAndEmplaceHashMap();
+        });
+        Stopwatch create_agg_state_watch;
+        create_agg_state_watch.stop();
+        create_agg_state_watch.reset();
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
         {
-            LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
-            break;
+            AggregateDataPtr aggregate_data = nullptr;
+
+            auto emplace_result_holder = emplaceKey(method, state, i, *aggregates_pool, sort_key_containers);
+            if unlikely (!emplace_result_holder.has_value())
+            {
+                LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
+                break;
+            }
+
+            auto & emplace_result = emplace_result_holder.value();
+
+            create_agg_state_watch.start();
+            SCOPE_EXIT({
+                create_agg_state_watch.stopAndCreateAggState();
+            });
+
+            /// If a new key is inserted, initialize the states of the aggregate functions, and possibly something related to the key.
+            if (emplace_result.isInserted())
+            {
+                /// exception-safety - if you can not allocate memory or create states, then destructors will not be called.
+                emplace_result.setMapped(nullptr);
+
+                aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                createAggregateStates(aggregate_data);
+
+                emplace_result.setMapped(aggregate_data);
+            }
+            else
+                aggregate_data = emplace_result.getMapped();
+
+            places[i - agg_process_info.start_row] = aggregate_data;
+            processed_rows = i;
         }
-
-        auto & emplace_result = emplace_result_holder.value();
-
-        /// If a new key is inserted, initialize the states of the aggregate functions, and possibly something related to the key.
-        if (emplace_result.isInserted())
-        {
-            /// exception-safety - if you can not allocate memory or create states, then destructors will not be called.
-            emplace_result.setMapped(nullptr);
-
-            aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-            createAggregateStates(aggregate_data);
-
-            emplace_result.setMapped(aggregate_data);
-        }
-        else
-            aggregate_data = emplace_result.getMapped();
-
-        places[i - agg_process_info.start_row] = aggregate_data;
-        processed_rows = i;
+        watch.addCreateAggState(create_agg_state_watch.getCreateAggState());
     }
 
     if (processed_rows)
     {
+        watch.start();
+        SCOPE_EXIT({
+            watch.stopAndComputeAggState();
+        });
         /// Add values to the aggregate functions.
         for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
              ++inst)
@@ -903,9 +924,10 @@ void Aggregator::AggProcessInfo::prepareForAgg()
 bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num,
         Stopwatch & watch)
 {
-    watch.start();
+    Stopwatch tmpwatch;
     SCOPE_EXIT({
-        watch.stopAndAddElapsed();
+        tmpwatch.stopAndAggBuild();
+        watch.addAggBuild(tmpwatch.getAggBuild());
     });
     assert(!result.need_spill);
 
@@ -954,7 +976,7 @@ bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDat
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
-            params.collators);                                             \
+            params.collators, watch);                                             \
         break;                                                             \
     }
 
@@ -1087,13 +1109,14 @@ BlocksList Aggregator::convertOneBucketToBlocks(
     Method & method,
     Arena * arena,
     bool final,
-    size_t bucket) const
+    size_t bucket,
+    Stopwatch & watch) const
 {
     BlocksList blocks = prepareBlocksAndFill(
         data_variants,
         final,
         method.data.impls[bucket].size(),
-        [bucket, &method, arena, this](
+        [bucket, &method, arena, this, &watch](
             std::vector<MutableColumns> & key_columns_vec,
             std::vector<AggregateColumnsData> & aggregate_columns_vec,
             std::vector<MutableColumns> & final_aggregate_columns_vec,
@@ -1105,7 +1128,8 @@ BlocksList Aggregator::convertOneBucketToBlocks(
                 aggregate_columns_vec,
                 final_aggregate_columns_vec,
                 arena,
-                final_);
+                final_,
+                watch);
         });
 
     for (auto & block : blocks)
@@ -1243,7 +1267,8 @@ void Aggregator::convertToBlocksImpl(
     std::vector<AggregateColumnsData> & aggregate_columns_vec,
     std::vector<MutableColumns> & final_aggregate_columns_vec,
     Arena * arena,
-    bool final) const
+    bool final,
+    Stopwatch & watch) const
 {
     if (data.empty())
         return;
@@ -1265,7 +1290,7 @@ void Aggregator::convertToBlocksImpl(
     }
 
     if (final)
-        convertToBlocksImplFinal(method, data, std::move(raw_key_columns_vec), final_aggregate_columns_vec, arena);
+        convertToBlocksImplFinal(method, data, std::move(raw_key_columns_vec), final_aggregate_columns_vec, arena, watch);
     else
         convertToBlocksImplNotFinal(method, data, std::move(raw_key_columns_vec), aggregate_columns_vec);
 
@@ -1477,7 +1502,8 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     Table & data,
     std::vector<std::vector<IColumn *>> && key_columns_vec,
     std::vector<MutableColumns> & final_aggregate_columns_vec,
-    Arena * arena) const
+    Arena * arena,
+    Stopwatch & watch) const
 {
     assert(!key_columns_vec.empty());
     auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
@@ -1486,13 +1512,30 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     auto agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
 
     size_t data_index = 0;
+    Stopwatch tmpwatch;
+    SCOPE_EXIT({
+        tmpwatch.stopAndConvertToBlocks();
+    });
     data.forEachValue([&](const auto & key, auto & mapped) {
         size_t key_columns_vec_index = data_index / params.max_block_size;
-        agg_keys_helpers[key_columns_vec_index]
-            ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
-        insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+        {
+            watch.start();
+            SCOPE_EXIT({
+                watch.stopAndInsertKeyColumns();
+            });
+            agg_keys_helpers[key_columns_vec_index]
+                ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+        }
+        {
+            watch.start();
+            SCOPE_EXIT({
+                watch.stopAndInsertAggVals();
+            });
+            insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+        }
         ++data_index;
     });
+    watch.addConvertToBlocks(tmpwatch.getConvertToBlocks());
 }
 
 template <typename Method, typename Table>
@@ -1782,6 +1825,7 @@ BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & 
                       std::vector<AggregateColumnsData> & aggregate_columns_vec,
                       std::vector<MutableColumns> & final_aggregate_columns_vec,
                       bool final_) {
+    Stopwatch tmp;
 #define M(NAME)                                                                        \
     case AggregationMethodType(NAME):                                                  \
     {                                                                                  \
@@ -1792,7 +1836,7 @@ BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & 
             aggregate_columns_vec,                                                     \
             final_aggregate_columns_vec,                                               \
             data_variants.aggregates_pool,                                             \
-            final_);                                                                   \
+            final_, tmp);                                                                   \
         break;                                                                         \
     }
         switch (data_variants.type)
@@ -2457,11 +2501,12 @@ Block MergingBuckets::getData(size_t concurrency_index, Stopwatch & watch)
 
     FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_aggregate_merge_failpoint);
 
-    watch.start();
+    Stopwatch tmpwatch;
     SCOPE_EXIT({
-            watch.stopAndAddElapsed();
+        tmpwatch.stopAndAggConvergent();
+        watch.addAggConvergent(tmpwatch.getAggConvergent());
     });
-    return is_two_level ? getDataForTwoLevel(concurrency_index) : getDataForSingleLevel();
+    return is_two_level ? getDataForTwoLevel(concurrency_index, watch) : getDataForSingleLevel();
 }
 
 Block MergingBuckets::getDataForSingleLevel()
@@ -2504,7 +2549,7 @@ Block MergingBuckets::getDataForSingleLevel()
     return popBlocksListFront(single_level_blocks);
 }
 
-Block MergingBuckets::getDataForTwoLevel(size_t concurrency_index)
+Block MergingBuckets::getDataForTwoLevel(size_t concurrency_index, Stopwatch & watch)
 {
     assert(concurrency_index < two_level_parallel_merge_data.size());
     auto & two_level_merge_data = *two_level_parallel_merge_data[concurrency_index];
@@ -2521,14 +2566,14 @@ Block MergingBuckets::getDataForTwoLevel(size_t concurrency_index)
         if (unlikely(local_current_bucket_num >= NUM_BUCKETS))
             return {};
 
-        doLevelMerge(local_current_bucket_num, concurrency_index);
+        doLevelMerge(local_current_bucket_num, concurrency_index, watch);
         Block block = popBlocksListFront(two_level_merge_data);
         if (likely(block))
             return block;
     }
 }
 
-void MergingBuckets::doLevelMerge(Int32 bucket_num, size_t concurrency_index)
+void MergingBuckets::doLevelMerge(Int32 bucket_num, size_t concurrency_index, Stopwatch & watch)
 {
     auto & two_level_merge_data = *two_level_parallel_merge_data[concurrency_index];
     assert(two_level_merge_data.empty());
@@ -2549,7 +2594,8 @@ void MergingBuckets::doLevelMerge(Int32 bucket_num, size_t concurrency_index)
             *ToAggregationMethodPtr(NAME, merged_data.aggregation_method_impl),           \
             arena,                                                                        \
             final,                                                                        \
-            bucket_num);                                                                  \
+            bucket_num, \
+            watch);                                                                  \
         break;                                                                            \
     }
     switch (method)

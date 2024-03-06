@@ -81,17 +81,6 @@ public:
         stop_ns = 0;
         last_ns = 0;
         is_running = false;
-        acc_ns = 0;
-    }
-
-    void stopAndAddElapsed()
-    {
-        stop();
-        acc_ns += elapsed();
-    }
-    UInt64 getAccNs() const
-    {
-        return acc_ns;
     }
 
     void restart() { start(); }
@@ -118,13 +107,121 @@ public:
     UInt64 elapsedMillisecondsFromLastTime() { return elapsedFromLastTime() / 1000000UL; }
     double elapsedSecondsFromLastTime() { return static_cast<double>(elapsedFromLastTime()) / 1000000000ULL; }
 
+    void stopAndAggBuild()
+    {
+        stop();
+        agg_build += elapsed();
+    }
+    UInt64 getAggBuild() const { return agg_build; }
+    void addAggBuild(UInt64 tmp)
+    {
+        agg_build += tmp;
+    }
+
+    void stopAndEmplaceHashMap()
+    {
+        stop();
+        emplace_hash_map += elapsed();
+    }
+    UInt64 getEmplaceHashMap() const { return emplace_hash_map; }
+    void addEmplaceHashMap(UInt64 tmp)
+    {
+        emplace_hash_map += tmp;
+    }
+
+    void stopAndCreateAggState()
+    {
+        stop();
+        create_agg_state += elapsed();
+    }
+    UInt64 getCreateAggState() const { return create_agg_state; }
+    void addCreateAggState(UInt64 tmp)
+    {
+        create_agg_state += tmp;
+    }
+
+    void stopAndComputeAggState()
+    {
+        stop();
+        compute_agg_state += elapsed();
+    }
+    UInt64 getComputeAggState() const { return compute_agg_state; }
+    void addComputeAggState(UInt64 tmp)
+    {
+        compute_agg_state += tmp;
+    }
+
+    void stopAndAggConvergent()
+    {
+        stop();
+        agg_convergent += elapsed();
+    }
+    UInt64 getAggConvergent() const { return agg_convergent; }
+    void addAggConvergent(UInt64 tmp)
+    {
+        agg_convergent += tmp;
+    }
+
+    void stopAndIterHashMap()
+    {
+        stop();
+        iter_hash_map += elapsed();
+    }
+    UInt64 getIterHashMap() const { return iter_hash_map; }
+    void addIterHashMap(UInt64 tmp)
+    {
+        iter_hash_map += tmp;
+    }
+
+    void stopAndInsertKeyColumns()
+    {
+        stop();
+        insert_key_columns += elapsed();
+    }
+    UInt64 getInsertKeyColumns() const { return insert_key_columns; }
+    void addInsertKeyColumns(UInt64 tmp)
+    {
+        insert_key_columns += tmp;
+    }
+
+    void stopAndInsertAggVals()
+    {
+        stop();
+        insert_agg_vals += elapsed();
+    }
+    UInt64 getInsertAggVals() const { return insert_agg_vals; }
+    void addInsertAggVals(UInt64 tmp)
+    {
+        insert_agg_vals += tmp;
+    }
+
+    void stopAndConvertToBlocks()
+    {
+        stop();
+        convert_to_blocks += elapsed();
+    }
+    UInt64 getConvertToBlocks() const { return convert_to_blocks; }
+    void addConvertToBlocks(UInt64 tmp)
+    {
+        convert_to_blocks += tmp;
+    }
 private:
     UInt64 start_ns = 0;
     UInt64 stop_ns = 0;
     UInt64 last_ns = 0;
     clockid_t clock_type;
     bool is_running = false;
-    UInt64 acc_ns = 0;
+
+    UInt64 agg_build = 0;
+    UInt64 emplace_hash_map = 0;
+    UInt64 create_agg_state = 0;
+    UInt64 compute_agg_state = 0;
+
+    UInt64 agg_convergent = 0;
+    UInt64 iter_hash_map = 0;
+    UInt64 insert_key_columns = 0;
+    UInt64 insert_agg_vals = 0;
+    UInt64 convert_to_blocks = 0;
 
     // Get current nano seconds, ensuring the return value is not
     // less than `lower_bound`.

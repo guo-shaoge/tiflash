@@ -999,9 +999,9 @@ public:
 private:
     Block getDataForSingleLevel();
 
-    Block getDataForTwoLevel(size_t concurrency_index);
+    Block getDataForTwoLevel(size_t concurrency_index, Stopwatch & watch);
 
-    void doLevelMerge(Int32 bucket_num, size_t concurrency_index);
+    void doLevelMerge(Int32 bucket_num, size_t concurrency_index, Stopwatch & watch);
 
 private:
     const LoggerPtr log;
@@ -1279,14 +1279,16 @@ protected:
         Method & method,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        TiDB::TiDBCollators & collators) const;
+        TiDB::TiDBCollators & collators,
+        Stopwatch & watch) const;
 
     template <typename Method>
     void executeImplBatch(
         Method & method,
         typename Method::State & state,
         Arena * aggregates_pool,
-        AggProcessInfo & agg_process_info) const;
+        AggProcessInfo & agg_process_info,
+        Stopwatch & watch) const;
 
     template <typename Method>
     std::optional<typename Method::EmplaceResult> emplaceKey(
@@ -1330,7 +1332,8 @@ protected:
         std::vector<AggregateColumnsData> & aggregate_columns_vec,
         std::vector<MutableColumns> & final_aggregate_columns_vec,
         Arena * arena,
-        bool final) const;
+        bool final,
+        Stopwatch & watch) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplFinal(
@@ -1346,7 +1349,8 @@ protected:
         Table & data,
         std::vector<std::vector<IColumn *>> && key_columns_vec,
         std::vector<MutableColumns> & final_aggregate_columns_vec,
-        Arena * arena) const;
+        Arena * arena,
+        Stopwatch & watch) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplNotFinal(
@@ -1383,7 +1387,8 @@ protected:
         Method & method,
         Arena * arena,
         bool final,
-        size_t bucket) const;
+        size_t bucket,
+        Stopwatch & watch) const;
 
     template <typename Mapped>
     void insertAggregatesIntoColumns(Mapped & mapped, MutableColumns & final_aggregate_columns, Arena * arena) const;
