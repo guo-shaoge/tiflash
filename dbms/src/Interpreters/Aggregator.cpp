@@ -759,6 +759,11 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
         Stopwatch create_agg_state_watch;
         create_agg_state_watch.stop();
         create_agg_state_watch.reset();
+
+        Stopwatch alloc_agg_state_watch;
+        alloc_agg_state_watch.stop();
+        alloc_agg_state_watch.reset();
+
         for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
         {
             AggregateDataPtr aggregate_data = nullptr;
@@ -780,6 +785,10 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
             /// If a new key is inserted, initialize the states of the aggregate functions, and possibly something related to the key.
             if (emplace_result.isInserted())
             {
+                alloc_agg_state_watch.start();
+                SCOPE_EXIT({
+                    alloc_agg_state_watch.stopAndAllocAggState();
+                });
                 /// exception-safety - if you can not allocate memory or create states, then destructors will not be called.
                 emplace_result.setMapped(nullptr);
 

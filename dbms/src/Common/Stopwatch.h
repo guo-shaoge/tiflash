@@ -205,6 +205,17 @@ public:
     {
         convert_to_blocks += tmp;
     }
+
+    void stopAndAllocAggState()
+    {
+        stop();
+        alloc_agg_state += elapsed();
+    }
+    UInt64 getAllocAggState() const { return alloc_agg_state; }
+    void addAllocAggState(UInt64 tmp)
+    {
+        alloc_agg_state += tmp;
+    }
 private:
     UInt64 start_ns = 0;
     UInt64 stop_ns = 0;
@@ -216,6 +227,7 @@ private:
     UInt64 emplace_hash_map = 0;
     UInt64 create_agg_state = 0;
     UInt64 compute_agg_state = 0;
+    UInt64 alloc_agg_state = 0;
 
     UInt64 agg_convergent = 0;
     UInt64 iter_hash_map = 0;

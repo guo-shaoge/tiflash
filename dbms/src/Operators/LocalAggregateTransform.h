@@ -34,8 +34,8 @@ public:
     virtual ~LocalAggregateTransform()
     {
         auto log = Logger::get();
-        LOG_DEBUG(log, "gjt debug AggBuild: {}, EmplaceHashMap: {}, CreateAggState: {}, ComputeAggState: {}, AggConvert: {}, ConvertToBlocks: {}, IterHashTable: {}, InsertKeyColumns: {}, InsertAggVals: {}",
-                watch.getAggBuild(), watch.getEmplaceHashMap(), watch.getCreateAggState(), watch.getComputeAggState(),
+        LOG_DEBUG(log, "gjt debug AggBuild: {}, EmplaceHashMap: {}, CreateAggState: {}, ComputeAggState: {}, AllocAggState: {}, AggConvert: {}, ConvertToBlocks: {}, IterHashTable: {}, InsertKeyColumns: {}, InsertAggVals: {}",
+                watch.getAggBuild(), watch.getEmplaceHashMap(), watch.getCreateAggState(), watch.getComputeAggState(), watch.getAllocAggState(),
                 convergent_watch.getAggConvergent(),  
                 convergent_watch.getConvertToBlocks(),  
                 convergent_watch.getConvertToBlocks() - convergent_watch.getInsertKeyColumns() - convergent_watch.getInsertAggVals(),
