@@ -142,11 +142,11 @@ public:
         const Expect & expect,
         size_t concurrency = 10);
 
-private:
     void executeExecutor(
         const std::shared_ptr<tipb::DAGRequest> & request,
         std::function<::testing::AssertionResult(const ColumnsWithTypeAndName &)> assert_func);
 
+private:
     void checkBlockSorted(
         const std::shared_ptr<tipb::DAGRequest> & request,
         const SortInfos & sort_infos,

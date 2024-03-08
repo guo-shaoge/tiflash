@@ -1019,6 +1019,58 @@ try
 }
 CATCH
 
+TEST_F(AggExecutorTestRunner, bench)
+try
+{
+    const std::string table_name = "gjt_bench_agg";
+    const std::string col_name_1 = "col_decimal128_1";
+    const std::string col_name_2 = "col_decimal128_2";
+    const size_t size = 4000000;
+
+    using ColDecimal128NullableType = std::optional<typename TypeTraits<Decimal128>::FieldType>;
+    using ColumnWithNullableDecimal128 = std::vector<ColDecimal128NullableType>;
+    ColumnWithNullableDecimal128 col_decimal_data_1;
+    ColumnWithNullableDecimal128 col_decimal_data_2;
+    col_decimal_data_1.reserve(size);
+    col_decimal_data_2.reserve(size);
+
+    for (size_t i = 0; i < size; ++i)
+    {
+        // col_decimal_data_1.push_back(std::make_optional<ColDecimal128NullableType>(DecimalField<Decimal128>(i, 0)));
+        // col_decimal_data_2.push_back(std::make_optional<ColDecimal128NullableType>(DecimalField<Decimal128>(i, 0)));
+        col_decimal_data_1.push_back(DecimalField<Decimal128>(i, 0));
+        col_decimal_data_2.push_back(DecimalField<Decimal128>(i, 0));
+    }
+    context.addMockTable({db_name, table_name},
+            {{col_name_1, TiDB::TP::TypeNewDecimal},
+             {col_name_2, TiDB::TP::TypeNewDecimal}}, // columnInfos
+            {toNullableVec<Decimal128>(col_name_1, col_decimal_data_1),
+             toNullableVec<Decimal128>(col_name_2, col_decimal_data_2),
+            });
+
+    MockAstVec group_by_expr{col(col_name_2)};
+    MockAstVec agg_func{Sum(col(col_name_1))};
+    MockColumnNameVec projection{"sum(col_decimal128_1)"};
+    // auto request = buildDAGRequest(std::make_pair(db_name, table_name), agg_func, group_by_expr, projection);
+    auto request = context.scan(db_name, table_name).aggregation(agg_func, group_by_expr, 8).build(context);
+    // executeExecutor(request, [&](const ColumnsWithTypeAndName & res) {
+    //     std::cout << "gjt done\n";
+    //     return ::test::AssertResult{};
+    // });
+    Stopwatch watch;
+    SCOPE_EXIT({
+        watch.stop();
+        std::cout << "gjt time: " << watch.elapsed() << std::endl;
+    });
+    // executeAndAssertColumnsEqual(request, {});
+
+    enablePlanner(true);
+    enablePipeline(true);
+    DAGContext dag_context(*request, "test log", 8);
+    executeStreams(&dag_context, false);
+}
+CATCH
+
 #undef WRAP_FOR_AGG_PARTIAL_BLOCK_START
 #undef WRAP_FOR_AGG_PARTIAL_BLOCK_END
 

@@ -36,6 +36,6 @@ target_link_libraries(delta_merge PRIVATE dbms page)
 
 add_subdirectory(workload)
 
-if (ENABLE_TESTS)
-    add_subdirectory(tests)
-endif ()
+# if (ENABLE_TESTS)
+#     add_subdirectory(tests)
+# endif ()

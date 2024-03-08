@@ -199,8 +199,12 @@ void AggregationBinder::buildAggFunc(tipb::Expr * agg_func, const ASTFunction * 
     if (agg_sig == tipb::ExprType::Count || agg_sig == tipb::ExprType::Sum)
     {
         auto * ft = agg_func->mutable_field_type();
-        ft->set_tp(TiDB::TypeLongLong);
-        ft->set_flag(TiDB::ColumnFlagUnsigned | TiDB::ColumnFlagNotNull);
+        // ft->set_tp(TiDB::TypeLongLong);
+        // ft->set_flag(TiDB::ColumnFlagUnsigned | TiDB::ColumnFlagNotNull);
+        ft->set_tp(agg_func->children(0).field_type().tp());
+        ft->set_decimal(agg_func->children(0).field_type().decimal());
+        ft->set_flen(50);
+        ft->set_flag(agg_func->children(0).field_type().flag() & (~TiDB::ColumnFlagNotNull));
     }
     else if (agg_sig == tipb::ExprType::Min || agg_sig == tipb::ExprType::Max || agg_sig == tipb::ExprType::First)
     {

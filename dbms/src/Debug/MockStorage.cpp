@@ -588,7 +588,7 @@ ColumnInfos mockColumnInfosToTiDBColumnInfos(const MockColumnInfoVec & mock_colu
         column_info.id = col_id++;
         // TODO: find a way to assign decimal field's flen.
         if (column_info.tp == TiDB::TP::TypeNewDecimal)
-            column_info.flen = 65;
+            column_info.flen = 19;
         if (!mock_column_info.nullable)
             column_info.setNotNullFlag();
         ret.push_back(std::move(column_info));
