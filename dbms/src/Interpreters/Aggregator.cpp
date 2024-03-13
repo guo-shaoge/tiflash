@@ -751,18 +751,17 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[agg_size]);
     std::optional<size_t> processed_rows;
 
+    Stopwatch emplace_watch;
+    Stopwatch create_agg_state_watch;
+    Stopwatch alloc_agg_state_watch;
     {
-        watch.start();
+        emplace_watch.start();
         SCOPE_EXIT({
-            watch.stopAndEmplaceHashMap();
+            emplace_watch.stop();
+            watch.addEmplaceHashMap(emplace_watch.elapsed() - create_agg_state_watch.getCreateAggState() - alloc_agg_state_watch.getAllocAggState());
+            watch.addCreateAggState(create_agg_state_watch.getCreateAggState());
+            watch.addAllocAggState(alloc_agg_state_watch.getAllocAggState());
         });
-        Stopwatch create_agg_state_watch;
-        create_agg_state_watch.stop();
-        create_agg_state_watch.reset();
-
-        Stopwatch alloc_agg_state_watch;
-        alloc_agg_state_watch.stop();
-        alloc_agg_state_watch.reset();
 
         for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
         {
@@ -803,14 +802,13 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
             places[i - agg_process_info.start_row] = aggregate_data;
             processed_rows = i;
         }
-        watch.addCreateAggState(create_agg_state_watch.getCreateAggState());
     }
 
     if (processed_rows)
     {
-        watch.start();
+        Stopwatch compute_agg_state_watch;
         SCOPE_EXIT({
-            watch.stopAndComputeAggState();
+            watch.addComputeAggState(compute_agg_state_watch.elapsed());
         });
         /// Add values to the aggregate functions.
         for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
@@ -935,8 +933,7 @@ bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDat
 {
     Stopwatch tmpwatch;
     SCOPE_EXIT({
-        tmpwatch.stopAndAggBuild();
-        watch.addAggBuild(tmpwatch.getAggBuild());
+        watch.addAggBuild(tmpwatch.elapsed());
     });
     assert(!result.need_spill);
 
@@ -1537,6 +1534,7 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     Arena * arena,
     Stopwatch & watch) const
 {
+    LOG_DEBUG(log, "gjt debug convertToBlocksImplFinal");
     assert(!key_columns_vec.empty());
     auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
     const auto & key_sizes_ref = shuffled_key_sizes ? *shuffled_key_sizes : key_sizes;
@@ -1545,8 +1543,11 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
 
     Stopwatch tmpwatch;
     SCOPE_EXIT({
+        LOG_DEBUG(log, "gjt debug convertToBlocksImplFinal tmpwatch {} {}", tmpwatch.elapsed(),
+                tmpwatch.getConvertToBlocks());
         tmpwatch.stopAndConvertToBlocks();
         watch.addConvertToBlocks(tmpwatch.getConvertToBlocks());
+        LOG_DEBUG(log, "gjt debug convertToBlocksImplFinal watch {}", watch.getConvertToBlocks());
     });
     // FixedHashMap<unsigned char, char *, FixedHashMapImplicitZeroCell<unsigned char, char *>, FixedHashTableCalculatedSize<FixedHashMapImplicitZeroCell<unsigned char, char *>>>
     std::vector<const typename Table::Key *> keys;
@@ -1855,6 +1856,7 @@ BlocksList Aggregator::prepareBlocksAndFill(
 
 BlocksList Aggregator::prepareBlocksAndFillWithoutKey(AggregatedDataVariants & data_variants, bool final) const
 {
+    LOG_DEBUG(log, "gjt debug prepareBlocksAndFillWithoutKey");
     size_t rows = 1;
 
     auto filler = [&data_variants, this](
@@ -1890,16 +1892,15 @@ BlocksList Aggregator::prepareBlocksAndFillWithoutKey(AggregatedDataVariants & d
     return blocks;
 }
 
-BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & data_variants, bool final) const
+BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & data_variants, bool final, Stopwatch & watch) const
 {
     size_t rows = data_variants.size();
 
-    auto filler = [&data_variants, this](
+    auto filler = [&data_variants, this, &watch](
                       std::vector<MutableColumns> & key_columns_vec,
                       std::vector<AggregateColumnsData> & aggregate_columns_vec,
                       std::vector<MutableColumns> & final_aggregate_columns_vec,
                       bool final_) {
-    Stopwatch tmp;
 #define M(NAME)                                                                        \
     case AggregationMethodType(NAME):                                                  \
     {                                                                                  \
@@ -1910,7 +1911,7 @@ BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & 
             aggregate_columns_vec,                                                     \
             final_aggregate_columns_vec,                                               \
             data_variants.aggregates_pool,                                             \
-            final_, tmp);                                                                   \
+            final_, watch);                                                                   \
         break;                                                                         \
     }
         switch (data_variants.type)
@@ -2286,11 +2287,12 @@ BlocksList Aggregator::vstackBlocks(BlocksList & blocks, bool final)
 #undef M
     }
 
+    Stopwatch tmpwatch;
     BlocksList return_blocks;
     if (result.type == AggregatedDataVariants::Type::without_key)
         return_blocks = prepareBlocksAndFillWithoutKey(result, final);
     else
-        return_blocks = prepareBlocksAndFillSingleLevel(result, final);
+        return_blocks = prepareBlocksAndFillSingleLevel(result, final, tmpwatch);
     /// NOTE: two-level data is not possible here - chooseAggregationMethod chooses only among single-level methods.
 
     if (!final)
@@ -2580,10 +2582,10 @@ Block MergingBuckets::getData(size_t concurrency_index, Stopwatch & watch)
         tmpwatch.stopAndAggConvergent();
         watch.addAggConvergent(tmpwatch.getAggConvergent());
     });
-    return is_two_level ? getDataForTwoLevel(concurrency_index, watch) : getDataForSingleLevel();
+    return is_two_level ? getDataForTwoLevel(concurrency_index, watch) : getDataForSingleLevel(watch);
 }
 
-Block MergingBuckets::getDataForSingleLevel()
+Block MergingBuckets::getDataForSingleLevel(Stopwatch & watch)
 {
     assert(!data.empty());
 
@@ -2617,7 +2619,7 @@ Block MergingBuckets::getDataForSingleLevel()
             throw Exception("Unknown aggregated data variant.", ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT);
         }
 #undef M
-        single_level_blocks = aggregator.prepareBlocksAndFillSingleLevel(*first, final);
+        single_level_blocks = aggregator.prepareBlocksAndFillSingleLevel(*first, final, watch);
     }
     ++current_bucket_num;
     return popBlocksListFront(single_level_blocks);

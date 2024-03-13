@@ -1038,8 +1038,8 @@ try
     {
         // col_decimal_data_1.push_back(std::make_optional<ColDecimal128NullableType>(DecimalField<Decimal128>(i, 0)));
         // col_decimal_data_2.push_back(std::make_optional<ColDecimal128NullableType>(DecimalField<Decimal128>(i, 0)));
-        col_decimal_data_1.push_back(DecimalField<Decimal128>(i, 0));
-        col_decimal_data_2.push_back(DecimalField<Decimal128>(i, 0));
+        col_decimal_data_1.push_back(DecimalField<Decimal128>(i * 1000000, 0));
+        col_decimal_data_2.push_back(DecimalField<Decimal128>(i * 1000000, 0));
     }
     context.addMockTable({db_name, table_name},
             {{col_name_1, TiDB::TP::TypeNewDecimal},
@@ -1052,7 +1052,7 @@ try
     MockAstVec agg_func{Sum(col(col_name_1))};
     MockColumnNameVec projection{"sum(col_decimal128_1)"};
     // auto request = buildDAGRequest(std::make_pair(db_name, table_name), agg_func, group_by_expr, projection);
-    auto request = context.scan(db_name, table_name).aggregation(agg_func, group_by_expr, 8).build(context);
+    auto request = context.scan(db_name, table_name).aggregation(agg_func, group_by_expr, 1).build(context);
     // executeExecutor(request, [&](const ColumnsWithTypeAndName & res) {
     //     std::cout << "gjt done\n";
     //     return ::test::AssertResult{};

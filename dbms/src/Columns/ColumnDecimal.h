@@ -210,6 +210,13 @@ public:
 
     UInt32 getScale() const { return scale; }
 
+    std::string dumpRow(size_t row) const
+    {
+        Field field;
+        get(row, field);
+        auto & decimal_field = field.get<DecimalField<T>>();
+        return decimal_field.toString();
+    }
 protected:
     Container data;
     UInt32 scale;

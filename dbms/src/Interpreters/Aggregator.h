@@ -1001,7 +1001,7 @@ public:
     size_t getConcurrency() const { return concurrency; }
 
 private:
-    Block getDataForSingleLevel();
+    Block getDataForSingleLevel(Stopwatch & watch);
 
     Block getDataForTwoLevel(size_t concurrency_index, Stopwatch & watch);
 
@@ -1404,7 +1404,7 @@ protected:
         AggregateFunctionInstructions & instructions);
 
     BlocksList prepareBlocksAndFillWithoutKey(AggregatedDataVariants & data_variants, bool final) const;
-    BlocksList prepareBlocksAndFillSingleLevel(AggregatedDataVariants & data_variants, bool final) const;
+    BlocksList prepareBlocksAndFillSingleLevel(AggregatedDataVariants & data_variants, bool final, Stopwatch & watch) const;
 
     template <typename Method, typename Table>
     void mergeStreamsImplCase(Block & block, Arena * aggregates_pool, Method & method, Table & data) const;

@@ -69,7 +69,7 @@ void ExecutorTest::SetUp()
     initializeContext();
     initializeClientInfo();
     DB::LocalAdmissionController::global_instance = std::make_unique<DB::MockLocalAdmissionController>();
-    TaskSchedulerConfig config{8, 8};
+    TaskSchedulerConfig config{1, 1};
     assert(!TaskScheduler::instance);
     TaskScheduler::instance = std::make_unique<TaskScheduler>(config);
 }
