@@ -759,15 +759,15 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     std::optional<size_t> processed_rows;
 
     Stopwatch emplace_watch;
-    Stopwatch create_agg_state_watch;
-    Stopwatch alloc_agg_state_watch;
+    // Stopwatch create_agg_state_watch;
+    // Stopwatch alloc_agg_state_watch;
     {
-        emplace_watch.start();
         SCOPE_EXIT({
             emplace_watch.stop();
-            watch.addEmplaceHashMap(emplace_watch.elapsed() - create_agg_state_watch.getCreateAggState() - alloc_agg_state_watch.getAllocAggState());
-            watch.addCreateAggState(create_agg_state_watch.getCreateAggState());
-            watch.addAllocAggState(alloc_agg_state_watch.getAllocAggState());
+            watch.addEmplaceHashMap(emplace_watch.elapsed());
+            //watch.addEmplaceHashMap(emplace_watch.elapsed() - create_agg_state_watch.getCreateAggState() - alloc_agg_state_watch.getAllocAggState());
+            //watch.addCreateAggState(create_agg_state_watch.getCreateAggState());
+            //watch.addAllocAggState(alloc_agg_state_watch.getAllocAggState());
         });
 
         for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
@@ -783,18 +783,18 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
 
             auto & emplace_result = emplace_result_holder.value();
 
-            create_agg_state_watch.start();
-            SCOPE_EXIT({
-                create_agg_state_watch.stopAndCreateAggState();
-            });
+            // create_agg_state_watch.start();
+            // SCOPE_EXIT({
+            //     create_agg_state_watch.stopAndCreateAggState();
+            // });
 
             /// If a new key is inserted, initialize the states of the aggregate functions, and possibly something related to the key.
             if (emplace_result.isInserted())
             {
-                alloc_agg_state_watch.start();
-                SCOPE_EXIT({
-                    alloc_agg_state_watch.stopAndAllocAggState();
-                });
+                // alloc_agg_state_watch.start();
+                // SCOPE_EXIT({
+                //     alloc_agg_state_watch.stopAndAllocAggState();
+                // });
                 /// exception-safety - if you can not allocate memory or create states, then destructors will not be called.
                 emplace_result.setMapped(nullptr);
 
@@ -938,10 +938,10 @@ void Aggregator::AggProcessInfo::prepareForAgg()
 bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num,
         Stopwatch & watch, bool use_ph)
 {
-    Stopwatch tmpwatch;
-    SCOPE_EXIT({
-        watch.addAggBuild(tmpwatch.elapsed());
-    });
+    // Stopwatch tmpwatch;
+    // SCOPE_EXIT({
+    //     watch.addAggBuild(tmpwatch.elapsed());
+    // });
     assert(!result.need_spill);
 
     if (is_cancelled())
@@ -1550,14 +1550,14 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
 
     auto agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
 
-    Stopwatch tmpwatch;
-    SCOPE_EXIT({
-        LOG_DEBUG(log, "gjt debug convertToBlocksImplFinal tmpwatch {} {}", tmpwatch.elapsed(),
-                tmpwatch.getConvertToBlocks());
-        tmpwatch.stopAndConvertToBlocks();
-        watch.addConvertToBlocks(tmpwatch.getConvertToBlocks());
-        LOG_DEBUG(log, "gjt debug convertToBlocksImplFinal watch {}", watch.getConvertToBlocks());
-    });
+    // Stopwatch tmpwatch;
+    // SCOPE_EXIT({
+    //     LOG_DEBUG(log, "gjt debug convertToBlocksImplFinal tmpwatch {} {}", tmpwatch.elapsed(),
+    //             tmpwatch.getConvertToBlocks());
+    //     tmpwatch.stopAndConvertToBlocks();
+    //     watch.addConvertToBlocks(tmpwatch.getConvertToBlocks());
+    //     LOG_DEBUG(log, "gjt debug convertToBlocksImplFinal watch {}", watch.getConvertToBlocks());
+    // });
     // FixedHashMap<unsigned char, char *, FixedHashMapImplicitZeroCell<unsigned char, char *>, FixedHashTableCalculatedSize<FixedHashMapImplicitZeroCell<unsigned char, char *>>>
     std::vector<const typename Table::Key *> keys;
     keys.reserve(data.size());
@@ -1565,20 +1565,20 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     values.reserve(data.size());
 
     {
-        watch.start();
-        SCOPE_EXIT({
-            watch.stopAndIterHashMap();
-        });
+        // watch.start();
+        // SCOPE_EXIT({
+        //     watch.stopAndIterHashMap();
+        // });
         data.forEachValue([&](const auto & key, auto & mapped) {
             keys.push_back(&key);
             values.push_back(&mapped);
         });
     }
     {
-        watch.start();
-        SCOPE_EXIT({
-            watch.stopAndInsertKeyColumns();
-        });
+        // watch.start();
+        // SCOPE_EXIT({
+        //     watch.stopAndInsertKeyColumns();
+        // });
         size_t data_index = 0;
         for (const auto * key : keys)
         {
@@ -1588,10 +1588,10 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
         }
     }
     {
-        watch.start();
-        SCOPE_EXIT({
-            watch.stopAndInsertAggVals();
-        });
+        // watch.start();
+        // SCOPE_EXIT({
+        //     watch.stopAndInsertAggVals();
+        // });
         size_t data_index = 0;
         for (auto * mapped : values)
         {
@@ -2586,11 +2586,11 @@ Block MergingBuckets::getData(size_t concurrency_index, Stopwatch & watch)
 
     FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_aggregate_merge_failpoint);
 
-    Stopwatch tmpwatch;
-    SCOPE_EXIT({
-        tmpwatch.stopAndAggConvergent();
-        watch.addAggConvergent(tmpwatch.getAggConvergent());
-    });
+    // Stopwatch tmpwatch;
+    // SCOPE_EXIT({
+    //     tmpwatch.stopAndAggConvergent();
+    //     watch.addAggConvergent(tmpwatch.getAggConvergent());
+    // });
     return is_two_level ? getDataForTwoLevel(concurrency_index, watch) : getDataForSingleLevel(watch);
 }
 
