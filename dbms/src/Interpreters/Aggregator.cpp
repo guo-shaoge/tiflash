@@ -134,6 +134,13 @@ void AggregatedDataVariants::init(Type variants_type)
     type = variants_type;
 }
 
+void AggregatedDataVariants::initPH()
+{
+    destroyAggregationMethodImpl();
+    aggregation_method_impl = std::make_unique<AggregationMethod_keys128_ph>().release();
+    type = Type::keys128_ph;
+}
+
 size_t AggregatedDataVariants::getBucketNumberForTwoLevelHashTable(Type type)
 {
     switch (type)
@@ -929,7 +936,7 @@ void Aggregator::AggProcessInfo::prepareForAgg()
 }
 
 bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num,
-        Stopwatch & watch)
+        Stopwatch & watch, bool use_ph)
 {
     Stopwatch tmpwatch;
     SCOPE_EXIT({
@@ -947,6 +954,8 @@ bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDat
     if (!result.inited())
     {
         result.init(method_chosen);
+        if (use_ph)
+            result.initPH();
         result.keys_size = params.keys_size;
         result.key_sizes = key_sizes;
         LOG_TRACE(log, "Aggregation method: `{}`", result.getMethodName());

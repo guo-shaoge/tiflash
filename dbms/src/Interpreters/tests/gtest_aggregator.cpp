@@ -159,7 +159,7 @@ public:
     const std::string col2_name = "col2_decimal128";
     const size_t rows_per_block = 4096;
     const size_t total_rows = 4000000;
-    const size_t prec = 15;
+    const size_t prec = 19;
     const size_t scale = 6;
 
     DataTypePtr col1_data_type;
@@ -186,7 +186,7 @@ try
     for (auto & block : input_blocks)
     {
         info.resetBlock(block);
-        ASSERT_TRUE(aggregator->executeOnBlock(/*agg_process_info*/info, /*result*/*data_variants, /*thread_index*/0, watch));
+        ASSERT_TRUE(aggregator->executeOnBlock(/*agg_process_info*/info, /*result*/*data_variants, /*thread_index*/0, watch, true));
     }
 
     Stopwatch convergent_watch;
@@ -211,6 +211,23 @@ try
             convergent_watch.getIterHashMap(),
             convergent_watch.getInsertKeyColumns(),  
             convergent_watch.getInsertAggVals());
+
+    EXPECT_EQ(res_block.rows(), rows_per_block);
+    auto res_col1 = res_block.getByPosition(0).column;
+    auto res_col2 = res_block.getByPosition(1).column;
+    const auto * res_col1_decimal128 = checkAndGetColumn<ColumnDecimal<Decimal128>>(res_col1.get());
+    const auto * res_col2_decimal256 = checkAndGetColumn<ColumnDecimal<Decimal256>>(res_col2.get());
+    for (size_t i = 0; i < res_block.rows(); ++i)
+    {
+        Field field1;
+        res_col1_decimal128->get(i, field1);
+        auto v1 = field1.get<Int128>();
+
+        Field field2;
+        res_col2_decimal256->get(i, field2);
+        auto v2 = field2.get<Int256>();
+        EXPECT_EQ(v1 * 977, v2);
+    }
 
     // auto res_col1 = res_block.getByPosition(0).column;
     // auto res_col2 = res_block.getByPosition(1).column;

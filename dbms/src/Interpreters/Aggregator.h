@@ -27,6 +27,7 @@
 #include <Common/HashTable/StringHashMap.h>
 #include <Common/HashTable/TwoLevelHashMap.h>
 #include <Common/HashTable/TwoLevelStringHashMap.h>
+#include <Common/HashTable/PHHashMap.h>
 #include <Common/Logger.h>
 #include <DataStreams/IBlockInputStream.h>
 #include <Interpreters/AggSpillContext.h>
@@ -87,6 +88,46 @@ using AggregatedDataWithInt256Key = HashMap<Int256, AggregateDataPtr, HashCRC32<
 
 using AggregatedDataWithKeys128 = HashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
+
+inline uint64_t umul128(uint64_t a, uint64_t b, uint64_t* high)
+{
+    auto result = static_cast<Int128>(a) * static_cast<Int128>(b);
+    *high = static_cast<uint64_t>(result >> 64u);
+    return static_cast<uint64_t>(result);
+}
+
+template <typename T>
+inline void hash_combine(uint64_t& seed, const T& val) {
+  seed ^= std::hash<T>{}(val) + 0x9e3779b97f4a7c15LLU + (seed << 12) + (seed >> 4);
+}
+
+inline uint64_t hash_128(uint64_t seed, Int128 val) {
+    auto low = static_cast<size_t>(val);
+    auto high = static_cast<size_t>(val >> 64);
+    hash_combine(seed, low);
+    hash_combine(seed, high);
+    return seed;
+}
+
+class PHHashMapMixWithSeed {
+public:
+  inline size_t operator()(size_t a) const {
+      static constexpr uint64_t k = 0xde5fb9d2630458e9ULL;
+      uint64_t h;
+      uint64_t l = umul128(a, k, &h);
+      return static_cast<size_t>(h + l);
+  }
+};
+
+struct Int128Hash
+{
+    size_t operator()(Int128 value) const {
+        return PHHashMapMixWithSeed()(hash_128(0, value));
+    }
+};
+
+// todo value is key and agg data?
+using AggregatedDataWithKeys128_ph = PHHashMap<Int128, AggregateDataPtr, Int128Hash>;
 
 using AggregatedDataWithUInt32KeyTwoLevel = TwoLevelHashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
 using AggregatedDataWithUInt64KeyTwoLevel = TwoLevelHashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
@@ -620,6 +661,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     using AggregationMethod_keys32 = AggregationMethodKeysFixed<AggregatedDataWithUInt32Key>;
     using AggregationMethod_keys64 = AggregationMethodKeysFixed<AggregatedDataWithUInt64Key>;
     using AggregationMethod_keys128 = AggregationMethodKeysFixed<AggregatedDataWithKeys128>;
+    using AggregationMethod_keys128_ph = AggregationMethodKeysFixed<AggregatedDataWithKeys128_ph>;
     using AggregationMethod_keys256 = AggregationMethodKeysFixed<AggregatedDataWithKeys256>;
     using AggregationMethod_serialized = AggregationMethodSerialized<AggregatedDataWithStringKey>;
     // AggregationMethodOneNumber<FieldType->UInt32, TData->AggregatedDataWithUInt64KeyTwoLevel>
@@ -722,6 +764,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(keys32, false)                                        \
     M(keys64, false)                                        \
     M(keys128, false)                                       \
+    M(keys128_ph, false) \
     M(keys256, false)                                       \
     M(key_int256, false)                                    \
     M(serialized, false)                                    \
@@ -790,6 +833,7 @@ struct AggregatedDataVariants : private boost::noncopyable
 
     ~AggregatedDataVariants();
 
+    void initPH();
     void init(Type variants_type);
 
     /// Number of rows (different keys).
@@ -920,6 +964,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(key8)                                                \
     M(key16)                                               \
     M(keys16)                                              \
+    M(keys128_ph)                                         \
     M(key64_hash64)                                        \
     M(key_fixed_string_hash64)                             \
     M(keys128_hash64)                                      \
@@ -1187,7 +1232,7 @@ public:
 
     /// Process one block. Return false if the processing should be aborted.
     bool executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num,
-            Stopwatch & watch);
+            Stopwatch & watch, bool use_ph = false);
 
     /** Merge several aggregation data structures and output the MergingBucketsPtr used to merge.
       * Return nullptr if there are no non empty data_variant.

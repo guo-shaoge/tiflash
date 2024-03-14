@@ -123,6 +123,7 @@ list (APPEND dbms_headers src/TableFunctions/ITableFunction.h src/TableFunctions
 add_library(tiflash_common_io ${SPLIT_SHARED} ${tiflash_common_io_headers} ${tiflash_common_io_sources})
 target_link_libraries(tiflash_common_io PUBLIC process_metrics)
 target_include_directories(tiflash_common_io BEFORE PUBLIC ${XXHASH_INCLUDE_DIR} ${TiFlash_SOURCE_DIR}/libs/libprocess_metrics/include)
+target_include_directories(tiflash_common_io BEFORE PUBLIC ${phmap_SOURCE_DIR})
 
 if (OS_FREEBSD)
     target_compile_definitions (tiflash_common_io PUBLIC CLOCK_MONOTONIC_COARSE=CLOCK_MONOTONIC_FAST)

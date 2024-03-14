@@ -346,7 +346,6 @@ template <
     typename Allocator = HashTableAllocator>
 using HashMap = HashMapTable<Key, HashMapCell<Key, Mapped, Hash>, Hash, Grower, Allocator>;
 
-
 template <
     typename Key,
     typename Mapped,

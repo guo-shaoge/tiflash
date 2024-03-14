@@ -140,3 +140,6 @@
 [submodule "contrib/qpl"]
 	path = contrib/qpl
 	url = https://github.com/intel/qpl.git
+[submodule "contrib/parallel-hashmap"]
+	path = contrib/parallel-hashmap
+	url = git@github.com:greg7mdp/parallel-hashmap.git
