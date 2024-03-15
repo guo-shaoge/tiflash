@@ -181,16 +181,16 @@ protected:
     template <typename Data, typename KeyHolder>
     ALWAYS_INLINE inline EmplaceResult emplaceImpl(KeyHolder & key_holder, Data & data)
     {
-        if constexpr (Cache::consecutive_keys_optimization)
-        {
-            if (cache.found && cache.check(keyHolderGetKey(key_holder)))
-            {
-                if constexpr (has_mapped)
-                    return EmplaceResult(cache.value.second, cache.value.second, false);
-                else
-                    return EmplaceResult(false);
-            }
-        }
+        // if constexpr (Cache::consecutive_keys_optimization)
+        // {
+        //     if (cache.found && cache.check(keyHolderGetKey(key_holder)))
+        //     {
+        //         if constexpr (has_mapped)
+        //             return EmplaceResult(cache.value.second, cache.value.second, false);
+        //         else
+        //             return EmplaceResult(false);
+        //     }
+        // }
 
         typename Data::LookupResult it;
         bool inserted = false;
@@ -208,22 +208,22 @@ protected:
             }
         }
 
-        if constexpr (consecutive_keys_optimization)
-        {
-            cache.found = true;
-            cache.empty = false;
+        // if constexpr (consecutive_keys_optimization)
+        // {
+        //     cache.found = true;
+        //     cache.empty = false;
 
-            if constexpr (has_mapped)
-            {
-                cache.value.first = it->getKey();
-                cache.value.second = it->getMapped();
-                cached = &cache.value.second;
-            }
-            else
-            {
-                cache.value = it->getKey();
-            }
-        }
+        //     if constexpr (has_mapped)
+        //     {
+        //         cache.value.first = it->getKey();
+        //         cache.value.second = it->getMapped();
+        //         cached = &cache.value.second;
+        //     }
+        //     else
+        //     {
+        //         cache.value = it->getKey();
+        //     }
+        // }
 
         if constexpr (has_mapped)
             return EmplaceResult(it->getMapped(), *cached, inserted);
