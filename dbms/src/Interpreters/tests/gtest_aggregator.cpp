@@ -158,8 +158,8 @@ public:
     const std::string col1_name = "col1_decimal128";
     const std::string col2_name = "col2_decimal128";
     const size_t rows_per_block = 4096;
-    const size_t total_rows = 40000000;
-    const size_t prec = 15;
+    const size_t total_rows = 4000000;
+    const size_t prec = 19;
     const size_t scale = 6;
 
     DataTypePtr col1_data_type;
@@ -186,7 +186,7 @@ try
     for (auto & block : input_blocks)
     {
         info.resetBlock(block);
-        ASSERT_TRUE(aggregator->executeOnBlock(/*agg_process_info*/info, /*result*/*data_variants, /*thread_index*/0, watch, false));
+        ASSERT_TRUE(aggregator->executeOnBlock(/*agg_process_info*/info, /*result*/*data_variants, /*thread_index*/0, watch, /*use_ph*/false));
     }
     watch.stopAndAggBuild();
 
@@ -197,6 +197,7 @@ try
     Block res_block;
     do
     {
+        // gjt todo: use res_block vector to record all block.
         res_block = merging_buckets->getData(0, convergent_watch);
     } while (!res_block);
     convergent_watch.stopAndAggConvergent();
@@ -232,23 +233,23 @@ try
     //     EXPECT_EQ(v1 * 977, v2);
     // }
 
-    // auto res_col1 = res_block.getByPosition(0).column;
-    // auto res_col2 = res_block.getByPosition(1).column;
-    // const auto * res_col1_decimal128 = checkAndGetColumn<ColumnDecimal<Decimal128>>(res_col1.get());
-    // const auto * res_col2_decimal256 = checkAndGetColumn<ColumnDecimal<Decimal256>>(res_col2.get());
-    // for (size_t i = 0; i < res_block.rows(); ++i)
-    // {
-    //     Field field1;
-    //     res_col1_decimal128->get(i, field1);
-    //     DecimalField field1_decimal(Decimal128(field1.get<Decimal128::NativeType>()), res_col1_decimal128->getScale());
+    auto res_col1 = res_block.getByPosition(0).column;
+    auto res_col2 = res_block.getByPosition(1).column;
+    const auto * res_col1_decimal128 = checkAndGetColumn<ColumnDecimal<Decimal128>>(res_col1.get());
+    const auto * res_col2_decimal256 = checkAndGetColumn<ColumnDecimal<Decimal256>>(res_col2.get());
+    for (size_t i = 0; i < res_block.rows(); ++i)
+    {
+        Field field1;
+        res_col1_decimal128->get(i, field1);
+        DecimalField field1_decimal(Decimal128(field1.get<Decimal128::NativeType>()), res_col1_decimal128->getScale());
 
-    //     Field field2;
-    //     res_col2_decimal256->get(i, field2);
-    //     // todo how to get field not seeing column structure?
-    //     DecimalField field2_decimal(Decimal256(field2.get<Decimal256::NativeType>()), res_col2_decimal256->getScale());
+        Field field2;
+        res_col2_decimal256->get(i, field2);
+        // todo how to get field not seeing column structure?
+        DecimalField field2_decimal(Decimal256(field2.get<Decimal256::NativeType>()), res_col2_decimal256->getScale());
 
-    //     LOG_DEBUG(log, "gjt debug col {}, {}, {}", i, field1_decimal.toString(), field2_decimal.toString());
-    // }
+        LOG_DEBUG(log, "gjt debug col {}, {}, {}", i, field1_decimal.toString(), field2_decimal.toString());
+    }
 }
 CATCH
 
