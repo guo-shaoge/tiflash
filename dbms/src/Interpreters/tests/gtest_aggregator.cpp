@@ -150,16 +150,18 @@ public:
                 spill_config,
                 context->getSettingsRef().max_block_size,
                 TiDB::dummy_collators);
-        aggregator = std::make_shared<Aggregator>(params, /*req_id*/"bench_agg", /*concurrency*/1, /*spill_context*/nullptr);
 
         data_variants = std::make_unique<AggregatedDataVariants>();
+
+        aggregator = std::make_shared<Aggregator>(params, /*req_id*/"bench_agg",
+                /*concurrency*/1, /*spill_context*/nullptr, data_variants->aggregates_pool);
     }
 
     const std::string col1_name = "col1_decimal128";
     const std::string col2_name = "col2_decimal128";
     const size_t rows_per_block = 4096;
     const size_t total_rows = 4000000;
-    const size_t prec = 19;
+    const size_t prec = 15;
     const size_t scale = 6;
 
     DataTypePtr col1_data_type;
@@ -236,7 +238,7 @@ try
     auto res_col1 = res_block.getByPosition(0).column;
     auto res_col2 = res_block.getByPosition(1).column;
     const auto * res_col1_decimal128 = checkAndGetColumn<ColumnDecimal<Decimal128>>(res_col1.get());
-    const auto * res_col2_decimal256 = checkAndGetColumn<ColumnDecimal<Decimal256>>(res_col2.get());
+    const auto * res_col2_decimal128 = checkAndGetColumn<ColumnDecimal<Decimal128>>(res_col2.get());
     for (size_t i = 0; i < res_block.rows(); ++i)
     {
         Field field1;
@@ -244,12 +246,30 @@ try
         DecimalField field1_decimal(Decimal128(field1.get<Decimal128::NativeType>()), res_col1_decimal128->getScale());
 
         Field field2;
-        res_col2_decimal256->get(i, field2);
+        res_col2_decimal128->get(i, field2);
         // todo how to get field not seeing column structure?
-        DecimalField field2_decimal(Decimal256(field2.get<Decimal256::NativeType>()), res_col2_decimal256->getScale());
+        DecimalField field2_decimal(Decimal128(field2.get<Decimal128::NativeType>()), res_col2_decimal128->getScale());
 
         LOG_DEBUG(log, "gjt debug col {}, {}, {}", i, field1_decimal.toString(), field2_decimal.toString());
     }
+
+    // auto res_col1 = res_block.getByPosition(0).column;
+    // auto res_col2 = res_block.getByPosition(1).column;
+    // const auto * res_col1_decimal128 = checkAndGetColumn<ColumnDecimal<Decimal128>>(res_col1.get());
+    // const auto * res_col2_decimal256 = checkAndGetColumn<ColumnDecimal<Decimal256>>(res_col2.get());
+    // for (size_t i = 0; i < res_block.rows(); ++i)
+    // {
+    //     Field field1;
+    //     res_col1_decimal128->get(i, field1);
+    //     DecimalField field1_decimal(Decimal128(field1.get<Decimal128::NativeType>()), res_col1_decimal128->getScale());
+
+    //     Field field2;
+    //     res_col2_decimal256->get(i, field2);
+    //     // todo how to get field not seeing column structure?
+    //     DecimalField field2_decimal(Decimal256(field2.get<Decimal256::NativeType>()), res_col2_decimal256->getScale());
+
+    //     LOG_DEBUG(log, "gjt debug col {}, {}, {}", i, field1_decimal.toString(), field2_decimal.toString());
+    // }
 }
 CATCH
 

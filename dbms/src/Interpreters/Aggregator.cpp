@@ -291,7 +291,8 @@ Aggregator::Aggregator(
     const Params & params_,
     const String & req_id,
     size_t concurrency,
-    const RegisterOperatorSpillContext & register_operator_spill_context)
+    const RegisterOperatorSpillContext & register_operator_spill_context,
+    Arena * aggregates_pool)
     : params(params_)
     , log(Logger::get(req_id))
     , is_cancelled([]() { return false; })
@@ -362,6 +363,14 @@ Aggregator::Aggregator(
         /// for aggregation, the input block is sorted by bucket number
         /// so it can work with MergingAggregatedMemoryEfficientBlockInputStream
         agg_spill_context->buildSpiller(getHeader(false));
+    }
+
+    const size_t size = 4000000;
+    aggregates_data_vec.reserve(size);
+    for (size_t i = 0; i < size; ++i)
+    {
+        aggregates_data_vec.push_back(
+                aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states));
     }
 }
 
@@ -798,7 +807,11 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
                 /// exception-safety - if you can not allocate memory or create states, then destructors will not be called.
                 emplace_result.setMapped(nullptr);
 
-                aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                if unlikely (i >= aggregates_data_vec.size())
+                    aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                else
+                    aggregate_data = aggregates_data_vec[i];
+
                 createAggregateStates(aggregate_data);
 
                 emplace_result.setMapped(aggregate_data);

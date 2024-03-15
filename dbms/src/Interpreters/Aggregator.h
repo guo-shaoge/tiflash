@@ -1168,7 +1168,8 @@ public:
         const Params & params_,
         const String & req_id,
         size_t concurrency,
-        const RegisterOperatorSpillContext & register_operator_spill_context);
+        const RegisterOperatorSpillContext & register_operator_spill_context,
+        Arena * aggregates_pool = nullptr);
 
     /// Aggregate the source. Get the result in the form of one of the data structures.
     void execute(const BlockInputStreamPtr & stream, AggregatedDataVariants & result, size_t thread_num);
@@ -1477,6 +1478,8 @@ protected:
 
     template <typename Method>
     friend class AggHashTableToBlocksBlockInputStream;
+
+    std::vector<AggregateDataPtr> aggregates_data_vec;
 };
 
 /** Get the aggregation variant by its type. */
