@@ -160,7 +160,7 @@ public:
     const std::string col1_name = "col1_decimal128";
     const std::string col2_name = "col2_decimal128";
     const size_t rows_per_block = 4096;
-    const size_t total_rows = 4000000;
+    const size_t total_rows = 40000000;
     const size_t prec = 15;
     const size_t scale = 6;
 
