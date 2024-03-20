@@ -366,13 +366,13 @@ Aggregator::Aggregator(
         agg_spill_context->buildSpiller(getHeader(false));
     }
 
-    const size_t size = 50000000;
-    aggregates_data_vec.reserve(size);
-    for (size_t i = 0; i < size; ++i)
-    {
-        aggregates_data_vec.push_back(
-                aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states));
-    }
+    // const size_t size = 50000000;
+    // aggregates_data_vec.reserve(size);
+    // for (size_t i = 0; i < size; ++i)
+    // {
+    //     aggregates_data_vec.push_back(
+    //             aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states));
+    // }
 }
 
 
@@ -812,9 +812,9 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
                 // emplace_result.setMapped(nullptr);
 
                 // if unlikely (i >= aggregates_data_vec.size())
-                //     aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
                 // else
-                    aggregate_data = aggregates_data_vec[i];
+                //     aggregate_data = aggregates_data_vec[i];
 
                 createAggregateStates(aggregate_data);
 
