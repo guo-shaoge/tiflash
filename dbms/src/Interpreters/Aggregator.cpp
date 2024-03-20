@@ -30,6 +30,7 @@
 
 namespace DB
 {
+size_t g_emplace_result_cnt = 0;
 namespace ErrorCodes
 {
 extern const int UNKNOWN_AGGREGATED_DATA_VARIANT;
@@ -365,7 +366,7 @@ Aggregator::Aggregator(
         agg_spill_context->buildSpiller(getHeader(false));
     }
 
-    const size_t size = 4000000;
+    const size_t size = 50000000;
     aggregates_data_vec.reserve(size);
     for (size_t i = 0; i < size; ++i)
     {
@@ -681,23 +682,23 @@ void NO_INLINE Aggregator::executeImpl(
     executeImplBatch(method, state, aggregates_pool, agg_process_info, watch);
 }
 
-template <typename Method>
-std::optional<typename Method::EmplaceResult> Aggregator::emplaceKey(
-    Method & method,
-    typename Method::State & state,
-    size_t index,
-    Arena & aggregates_pool,
-    std::vector<std::string> & sort_key_containers) const
-{
-    try
-    {
-        return state.emplaceKey(method.data, index, aggregates_pool, sort_key_containers);
-    }
-    catch (ResizeException &)
-    {
-        return {};
-    }
-}
+// template <typename Method>
+// typename Method::EmplaceResult Aggregator::emplaceKey(
+//     Method & method,
+//     typename Method::State & state,
+//     size_t index,
+//     Arena & aggregates_pool,
+//     std::vector<std::string> & sort_key_containers) const
+// {
+//     // try
+//     // {
+//         return state.emplaceKey(method.data, index, aggregates_pool, sort_key_containers);
+//     // }
+//     // catch (ResizeException &)
+//     // {
+//     //     return {};
+//     // }
+// }
 
 template <typename Method>
 ALWAYS_INLINE void Aggregator::executeImplBatch(
@@ -715,52 +716,52 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
             agg_size = std::max(agg_size / 2, 1);
     });
 
-    /// Optimization for special case when there are no aggregate functions.
-    if (params.aggregates_size == 0)
-    {
-        /// For all rows.
-        AggregateDataPtr place = aggregates_pool->alloc(0);
-        for (size_t i = 0; i < agg_size; ++i)
-        {
-            auto emplace_result_hold
-                = emplaceKey(method, state, agg_process_info.start_row, *aggregates_pool, sort_key_containers);
-            if likely (emplace_result_hold.has_value())
-            {
-                emplace_result_hold.value().setMapped(place);
-                ++agg_process_info.start_row;
-            }
-            else
-            {
-                LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
-                break;
-            }
-        }
-        return;
-    }
+    // /// Optimization for special case when there are no aggregate functions.
+    // if (params.aggregates_size == 0)
+    // {
+    //     /// For all rows.
+    //     AggregateDataPtr place = aggregates_pool->alloc(0);
+    //     for (size_t i = 0; i < agg_size; ++i)
+    //     {
+    //         auto emplace_result_hold
+    //             = emplaceKey(method, state, agg_process_info.start_row, *aggregates_pool, sort_key_containers);
+    //         if likely (emplace_result_hold.has_value())
+    //         {
+    //             emplace_result_hold.value().setMapped(place);
+    //             ++agg_process_info.start_row;
+    //         }
+    //         else
+    //         {
+    //             LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
+    //             break;
+    //         }
+    //     }
+    //     return;
+    // }
 
-    /// Optimization for special case when aggregating by 8bit key.
-    if constexpr (std::is_same_v<Method, AggregatedDataVariants::AggregationMethod_key8>)
-    {
-        for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
-             ++inst)
-        {
-            inst->batch_that->addBatchLookupTable8(
-                agg_process_info.start_row,
-                agg_size,
-                reinterpret_cast<AggregateDataPtr *>(method.data.data()),
-                inst->state_offset,
-                [&](AggregateDataPtr & aggregate_data) {
-                    aggregate_data
-                        = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-                    createAggregateStates(aggregate_data);
-                },
-                state.getKeyData(),
-                inst->batch_arguments,
-                aggregates_pool);
-        }
-        agg_process_info.start_row += agg_size;
-        return;
-    }
+    // /// Optimization for special case when aggregating by 8bit key.
+    // if constexpr (std::is_same_v<Method, AggregatedDataVariants::AggregationMethod_key8>)
+    // {
+    //     for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
+    //          ++inst)
+    //     {
+    //         inst->batch_that->addBatchLookupTable8(
+    //             agg_process_info.start_row,
+    //             agg_size,
+    //             reinterpret_cast<AggregateDataPtr *>(method.data.data()),
+    //             inst->state_offset,
+    //             [&](AggregateDataPtr & aggregate_data) {
+    //                 aggregate_data
+    //                     = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+    //                 createAggregateStates(aggregate_data);
+    //             },
+    //             state.getKeyData(),
+    //             inst->batch_arguments,
+    //             aggregates_pool);
+    //     }
+    //     agg_process_info.start_row += agg_size;
+    //     return;
+    // }
 
     /// Generic case.
 
@@ -783,14 +784,17 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
         {
             AggregateDataPtr aggregate_data = nullptr;
 
-            auto emplace_result_holder = emplaceKey(method, state, i, *aggregates_pool, sort_key_containers);
-            if unlikely (!emplace_result_holder.has_value())
-            {
-                LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
-                break;
-            }
+            // auto emplace_result_holder = emplaceKey(method, state, i, *aggregates_pool, sort_key_containers);
+            // if unlikely (!emplace_result_holder.has_value())
+            // {
+            //     LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
+            //     break;
+            // }
+            // auto & emplace_result = emplace_result_holder.value();
+           
+            // auto emplace_result = emplaceKey(method, state, i, *aggregates_pool, sort_key_containers);
 
-            auto & emplace_result = emplace_result_holder.value();
+            auto emplace_result = state.emplaceKey(method.data, i, *aggregates_pool, sort_key_containers);
 
             // create_agg_state_watch.start();
             // SCOPE_EXIT({
@@ -805,11 +809,11 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
                 //     alloc_agg_state_watch.stopAndAllocAggState();
                 // });
                 /// exception-safety - if you can not allocate memory or create states, then destructors will not be called.
-                emplace_result.setMapped(nullptr);
+                // emplace_result.setMapped(nullptr);
 
-                if unlikely (i >= aggregates_data_vec.size())
-                    aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-                else
+                // if unlikely (i >= aggregates_data_vec.size())
+                //     aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                // else
                     aggregate_data = aggregates_data_vec[i];
 
                 createAggregateStates(aggregate_data);

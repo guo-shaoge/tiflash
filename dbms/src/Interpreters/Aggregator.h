@@ -1341,12 +1341,14 @@ protected:
         Stopwatch & watch) const;
 
     template <typename Method>
-    std::optional<typename Method::EmplaceResult> emplaceKey(
+    inline typename Method::EmplaceResult emplaceKey(
         Method & method,
         typename Method::State & state,
         size_t index,
         Arena & aggregates_pool,
-        std::vector<std::string> & sort_key_containers) const;
+        std::vector<std::string> & sort_key_containers) const {
+        return state.emplaceKey(method.data, index, aggregates_pool, sort_key_containers);
+    }
 
     /// For case when there are no keys (all aggregate into one row).
     static void executeWithoutKeyImpl(AggregatedDataWithoutKey & res, AggProcessInfo & agg_process_info, Arena * arena);

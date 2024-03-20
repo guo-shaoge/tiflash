@@ -26,6 +26,7 @@
 namespace DB
 {
 using Sizes = std::vector<size_t>;
+extern size_t g_emplace_result_cnt;
 
 /// When packing the values of nullable columns at a given row, we have to
 /// store the fact that these values are nullable or not. This is achieved

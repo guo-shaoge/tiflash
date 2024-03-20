@@ -207,7 +207,8 @@ try
     // col2_decimal128 0 Decimal(19,6) Decimal128(size = 8192),
     // sum(col1_decimal128) 0 Decimal(41,6) Decimal256(size = 8192)
     auto res_structure = res_block.dumpStructure();
-    LOG_DEBUG(log, "gjt debug res_structure {}, rows: {}", res_structure, res_block.rows());
+    LOG_DEBUG(log, "gjt debug res_structure {}, rows: {}, g_emplace_result_cnt: {}", res_structure, res_block.rows(),
+            g_emplace_result_cnt);
 
     LOG_DEBUG(log, "gjt debug AggBuild: {}, EmplaceHashMap: {}, CreateAggState: {}, ComputeAggState: {}, AllocAggState: {}, AggConvert: {}, ConvertToBlocks: {}, computed IterHashTable: {}, IterHashTable: {}, InsertKeyColumns: {}, InsertAggVals: {}",
             watch.getAggBuild(), watch.getEmplaceHashMap(), watch.getCreateAggState(), watch.getComputeAggState(), watch.getAllocAggState(),
