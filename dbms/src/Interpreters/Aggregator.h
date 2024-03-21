@@ -589,6 +589,8 @@ struct AggregatedDataVariants : private boost::noncopyable
       */
     Aggregator * aggregator = nullptr;
 
+    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map = nullptr;
+
     size_t keys_size{}; /// Number of keys. NOTE do we need this field?
     Sizes key_sizes; /// Dimensions of keys, if keys of fixed length
 
@@ -1277,14 +1279,16 @@ protected:
         Method & method,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        TiDB::TiDBCollators & collators) const;
+        TiDB::TiDBCollators & collators,
+        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
 
     template <typename Method>
     void executeImplBatch(
         Method & method,
         typename Method::State & state,
         Arena * aggregates_pool,
-        AggProcessInfo & agg_process_info) const;
+        AggProcessInfo & agg_process_info,
+        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
 
     template <typename Method>
     std::optional<typename Method::EmplaceResult> emplaceKey(
@@ -1328,7 +1332,8 @@ protected:
         std::vector<AggregateColumnsData> & aggregate_columns_vec,
         std::vector<MutableColumns> & final_aggregate_columns_vec,
         Arena * arena,
-        bool final) const;
+        bool final,
+        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplFinal(
@@ -1344,7 +1349,8 @@ protected:
         Table & data,
         std::vector<std::vector<IColumn *>> && key_columns_vec,
         std::vector<MutableColumns> & final_aggregate_columns_vec,
-        Arena * arena) const;
+        Arena * arena,
+        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplNotFinal(

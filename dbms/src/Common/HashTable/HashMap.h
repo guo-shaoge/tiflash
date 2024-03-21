@@ -30,9 +30,10 @@ struct NoInitTag
 };
 
 /// A pair that does not initialize the elements, if not needed.
-template <typename First, typename Second>
+template <typename First, typename TSecond>
 struct PairNoInit
 {
+    using Second = TSecond;
     First first;
     Second second;
 
@@ -107,6 +108,7 @@ struct HashMapCell
     /// Do I need to store the zero key separately (that is, can a zero key be inserted into the hash table).
     static constexpr bool need_zero_value_storage = true;
 
+    void setMapped(const typename value_type::Second & v) { value.second = v; }
     void setMapped(const value_type & value_) { value.second = value_.second; }
 
     /// Serialization, in binary and text form.
