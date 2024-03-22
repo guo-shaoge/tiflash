@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Operators/AggregateContext.h>
+#include <ext/scope_guard.h>
 
 namespace DB
 {
@@ -164,7 +165,8 @@ void AggregateContext::initConvergentPrefix()
     {
         auto & agg_process_info = threads_data[0]->agg_process_info;
         agg_process_info.resetBlock(this->getHeader());
-        aggregator->executeOnBlock(agg_process_info, *many_data[0], 0);
+        Stopwatch tmp_watch;
+        aggregator->executeOnBlock(agg_process_info, *many_data[0], 0, tmp_watch);
         /// Since this won't consume a lot of memory,
         /// even if it triggers marking need spill due to a low threshold setting,
         /// it's still reasonable not to spill disk.
@@ -174,8 +176,12 @@ void AggregateContext::initConvergentPrefix()
     }
 }
 
-void AggregateContext::initConvergent()
+void AggregateContext::initConvergent(Stopwatch & convergent_watch)
 {
+    convergent_watch.start();
+    SCOPE_EXIT({
+            convergent_watch.stopAndAggConvergent();
+            });
     assert(status.load() == AggStatus::build);
 
     initConvergentPrefix();
@@ -200,8 +206,12 @@ Block AggregateContext::getHeader() const
     return aggregator->getHeader(true);
 }
 
-Block AggregateContext::readForConvergent(size_t index)
+Block AggregateContext::readForConvergent(size_t index, Stopwatch & convergent_watch)
 {
+    convergent_watch.start();
+    SCOPE_EXIT({
+            convergent_watch.stopAndAggConvergent();
+            });
     assert(status.load() == AggStatus::convergent);
     return popBlocksListFront(block_list);
     // if unlikely (!merging_buckets)

@@ -1592,7 +1592,8 @@ int Server::main(const std::vector<std::string> & /*args*/)
             };
             RUNTIME_CHECK(!TaskScheduler::instance);
             TaskScheduler::instance = std::make_unique<TaskScheduler>(config);
-            LOG_INFO(log, "init pipeline task scheduler");
+            LOG_INFO(log, "init pipeline task scheduler, {}, {}, {}, {}", settings.pipeline_cpu_task_thread_pool_size, get_pool_size(settings.pipeline_cpu_task_thread_pool_size),
+                    settings.pipeline_io_task_thread_pool_size, get_pool_size(settings.pipeline_io_task_thread_pool_size));
         }
     }
 

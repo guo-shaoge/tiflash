@@ -30,6 +30,14 @@ public:
         const Aggregator::Params & params_,
         const std::shared_ptr<FineGrainedOperatorSpillContext> & fine_grained_spill_context);
 
+    ~LocalAggregateTransform() override
+    {
+        auto log = Logger::get();
+        LOG_INFO(log, "gjt debug emplace result: {}, compute agg state: {}; convergent: {}",
+                build_watch.getEmplaceHashMap(), build_watch.getComputeAggState(),
+                convergent_watch.getAggConvergent());
+    }
+
     String getName() const override { return "LocalAggregateTransform"; }
 
 protected:

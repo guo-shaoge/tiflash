@@ -19,9 +19,10 @@ namespace DB
 {
 OperatorStatus AggregateBuildSinkOp::prepareImpl()
 {
+    Stopwatch tmp_watch;
     while (agg_context->hasLocalDataToBuild(index))
     {
-        agg_context->buildOnLocalData(index);
+        agg_context->buildOnLocalData(index, tmp_watch);
         if (agg_context->needSpill(index))
             return OperatorStatus::IO_OUT;
     }
@@ -40,7 +41,8 @@ OperatorStatus AggregateBuildSinkOp::writeImpl(Block && block)
         }
         return OperatorStatus::FINISHED;
     }
-    agg_context->buildOnBlock(index, block);
+    Stopwatch tmp_watch;
+    agg_context->buildOnBlock(index, block, tmp_watch);
     return agg_context->needSpill(index) ? OperatorStatus::IO_OUT : OperatorStatus::NEED_INPUT;
 }
 

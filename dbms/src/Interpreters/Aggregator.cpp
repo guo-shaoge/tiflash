@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <ext/scope_guard.h>
 #include <AggregateFunctions/AggregateFunctionArray.h>
 #include <AggregateFunctions/AggregateFunctionState.h>
 #include <Common/FailPoint.h>
@@ -774,8 +775,8 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     {
         Stopwatch emplace_result_watch;
         SCOPE_EXIT({
-            emplace_result_watch.stop();
-            build_watch.addEmplaceResul
+                emplace_result_watch.stop();
+            build_watch.addEmplaceHashMap(emplace_result_watch.elapsed());
         });
         for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
         {
@@ -835,6 +836,11 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     //     processed_rows = i;
     // }
 
+    Stopwatch compute_agg_state_watch;
+    SCOPE_EXIT({
+            compute_agg_state_watch.stop();
+        build_watch.addComputeAggState(compute_agg_state_watch.elapsed());
+    });
     if (processed_rows)
     {
         /// Add values to the aggregate functions.
@@ -1206,6 +1212,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
     size_t src_bytes = 0;
     AggProcessInfo agg_process_info(this);
 
+    Stopwatch tmp_watch;
     /// Read all the data
     while (Block block = stream->read())
     {
@@ -1215,7 +1222,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
         {
             if unlikely (is_cancelled())
                 return;
-            if (!executeOnBlock(agg_process_info, result, thread_num))
+            if (!executeOnBlock(agg_process_info, result, thread_num, tmp_watch))
             {
                 should_stop = true;
                 break;
@@ -1236,7 +1243,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
     if (result.empty() && params.keys_size == 0 && !params.empty_result_for_aggregation_by_empty_set)
     {
         agg_process_info.resetBlock(stream->getHeader());
-        executeOnBlock(agg_process_info, result, thread_num);
+        executeOnBlock(agg_process_info, result, thread_num, tmp_watch);
         if (result.need_spill)
             spill(result, thread_num);
         assert(agg_process_info.allBlockDataHandled());

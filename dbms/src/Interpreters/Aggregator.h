@@ -16,6 +16,7 @@
 
 #include <Columns/ColumnAggregateFunction.h>
 #include <Columns/ColumnFixedString.h>
+#include <Common/Stopwatch.h>
 #include <Columns/ColumnNullable.h>
 #include <Columns/ColumnString.h>
 #include <Columns/ColumnVector.h>
@@ -1184,7 +1185,7 @@ public:
     };
 
     /// Process one block. Return false if the processing should be aborted.
-    bool executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num);
+    bool executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num, Stopwatch & build_watch);
 
     /** Merge several aggregation data structures and output the MergingBucketsPtr used to merge.
       * Return nullptr if there are no non empty data_variant.
@@ -1282,7 +1283,8 @@ public:
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
         TiDB::TiDBCollators & collators,
-        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map);
+        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+        Stopwatch & build_watch);
 
     template <typename Method>
     void executeImplBatch(
@@ -1290,7 +1292,8 @@ public:
         typename Method::State & state,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map);
+        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+        Stopwatch & build_watch);
 
     template <typename Method>
     std::optional<typename Method::EmplaceResult> emplaceKey(

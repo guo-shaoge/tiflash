@@ -61,14 +61,14 @@ public:
 
     std::vector<SharedAggregateRestorerPtr> buildSharedRestorer(PipelineExecutorContext & exec_context);
 
-    void initConvergent();
+    void initConvergent(Stopwatch & stop_watch);
 
     // Called before convergent to trace aggregate statistics and handle empty table with result case.
     void initConvergentPrefix();
 
     size_t getConvergentConcurrency();
 
-    Block readForConvergent(size_t index);
+    Block readForConvergent(size_t index, Stopwatch & convergent_watch);
 
     Block getHeader() const;
 
