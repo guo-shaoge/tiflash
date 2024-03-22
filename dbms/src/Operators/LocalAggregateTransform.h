@@ -51,6 +51,8 @@ private:
 private:
     Aggregator::Params params;
     AggregateContext agg_context;
+    Stopwatch build_watch;
+    Stopwatch convergent_watch;
 
     /**
      * spill◄────►build────┬─────────────►restore

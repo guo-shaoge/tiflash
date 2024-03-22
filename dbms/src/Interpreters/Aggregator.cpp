@@ -286,7 +286,8 @@ Aggregator::Aggregator(
     const Params & params_,
     const String & req_id,
     size_t concurrency,
-    const RegisterOperatorSpillContext & register_operator_spill_context)
+    const RegisterOperatorSpillContext & register_operator_spill_context,
+    Arena * aggregates_pool)
     : params(params_)
     , log(Logger::get(req_id))
     , is_cancelled([]() { return false; })
@@ -358,8 +359,20 @@ Aggregator::Aggregator(
         /// so it can work with MergingAggregatedMemoryEfficientBlockInputStream
         agg_spill_context->buildSpiller(getHeader(false));
     }
+
+    batchAllocAggData(aggregates_pool);
 }
 
+void Aggregator::batchAllocAggData(Arena * aggregates_pool)
+{
+    auto ori_size = aggregate_data_vec.size();
+    const auto alloc_size = 4096;
+    aggregate_data_vec.reserve(ori_size + alloc_size);
+    for (size_t i = 0; i < alloc_size; ++i)
+    {
+        aggregate_data_vec.push_back(aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states));
+    }
+}
 
 inline bool IsTypeNumber64(const DataTypePtr & type)
 {
@@ -660,11 +673,12 @@ void NO_INLINE Aggregator::executeImpl(
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
     TiDB::TiDBCollators & collators,
-    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
+    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+    Stopwatch & build_watch)
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    executeImplBatch(method, state, aggregates_pool, agg_process_info, test_map);
+    executeImplBatch(method, state, aggregates_pool, agg_process_info, test_map, build_watch);
 }
 
 template <typename Method>
@@ -691,7 +705,8 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     typename Method::State & state,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
-    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
+    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+    Stopwatch & build_watch)
 {
     std::vector<std::string> sort_key_containers;
     sort_key_containers.resize(params.keys_size, "");
@@ -756,25 +771,37 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     const auto * col_decimal = checkAndGetColumn<ColumnDecimal<Decimal128>>(agg_process_info.key_columns[0]);
     RUNTIME_CHECK_MSG(col_decimal, "col is not decimal128");
     const auto & datas = col_decimal->getData();
-    for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
     {
-        AggregateDataPtr aggregate_data = nullptr;
-        bool inserted = false;
-        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>::LookupResult it;
-        test_map->emplace(static_cast<Int128>(datas[i]), it, inserted);
+        Stopwatch emplace_result_watch;
+        SCOPE_EXIT({
+            emplace_result_watch.stop();
+            build_watch.addEmplaceResul
+        });
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
+        {
+            AggregateDataPtr aggregate_data = nullptr;
+            bool inserted = false;
+            HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>::LookupResult it;
+            test_map->emplace(static_cast<Int128>(datas[i]), it, inserted);
 
-        if (inserted)
-        {
-            aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-            createAggregateStates(aggregate_data);
-            it->setMapped(aggregate_data);
+            if (inserted)
+            {
+                // aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                if unlikely (used_aggregate_data_index >= aggregate_data_vec.size())
+                {
+                    batchAllocAggData(aggregates_pool);
+                }
+                aggregate_data = aggregate_data_vec[used_aggregate_data_index++];
+                createAggregateStates(aggregate_data);
+                it->setMapped(aggregate_data);
+            }
+            else
+            {
+                aggregate_data = it->getMapped();
+            }
+            places[i - agg_process_info.start_row] = aggregate_data;
+            processed_rows = i;
         }
-        else
-        {
-            aggregate_data = it->getMapped();
-        }
-        places[i - agg_process_info.start_row] = aggregate_data;
-        processed_rows = i;
     }
 
     // for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
@@ -928,7 +955,7 @@ void Aggregator::AggProcessInfo::prepareForAgg()
     prepare_for_agg_done = true;
 }
 
-bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num)
+bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num, Stopwatch & build_watch)
 {
     assert(!result.need_spill);
 
@@ -978,7 +1005,7 @@ bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDat
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
             params.collators, \
-                result.test_map);                                             \
+                result.test_map, build_watch);                                             \
         break;                                                             \
     }
 

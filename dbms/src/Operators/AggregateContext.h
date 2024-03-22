@@ -49,7 +49,7 @@ public:
 
     size_t getBuildConcurrency() const { return max_threads; }
 
-    void buildOnBlock(size_t task_index, const Block & block);
+    void buildOnBlock(size_t task_index, const Block & block, Stopwatch & build_watch);
 
     bool hasSpilledData() const;
 
@@ -76,7 +76,7 @@ public:
 
     bool hasLocalDataToBuild(size_t task_index);
 
-    void buildOnLocalData(size_t task_index);
+    void buildOnLocalData(size_t task_index, Stopwatch & build_watch);
 
     bool isTaskMarkedForSpill(size_t task_index);
 

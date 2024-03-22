@@ -27,7 +27,11 @@ void AggregateContext::initBuild(
     max_threads = max_threads_;
     empty_result_for_aggregation_by_empty_set = params.empty_result_for_aggregation_by_empty_set;
     keys_size = params.keys_size;
-    aggregator = std::make_unique<Aggregator>(params, log->identifier(), max_threads, register_operator_spill_context);
+    for (size_t i = 0; i < max_threads; ++i)
+    {
+        many_data.emplace_back(std::make_shared<AggregatedDataVariants>());
+    }
+    aggregator = std::make_unique<Aggregator>(params, log->identifier(), max_threads, register_operator_spill_context, many_data[0]->aggregates_pool);
     aggregator->setCancellationHook(is_cancelled);
     aggregator->initThresholdByAggregatedDataVariantsSize(max_threads);
     many_data.reserve(max_threads);
@@ -35,17 +39,16 @@ void AggregateContext::initBuild(
     for (size_t i = 0; i < max_threads; ++i)
     {
         threads_data.emplace_back(std::make_unique<ThreadData>(aggregator.get()));
-        many_data.emplace_back(std::make_shared<AggregatedDataVariants>());
     }
     status = AggStatus::build;
     build_watch.emplace();
     LOG_TRACE(log, "Aggregate Context inited");
 }
 
-void AggregateContext::buildOnLocalData(size_t task_index)
+void AggregateContext::buildOnLocalData(size_t task_index, Stopwatch & build_watch)
 {
     auto & agg_process_info = threads_data[task_index]->agg_process_info;
-    aggregator->executeOnBlock(agg_process_info, *many_data[task_index], task_index);
+    aggregator->executeOnBlock(agg_process_info, *many_data[task_index], task_index, build_watch);
     if likely (agg_process_info.allBlockDataHandled())
     {
         threads_data[task_index]->src_bytes += agg_process_info.block.bytes();
@@ -70,12 +73,12 @@ bool AggregateContext::hasLocalDataToBuild(size_t task_index)
     return !threads_data[task_index]->agg_process_info.allBlockDataHandled();
 }
 
-void AggregateContext::buildOnBlock(size_t task_index, const Block & block)
+void AggregateContext::buildOnBlock(size_t task_index, const Block & block, Stopwatch & build_watch)
 {
     assert(status.load() == AggStatus::build);
     auto & agg_process_info = threads_data[task_index]->agg_process_info;
     agg_process_info.resetBlock(block);
-    buildOnLocalData(task_index);
+    buildOnLocalData(task_index, build_watch);
 }
 
 bool AggregateContext::hasSpilledData() const

@@ -1120,7 +1120,8 @@ public:
         const Params & params_,
         const String & req_id,
         size_t concurrency,
-        const RegisterOperatorSpillContext & register_operator_spill_context);
+        const RegisterOperatorSpillContext & register_operator_spill_context,
+    Arena * aggregates_pool = nullptr);
 
     /// Aggregate the source. Get the result in the form of one of the data structures.
     void execute(const BlockInputStreamPtr & stream, AggregatedDataVariants & result, size_t thread_num);
@@ -1192,6 +1193,8 @@ public:
         ManyAggregatedDataVariants & data_variants,
         bool final,
         size_t max_threads) const;
+
+    void batchAllocAggData(Arena * aggregates_pool);
 
     /// Merge several partially aggregated blocks into one.
     BlocksList vstackBlocks(BlocksList & blocks, bool final);
@@ -1279,7 +1282,7 @@ public:
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
         TiDB::TiDBCollators & collators,
-        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
+        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map);
 
     template <typename Method>
     void executeImplBatch(
@@ -1287,7 +1290,7 @@ public:
         typename Method::State & state,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
+        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map);
 
     template <typename Method>
     std::optional<typename Method::EmplaceResult> emplaceKey(
@@ -1437,6 +1440,9 @@ public:
 
     template <typename Method>
     friend class AggHashTableToBlocksBlockInputStream;
+
+    std::vector<AggregateDataPtr> aggregate_data_vec;
+    size_t used_aggregate_data_index = 0;
 };
 
 /** Get the aggregation variant by its type. */

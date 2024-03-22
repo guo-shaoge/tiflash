@@ -47,6 +47,8 @@ LocalAggregateTransform::LocalAggregateTransform(
             else if (exec_context.getRegisterOperatorSpillContext() != nullptr)
                 exec_context.getRegisterOperatorSpillContext()(operator_spill_context);
         });
+    build_watch.reset();
+    convergent_watch.reset();
 }
 
 OperatorStatus LocalAggregateTransform::transformImpl(Block & block)
@@ -61,7 +63,7 @@ OperatorStatus LocalAggregateTransform::transformImpl(Block & block)
                 ? fromBuildToFinalSpillOrRestore()
                 : fromBuildToConvergent(block);
         }
-        agg_context.buildOnBlock(task_index, block);
+        agg_context.buildOnBlock(task_index, block, build_watch);
         return tryFromBuildToSpill();
     default:
         throw Exception(fmt::format("Unexpected status: {}", magic_enum::enum_name(status)));
@@ -113,7 +115,7 @@ OperatorStatus LocalAggregateTransform::tryOutputImpl(Block & block)
     case LocalAggStatus::build:
         while (agg_context.hasLocalDataToBuild(task_index))
         {
-            agg_context.buildOnLocalData(task_index);
+            agg_context.buildOnLocalData(task_index, build_watch);
             if (tryFromBuildToSpill() == OperatorStatus::IO_OUT)
                 return OperatorStatus::IO_OUT;
         }
