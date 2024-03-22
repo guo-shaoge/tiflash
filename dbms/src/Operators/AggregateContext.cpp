@@ -177,9 +177,12 @@ void AggregateContext::initConvergent()
 
     initConvergentPrefix();
 
-    merging_buckets = aggregator->mergeAndConvertToBlocks(many_data, true, max_threads);
+    // merging_buckets = aggregator->mergeAndConvertToBlocks(many_data, true, max_threads);
     status = AggStatus::convergent;
-    RUNTIME_CHECK(!merging_buckets || merging_buckets->getConcurrency() > 0);
+    // RUNTIME_CHECK(!merging_buckets || merging_buckets->getConcurrency() > 0);
+
+    auto & data_variants = many_data[0];
+    block_list = aggregator->pureTestMapRead(*data_variants);
 }
 
 size_t AggregateContext::getConvergentConcurrency()
@@ -197,8 +200,9 @@ Block AggregateContext::getHeader() const
 Block AggregateContext::readForConvergent(size_t index)
 {
     assert(status.load() == AggStatus::convergent);
-    if unlikely (!merging_buckets)
-        return {};
-    return merging_buckets->getData(index);
+    return popBlocksListFront(block_list);
+    // if unlikely (!merging_buckets)
+    //     return {};
+    // return merging_buckets->getData(index);
 }
 } // namespace DB

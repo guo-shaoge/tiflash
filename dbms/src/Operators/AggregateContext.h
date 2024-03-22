@@ -115,6 +115,8 @@ private:
     const LoggerPtr log;
 
     std::optional<Stopwatch> build_watch;
+
+    BlocksList block_list;
 };
 
 using AggregateContextPtr = std::shared_ptr<AggregateContext>;

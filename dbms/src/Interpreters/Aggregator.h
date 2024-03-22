@@ -1219,7 +1219,6 @@ public:
     /// Get data structure of the result.
     Block getHeader(bool final) const;
 
-protected:
     friend struct AggregatedDataVariants;
     friend class MergingBuckets;
 
@@ -1304,7 +1303,6 @@ protected:
     template <typename Method>
     void spillImpl(AggregatedDataVariants & data_variants, Method & method, size_t thread_num);
 
-protected:
     /// Merge data from hash table `src` into `dst`.
     template <typename Method, typename Table>
     void mergeDataImpl(Table & table_dst, Table & table_src, Arena * arena) const;
@@ -1326,6 +1324,16 @@ protected:
 
     template <typename Method, typename Table>
     void convertToBlocksImpl(
+        Method & method,
+        Table & data,
+        std::vector<MutableColumns> & key_columns_vec,
+        std::vector<AggregateColumnsData> & aggregate_columns_vec,
+        std::vector<MutableColumns> & final_aggregate_columns_vec,
+        Arena * arena,
+        bool final) const;
+
+    template <typename Method, typename Table>
+    void convertToBlocksImplPureTestMap(
         Method & method,
         Table & data,
         std::vector<MutableColumns> & key_columns_vec,
@@ -1372,6 +1380,8 @@ protected:
     template <typename Filler>
     BlocksList prepareBlocksAndFill(AggregatedDataVariants & data_variants, bool final, size_t rows, Filler && filler)
         const;
+
+    BlocksList pureTestMapRead(AggregatedDataVariants & data_variants) const;
 
     template <typename Method>
     Block convertOneBucketToBlock(

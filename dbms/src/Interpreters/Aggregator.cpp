@@ -132,7 +132,7 @@ void AggregatedDataVariants::init(Type variants_type)
     }
 
     type = variants_type;
-
+    // todo delete
     test_map = new HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>();
 }
 
@@ -753,11 +753,6 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[agg_size]);
     std::optional<size_t> processed_rows;
 
-    LOG_INFO(log, "gjt debug key col: {}", agg_process_info.key_columns[0]->getName());
-    // const auto * nullable_col_decimal = checkAndGetColumn<ColumnNullable>(agg_process_info.key_columns[0]);
-    // RUNTIME_CHECK_MSG(!nullable_col_decimal, "col is not nullable decimal128");
-    // const auto * col_decimal = checkAndGetColumn<ColumnDecimal<Decimal128>>(&(nullable_col_decimal->getNestedColumn()));
-    // RUNTIME_CHECK_MSG(!col_decimal, "nested col is not decimal128");
     const auto * col_decimal = checkAndGetColumn<ColumnDecimal<Decimal128>>(agg_process_info.key_columns[0]);
     RUNTIME_CHECK_MSG(col_decimal, "col is not decimal128");
     const auto & datas = col_decimal->getData();
@@ -983,7 +978,7 @@ bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDat
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
             params.collators, \
-            result.test_map);                                             \
+                result.test_map);                                             \
         break;                                                             \
     }
 
@@ -1122,7 +1117,7 @@ BlocksList Aggregator::convertOneBucketToBlocks(
         data_variants,
         final,
         method.data.impls[bucket].size(),
-        [bucket, &method, arena, this, &data_variants](
+        [bucket, &method, arena, this](
             std::vector<MutableColumns> & key_columns_vec,
             std::vector<AggregateColumnsData> & aggregate_columns_vec,
             std::vector<MutableColumns> & final_aggregate_columns_vec,
@@ -1134,8 +1129,7 @@ BlocksList Aggregator::convertOneBucketToBlocks(
                 aggregate_columns_vec,
                 final_aggregate_columns_vec,
                 arena,
-                final_,
-                data_variants.test_map);
+                final_);
         });
 
     for (auto & block : blocks)
@@ -1272,12 +1266,47 @@ void Aggregator::convertToBlocksImpl(
     std::vector<AggregateColumnsData> & aggregate_columns_vec,
     std::vector<MutableColumns> & final_aggregate_columns_vec,
     Arena * arena,
+    bool final) const
+{
+    if (data.empty())
+        return;
+
+    std::vector<std::vector<IColumn *>> raw_key_columns_vec;
+    raw_key_columns_vec.reserve(key_columns_vec.size());
+    for (auto & key_columns : key_columns_vec)
+    {
+        RUNTIME_CHECK_MSG(key_columns.size() == params.keys_size, "Aggregate. Unexpected key columns size.");
+
+        std::vector<IColumn *> raw_key_columns;
+        raw_key_columns.reserve(key_columns.size());
+        for (auto & column : key_columns)
+        {
+            raw_key_columns.push_back(column.get());
+        }
+
+        raw_key_columns_vec.push_back(raw_key_columns);
+    }
+
+    if (final)
+        convertToBlocksImplFinal(method, data, std::move(raw_key_columns_vec), final_aggregate_columns_vec, arena, nullptr);
+    else
+        convertToBlocksImplNotFinal(method, data, std::move(raw_key_columns_vec), aggregate_columns_vec);
+
+    /// In order to release memory early.
+    data.clearAndShrink();
+}
+
+template <typename Method, typename Table>
+void Aggregator::convertToBlocksImplPureTestMap(
+    Method & method,
+    Table & data,
+    std::vector<MutableColumns> & key_columns_vec,
+    std::vector<AggregateColumnsData> & aggregate_columns_vec,
+    std::vector<MutableColumns> & final_aggregate_columns_vec,
+    Arena * arena,
     bool final,
     HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
 {
-    // if (data.empty())
-    //     return;
-
     std::vector<std::vector<IColumn *>> raw_key_columns_vec;
     raw_key_columns_vec.reserve(key_columns_vec.size());
     for (auto & key_columns : key_columns_vec)
@@ -1300,7 +1329,7 @@ void Aggregator::convertToBlocksImpl(
         convertToBlocksImplNotFinal(method, data, std::move(raw_key_columns_vec), aggregate_columns_vec);
 
     /// In order to release memory early.
-    data.clearAndShrink();
+    // data.clearAndShrink();
 }
 
 
@@ -1385,11 +1414,7 @@ struct AggregatorMethodInitKeyColumnHelper
         const Sizes & sizes,
         const TiDB::TiDBCollators & collators)
     {
-        // if constexpr (std::is_same<Key, Int128>::value ||
-        //         std::is_same<Key, UInt128>::value)
-        //     method.insertKeyIntoColumns((Int128)key, key_columns, sizes, collators);
-        // else
-            method.insertKeyIntoColumns(key, key_columns, sizes, collators);
+        method.insertKeyIntoColumns(key, key_columns, sizes, collators);
     }
 };
 
@@ -1522,7 +1547,9 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
 
     size_t data_index = 0;
     if constexpr (std::is_same<typename Method::Key, Int128>::value ||
-            std::is_same<typename Method::Key, UInt128>::value)
+        std::is_same<typename Method::Key, UInt128>::value)
+    {
+        // LOG_INFO(log, "gjt debug in convertToBlocksImplFinal");
         test_map->forEachValue([&](const auto & key, auto & mapped) {
             size_t key_columns_vec_index = data_index / params.max_block_size;
             agg_keys_helpers[key_columns_vec_index]
@@ -1530,6 +1557,7 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
             insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
             ++data_index;
         });
+    }
     else
         data.forEachValue([&](const auto & key, auto & mapped) {
             size_t key_columns_vec_index = data_index / params.max_block_size;
@@ -1602,7 +1630,6 @@ Block Aggregator::prepareBlockAndFill(AggregatedDataVariants & data_variants, bo
 
     Block header = getHeader(final);
 
-    LOG_INFO(log, "gjt debug header structure: {}, key_columns: {}", header.dumpStructure(), key_columns.size());
     for (size_t i = 0; i < params.keys_size; ++i)
     {
         key_columns[i] = header.safeGetByPosition(i).type->createColumn();
@@ -1664,6 +1691,30 @@ Block Aggregator::prepareBlockAndFill(AggregatedDataVariants & data_variants, bo
             res.getByPosition(i).column = res.getByPosition(i).column->cut(0, rows);
 
     return res;
+}
+
+BlocksList Aggregator::pureTestMapRead(AggregatedDataVariants & data_variants) const
+{
+    auto filler = [&](
+                      std::vector<MutableColumns> & key_columns_vec,
+                      std::vector<AggregateColumnsData> & aggregate_columns_vec,
+                      std::vector<MutableColumns> & final_aggregate_columns_vec,
+                      bool final_) {
+        convertToBlocksImplPureTestMap(                                                           
+            // *ToAggregationMethodPtr(NAME, data_variants.aggregation_method_impl),      
+            // ToAggregationMethodPtr(NAME, data_variants.aggregation_method_impl)->data, 
+            *reinterpret_cast<AggregatedDataVariants::AggregationMethod_keys128 *>(data_variants.aggregation_method_impl),
+            reinterpret_cast<AggregatedDataVariants::AggregationMethod_keys128 *>(data_variants.aggregation_method_impl)->data,
+            key_columns_vec,                                                           
+            aggregate_columns_vec,                                                     
+            final_aggregate_columns_vec,                                               
+            data_variants.aggregates_pool,                                             
+            final_,
+            data_variants.test_map);                                                                   
+    };
+    auto rows = data_variants.test_map->size();
+    // LOG_INFO(log, "gjt debug in pureTestMapRead rows: {}", rows);
+    return prepareBlocksAndFill(data_variants, true, rows, filler);
 }
 
 template <typename Filler>
@@ -1743,6 +1794,7 @@ BlocksList Aggregator::prepareBlocksAndFill(
 
     BlocksList res_list;
     block_rows = params.max_block_size;
+    // LOG_INFO(log, "gjt debug prepareBlocksAndFill block list size: {}", res_list.size());
     for (size_t j = 0; j < block_count; ++j)
     {
         Block res = header.cloneEmpty();
@@ -1821,9 +1873,7 @@ BlocksList Aggregator::prepareBlocksAndFillWithoutKey(AggregatedDataVariants & d
 
 BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & data_variants, bool final) const
 {
-    // todo
-    // size_t rows = data_variants.size();
-    size_t rows = data_variants.test_map->size();
+    size_t rows = data_variants.size();
 
     auto filler = [&data_variants, this](
                       std::vector<MutableColumns> & key_columns_vec,
@@ -1840,8 +1890,7 @@ BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & 
             aggregate_columns_vec,                                                     \
             final_aggregate_columns_vec,                                               \
             data_variants.aggregates_pool,                                             \
-            final_,\
-            data_variants.test_map);                                                                   \
+            final_);                                                                   \
         break;                                                                         \
     }
         switch (data_variants.type)
@@ -1953,78 +2002,76 @@ void NO_INLINE Aggregator::mergeBucketImpl(ManyAggregatedDataVariants & data, In
     }
 }
 
+
 MergingBucketsPtr Aggregator::mergeAndConvertToBlocks(
     ManyAggregatedDataVariants & data_variants,
     bool final,
     size_t max_threads) const
 {
-    // todo
-    return std::make_shared<MergingBuckets>(*this, data_variants, final, 1);
+    if (unlikely(data_variants.empty()))
+        throw Exception("Empty data passed to Aggregator::mergeAndConvertToBlocks.", ErrorCodes::EMPTY_DATA_PASSED);
 
-//     if (unlikely(data_variants.empty()))
-//         throw Exception("Empty data passed to Aggregator::mergeAndConvertToBlocks.", ErrorCodes::EMPTY_DATA_PASSED);
-// 
-//     LOG_TRACE(log, "Merging aggregated data");
-// 
-//     ManyAggregatedDataVariants non_empty_data;
-//     non_empty_data.reserve(data_variants.size());
-//     for (auto & data : data_variants)
-//         if (!data->empty())
-//             non_empty_data.push_back(data);
-// 
-//     if (non_empty_data.empty())
-//         return nullptr;
-// 
-//     if (non_empty_data.size() > 1)
-//     {
-//         /// Sort the states in descending order so that the merge is more efficient (since all states are merged into the first).
-//         std::sort(
-//             non_empty_data.begin(),
-//             non_empty_data.end(),
-//             [](const AggregatedDataVariantsPtr & lhs, const AggregatedDataVariantsPtr & rhs) {
-//                 return lhs->size() > rhs->size();
-//             });
-//     }
-// 
-//     /// If at least one of the options is two-level, then convert all the options into two-level ones, if there are not such.
-//     /// Note - perhaps it would be more optimal not to convert single-level versions before the merge, but merge them separately, at the end.
-// 
-//     bool has_at_least_one_two_level = false;
-//     for (const auto & variant : non_empty_data)
-//     {
-//         if (variant->isTwoLevel())
-//         {
-//             has_at_least_one_two_level = true;
-//             break;
-//         }
-//     }
-// 
-//     if (has_at_least_one_two_level)
-//         for (auto & variant : non_empty_data)
-//             if (!variant->isTwoLevel())
-//                 variant->convertToTwoLevel();
-// 
-//     AggregatedDataVariantsPtr & first = non_empty_data[0];
-// 
-//     for (size_t i = 1, size = non_empty_data.size(); i < size; ++i)
-//     {
-//         if (unlikely(first->type != non_empty_data[i]->type))
-//             throw Exception(
-//                 "Cannot merge different aggregated data variants.",
-//                 ErrorCodes::CANNOT_MERGE_DIFFERENT_AGGREGATED_DATA_VARIANTS);
-// 
-//         /** Elements from the remaining sets can be moved to the first data set.
-//           * Therefore, it must own all the arenas of all other sets.
-//           */
-//         first->aggregates_pools.insert(
-//             first->aggregates_pools.end(),
-//             non_empty_data[i]->aggregates_pools.begin(),
-//             non_empty_data[i]->aggregates_pools.end());
-//     }
-// 
-//     // for single level merge, concurrency must be 1.
-//     size_t merge_concurrency = has_at_least_one_two_level ? std::max(max_threads, 1) : 1;
-//     return std::make_shared<MergingBuckets>(*this, non_empty_data, final, merge_concurrency);
+    LOG_TRACE(log, "Merging aggregated data");
+
+    ManyAggregatedDataVariants non_empty_data;
+    non_empty_data.reserve(data_variants.size());
+    for (auto & data : data_variants)
+        if (!data->empty())
+            non_empty_data.push_back(data);
+
+    if (non_empty_data.empty())
+        return nullptr;
+
+    if (non_empty_data.size() > 1)
+    {
+        /// Sort the states in descending order so that the merge is more efficient (since all states are merged into the first).
+        std::sort(
+            non_empty_data.begin(),
+            non_empty_data.end(),
+            [](const AggregatedDataVariantsPtr & lhs, const AggregatedDataVariantsPtr & rhs) {
+                return lhs->size() > rhs->size();
+            });
+    }
+
+    /// If at least one of the options is two-level, then convert all the options into two-level ones, if there are not such.
+    /// Note - perhaps it would be more optimal not to convert single-level versions before the merge, but merge them separately, at the end.
+
+    bool has_at_least_one_two_level = false;
+    for (const auto & variant : non_empty_data)
+    {
+        if (variant->isTwoLevel())
+        {
+            has_at_least_one_two_level = true;
+            break;
+        }
+    }
+
+    if (has_at_least_one_two_level)
+        for (auto & variant : non_empty_data)
+            if (!variant->isTwoLevel())
+                variant->convertToTwoLevel();
+
+    AggregatedDataVariantsPtr & first = non_empty_data[0];
+
+    for (size_t i = 1, size = non_empty_data.size(); i < size; ++i)
+    {
+        if (unlikely(first->type != non_empty_data[i]->type))
+            throw Exception(
+                "Cannot merge different aggregated data variants.",
+                ErrorCodes::CANNOT_MERGE_DIFFERENT_AGGREGATED_DATA_VARIANTS);
+
+        /** Elements from the remaining sets can be moved to the first data set.
+          * Therefore, it must own all the arenas of all other sets.
+          */
+        first->aggregates_pools.insert(
+            first->aggregates_pools.end(),
+            non_empty_data[i]->aggregates_pools.begin(),
+            non_empty_data[i]->aggregates_pools.end());
+    }
+
+    // for single level merge, concurrency must be 1.
+    size_t merge_concurrency = has_at_least_one_two_level ? std::max(max_threads, 1) : 1;
+    return std::make_shared<MergingBuckets>(*this, non_empty_data, final, merge_concurrency);
 }
 
 template <typename Method, typename Table>
@@ -2473,8 +2520,6 @@ MergingBuckets::MergingBuckets(
     if (!data.empty())
     {
         is_two_level = data[0]->isTwoLevel();
-        // todo
-        is_two_level = false;
         if (is_two_level)
         {
             for (size_t i = 0; i < concurrency; ++i)
@@ -2503,16 +2548,14 @@ Block MergingBuckets::getHeader() const
 
 Block MergingBuckets::getData(size_t concurrency_index)
 {
-    return getDataForSingleLevel();
-    // todo
-    // assert(concurrency_index < concurrency);
+    assert(concurrency_index < concurrency);
 
-    // if (unlikely(data.empty()))
-    //     return {};
+    if (unlikely(data.empty()))
+        return {};
 
-    // FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_aggregate_merge_failpoint);
+    FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_aggregate_merge_failpoint);
 
-    // return is_two_level ? getDataForTwoLevel(concurrency_index) : getDataForSingleLevel();
+    return is_two_level ? getDataForTwoLevel(concurrency_index) : getDataForSingleLevel();
 }
 
 Block MergingBuckets::getDataForSingleLevel()
@@ -2529,31 +2572,28 @@ Block MergingBuckets::getDataForSingleLevel()
         return {};
 
     AggregatedDataVariantsPtr & first = data[0];
-//     if (first->type == AggregatedDataVariants::Type::without_key)
-//     {
-//         aggregator.mergeWithoutKeyDataImpl(data);
-//         single_level_blocks = aggregator.prepareBlocksAndFillWithoutKey(*first, final);
-//     }
-//     else
-//     {
-// #define M(NAME)                                                                 \
-//     case AggregationMethodType(NAME):                                           \
-//     {                                                                           \
-//         aggregator.mergeSingleLevelDataImpl<AggregationMethodName(NAME)>(data); \
-//         break;                                                                  \
-//     }
-//         switch (first->type)
-//         {
-//             APPLY_FOR_VARIANTS_SINGLE_LEVEL(M)
-//         default:
-//             throw Exception("Unknown aggregated data variant.", ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT);
-//         }
-// #undef M
-//         single_level_blocks = aggregator.prepareBlocksAndFillSingleLevel(*first, final);
-//     }
-    // todo
-    first->type = AggregatedDataVariants::Type::keys128;
-    single_level_blocks = aggregator.prepareBlocksAndFillSingleLevel(*first, final);
+    if (first->type == AggregatedDataVariants::Type::without_key)
+    {
+        aggregator.mergeWithoutKeyDataImpl(data);
+        single_level_blocks = aggregator.prepareBlocksAndFillWithoutKey(*first, final);
+    }
+    else
+    {
+#define M(NAME)                                                                 \
+    case AggregationMethodType(NAME):                                           \
+    {                                                                           \
+        aggregator.mergeSingleLevelDataImpl<AggregationMethodName(NAME)>(data); \
+        break;                                                                  \
+    }
+        switch (first->type)
+        {
+            APPLY_FOR_VARIANTS_SINGLE_LEVEL(M)
+        default:
+            throw Exception("Unknown aggregated data variant.", ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT);
+        }
+#undef M
+        single_level_blocks = aggregator.prepareBlocksAndFillSingleLevel(*first, final);
+    }
     ++current_bucket_num;
     return popBlocksListFront(single_level_blocks);
 }
