@@ -604,7 +604,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     AggregatedDataWithoutKey without_key = nullptr;
     // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map = nullptr;
     // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map = nullptr;
-    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map = nullptr;
+    HashMap<StringRef, AggregateDataPtr> * test_map = nullptr;
 
     using AggregationMethod_key8 = AggregationMethodOneNumber<UInt8, AggregatedDataWithUInt8Key, false>;
     using AggregationMethod_key16 = AggregationMethodOneNumber<UInt16, AggregatedDataWithUInt16Key, false>;
@@ -1285,7 +1285,7 @@ public:
         AggProcessInfo & agg_process_info,
         TiDB::TiDBCollators & collators,
         // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
-        HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map,
+        HashMap<StringRef, AggregateDataPtr> * test_map,
         Stopwatch & build_watch);
 
     template <typename Method>
@@ -1295,7 +1295,7 @@ public:
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
         // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
-        HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map,
+        HashMap<StringRef, AggregateDataPtr> * test_map,
         Stopwatch & build_watch);
 
     template <typename Method>
@@ -1351,7 +1351,7 @@ public:
         Arena * arena,
         bool final,
         // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
-        HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map) const;
+        HashMap<StringRef, AggregateDataPtr> * test_map) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplFinal(
@@ -1369,7 +1369,7 @@ public:
         std::vector<MutableColumns> & final_aggregate_columns_vec,
         Arena * arena,
         // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
-        HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map) const;
+        HashMap<StringRef, AggregateDataPtr> * test_map) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplNotFinal(

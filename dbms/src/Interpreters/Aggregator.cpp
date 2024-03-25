@@ -135,7 +135,7 @@ void AggregatedDataVariants::init(Type variants_type)
     type = variants_type;
     // todo delete
     // test_map = new HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>();
-    test_map = new HashMapWithSavedHash<StringRef, AggregateDataPtr>();
+    test_map = new HashMap<StringRef, AggregateDataPtr>();
 }
 
 size_t AggregatedDataVariants::getBucketNumberForTwoLevelHashTable(Type type)
@@ -676,7 +676,7 @@ void NO_INLINE Aggregator::executeImpl(
     AggProcessInfo & agg_process_info,
     TiDB::TiDBCollators & collators,
     // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
-    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map,
+    HashMap<StringRef, AggregateDataPtr> * test_map,
     Stopwatch & build_watch)
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
@@ -709,7 +709,7 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
     //HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
-    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map,
+    HashMap<StringRef, AggregateDataPtr> * test_map,
     Stopwatch & build_watch)
 {
     std::vector<std::string> sort_key_containers;
@@ -789,7 +789,7 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
                     serializeKeysToPoolContiguous(i, agg_process_info.key_columns.size(), agg_process_info.key_columns, params.collators, sort_key_containers, *aggregates_pool),
                     *aggregates_pool};
             bool inserted = false;
-            HashMapWithSavedHash<StringRef, AggregateDataPtr>::LookupResult it;
+            HashMap<StringRef, AggregateDataPtr>::LookupResult it;
             test_map->emplace(key_holder, it, inserted);
 
             if (inserted)
@@ -1371,7 +1371,7 @@ void Aggregator::convertToBlocksImplPureTestMap(
     Arena * arena,
     bool final,
     // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
-    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map) const
+    HashMap<StringRef, AggregateDataPtr> * test_map) const
 {
     std::vector<std::vector<IColumn *>> raw_key_columns_vec;
     raw_key_columns_vec.reserve(key_columns_vec.size());
@@ -1604,7 +1604,7 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     std::vector<MutableColumns> & final_aggregate_columns_vec,
     Arena * arena,
     // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
-    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map) const
+    HashMap<StringRef, AggregateDataPtr> * test_map) const
 {
     assert(!key_columns_vec.empty());
     auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
