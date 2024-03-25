@@ -590,8 +590,6 @@ struct AggregatedDataVariants : private boost::noncopyable
       */
     Aggregator * aggregator = nullptr;
 
-    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map = nullptr;
-
     size_t keys_size{}; /// Number of keys. NOTE do we need this field?
     Sizes key_sizes; /// Dimensions of keys, if keys of fixed length
 
@@ -604,6 +602,9 @@ struct AggregatedDataVariants : private boost::noncopyable
     /** Specialization for the case when there are no keys.
       */
     AggregatedDataWithoutKey without_key = nullptr;
+    // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map = nullptr;
+    // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map = nullptr;
+    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map = nullptr;
 
     using AggregationMethod_key8 = AggregationMethodOneNumber<UInt8, AggregatedDataWithUInt8Key, false>;
     using AggregationMethod_key16 = AggregationMethodOneNumber<UInt16, AggregatedDataWithUInt16Key, false>;
@@ -1283,7 +1284,8 @@ public:
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
         TiDB::TiDBCollators & collators,
-        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+        // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+        HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map,
         Stopwatch & build_watch);
 
     template <typename Method>
@@ -1292,7 +1294,8 @@ public:
         typename Method::State & state,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+        // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+        HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map,
         Stopwatch & build_watch);
 
     template <typename Method>
@@ -1347,7 +1350,8 @@ public:
         std::vector<MutableColumns> & final_aggregate_columns_vec,
         Arena * arena,
         bool final,
-        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
+        // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
+        HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplFinal(
@@ -1364,7 +1368,8 @@ public:
         std::vector<std::vector<IColumn *>> && key_columns_vec,
         std::vector<MutableColumns> & final_aggregate_columns_vec,
         Arena * arena,
-        HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
+        // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
+        HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplNotFinal(

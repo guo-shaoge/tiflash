@@ -134,7 +134,8 @@ void AggregatedDataVariants::init(Type variants_type)
 
     type = variants_type;
     // todo delete
-    test_map = new HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>();
+    // test_map = new HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>();
+    test_map = new HashMapWithSavedHash<StringRef, AggregateDataPtr>();
 }
 
 size_t AggregatedDataVariants::getBucketNumberForTwoLevelHashTable(Type type)
@@ -674,7 +675,8 @@ void NO_INLINE Aggregator::executeImpl(
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
     TiDB::TiDBCollators & collators,
-    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+    // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map,
     Stopwatch & build_watch)
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
@@ -706,7 +708,8 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     typename Method::State & state,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
-    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+    //HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map,
+    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map,
     Stopwatch & build_watch)
 {
     std::vector<std::string> sort_key_containers;
@@ -769,9 +772,9 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[agg_size]);
     std::optional<size_t> processed_rows;
 
-    const auto * col_decimal = checkAndGetColumn<ColumnDecimal<Decimal128>>(agg_process_info.key_columns[0]);
-    RUNTIME_CHECK_MSG(col_decimal, "col is not decimal128");
-    const auto & datas = col_decimal->getData();
+    // const auto * col_decimal = checkAndGetColumn<ColumnDecimal<Decimal128>>(agg_process_info.key_columns[0]);
+    // RUNTIME_CHECK_MSG(col_decimal, "col is not decimal128");
+    // const auto & datas = col_decimal->getData();
     {
         Stopwatch emplace_result_watch;
         SCOPE_EXIT({
@@ -781,13 +784,16 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
         for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
         {
             AggregateDataPtr aggregate_data = nullptr;
+            auto key_holder = 
+                SerializedKeyHolder{
+                    serializeKeysToPoolContiguous(i, agg_process_info.key_columns.size(), agg_process_info.key_columns, params.collators, sort_key_containers, *aggregates_pool),
+                    *aggregates_pool};
             bool inserted = false;
-            HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>::LookupResult it;
-            test_map->emplace(static_cast<Int128>(datas[i]), it, inserted);
+            HashMapWithSavedHash<StringRef, AggregateDataPtr>::LookupResult it;
+            test_map->emplace(key_holder, it, inserted);
 
             if (inserted)
             {
-                // aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
                 if unlikely (used_aggregate_data_index >= aggregate_data_vec.size())
                 {
                     batchAllocAggData(aggregates_pool);
@@ -803,6 +809,31 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
             places[i - agg_process_info.start_row] = aggregate_data;
             processed_rows = i;
         }
+        // for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
+        // {
+        //     AggregateDataPtr aggregate_data = nullptr;
+        //     bool inserted = false;
+        //     HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>::LookupResult it;
+        //     test_map->emplace(static_cast<Int128>(datas[i]), it, inserted);
+
+        //     if (inserted)
+        //     {
+        //         // aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+        //         if unlikely (used_aggregate_data_index >= aggregate_data_vec.size())
+        //         {
+        //             batchAllocAggData(aggregates_pool);
+        //         }
+        //         aggregate_data = aggregate_data_vec[used_aggregate_data_index++];
+        //         createAggregateStates(aggregate_data);
+        //         it->setMapped(aggregate_data);
+        //     }
+        //     else
+        //     {
+        //         aggregate_data = it->getMapped();
+        //     }
+        //     places[i - agg_process_info.start_row] = aggregate_data;
+        //     processed_rows = i;
+        // }
     }
 
     // for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
@@ -1339,7 +1370,8 @@ void Aggregator::convertToBlocksImplPureTestMap(
     std::vector<MutableColumns> & final_aggregate_columns_vec,
     Arena * arena,
     bool final,
-    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
+    // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
+    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map) const
 {
     std::vector<std::vector<IColumn *>> raw_key_columns_vec;
     raw_key_columns_vec.reserve(key_columns_vec.size());
@@ -1571,7 +1603,8 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     std::vector<std::vector<IColumn *>> && key_columns_vec,
     std::vector<MutableColumns> & final_aggregate_columns_vec,
     Arena * arena,
-    HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
+    // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
+    HashMapWithSavedHash<StringRef, AggregateDataPtr> * test_map) const
 {
     assert(!key_columns_vec.empty());
     auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
@@ -1580,14 +1613,13 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     auto agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
 
     size_t data_index = 0;
-    if constexpr (std::is_same<typename Method::Key, Int128>::value ||
-        std::is_same<typename Method::Key, UInt128>::value)
+    if constexpr (std::is_same<typename Method::Key, StringRef>::value)
     {
         // LOG_INFO(log, "gjt debug in convertToBlocksImplFinal");
         test_map->forEachValue([&](const auto & key, auto & mapped) {
             size_t key_columns_vec_index = data_index / params.max_block_size;
             agg_keys_helpers[key_columns_vec_index]
-                ->insertKeyIntoColumns((UInt128)key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+                ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
             insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
             ++data_index;
         });
