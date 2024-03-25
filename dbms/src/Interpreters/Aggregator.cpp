@@ -1769,8 +1769,10 @@ BlocksList Aggregator::pureTestMapRead(AggregatedDataVariants & data_variants) c
         convertToBlocksImplPureTestMap(                                                           
             // *ToAggregationMethodPtr(NAME, data_variants.aggregation_method_impl),      
             // ToAggregationMethodPtr(NAME, data_variants.aggregation_method_impl)->data, 
-            *reinterpret_cast<AggregatedDataVariants::AggregationMethod_keys128 *>(data_variants.aggregation_method_impl),
-            reinterpret_cast<AggregatedDataVariants::AggregationMethod_keys128 *>(data_variants.aggregation_method_impl)->data,
+            // *reinterpret_cast<AggregatedDataVariants::AggregationMethod_keys128 *>(data_variants.aggregation_method_impl),
+            // reinterpret_cast<AggregatedDataVariants::AggregationMethod_keys128 *>(data_variants.aggregation_method_impl)->data,
+            *reinterpret_cast<AggregatedDataVariants::AggregationMethod_serialized *>(data_variants.aggregation_method_impl),
+            reinterpret_cast<AggregatedDataVariants::AggregationMethod_serialized *>(data_variants.aggregation_method_impl)->data,
             key_columns_vec,                                                           
             aggregate_columns_vec,                                                     
             final_aggregate_columns_vec,                                               
