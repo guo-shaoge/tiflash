@@ -363,8 +363,6 @@ Aggregator::Aggregator(
     }
 
     batchAllocAggData(aggregates_pool);
-
-    agg_key_buf = aggregates_pool->alloc(512 * 4096);
 }
 
 void Aggregator::batchAllocAggData(Arena * aggregates_pool)
@@ -786,7 +784,8 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
         std::vector<size_t> slice_sizes(agg_size, 0);
         // todo make sure max_one_row_size is enough
         // todo make sure agg_key_buf size is enough
-        const size_t max_one_row_size = 512;
+        const size_t max_one_row_size = 1024;
+        agg_key_buf = aggregates_pool->alloc(max_one_row_size * agg_size);
         for (const auto & group_by_col : agg_process_info.key_columns)
         {
             group_by_col->serializeAll(agg_key_buf, max_one_row_size, slice_sizes);
@@ -801,10 +800,11 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
             //         *aggregates_pool};
 
             // todo SerializedKeyHolder or not?
+            const auto row_idx = i - agg_process_info.start_row;
             auto key_holder = 
                 SerializedKeyHolder{
                     // todo start from i or i - start_row
-                    StringRef(agg_key_buf + i * max_one_row_size, slice_sizes[i]),
+                    StringRef(agg_key_buf + row_idx * max_one_row_size, slice_sizes[i]),
                     *aggregates_pool};
             bool inserted = false;
             HashMap<StringRef, AggregateDataPtr>::LookupResult it;
@@ -824,7 +824,8 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
             {
                 aggregate_data = it->getMapped();
             }
-            places[i - agg_process_info.start_row] = aggregate_data;
+            // places[i - agg_process_info.start_row] = aggregate_data;
+            places[row_idx] = aggregate_data;
             processed_rows = i;
         }
         // for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
