@@ -201,6 +201,22 @@ public:
         offsets.resize_assume_reserved(offsets.size() - n);
     }
 
+    void serializeAll(char * const begin, size_t max_one_row,
+            std::vector<size_t> & slice_sizes) const override
+    {
+        const size_t size = this->size();
+        for (size_t i = 0; i < size; ++i)
+        {
+            size_t string_size = sizeAt(i);
+            size_t offset = offsetAt(i);
+            const void * src = &chars[offset];
+            const size_t arena_offset = slice_sizes[i] + i * max_one_row;
+            std::memcpy(begin + arena_offset, &string_size, sizeof(string_size));
+            std::memcpy(begin + sizeof(string_size) + arena_offset, src, string_size);
+            slice_sizes[i] += sizeof(string_size) + string_size;
+        }
+    }
+
     StringRef serializeValueIntoArena(
         size_t n,
         Arena & arena,

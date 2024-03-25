@@ -363,6 +363,8 @@ Aggregator::Aggregator(
     }
 
     batchAllocAggData(aggregates_pool);
+
+    agg_key_buf = aggregates_pool->alloc(512 * 4096);
 }
 
 void Aggregator::batchAllocAggData(Arena * aggregates_pool)
@@ -781,12 +783,28 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
                 emplace_result_watch.stop();
             build_watch.addEmplaceHashMap(emplace_result_watch.elapsed());
         });
+        std::vector<size_t> slice_sizes(agg_size, 0);
+        // todo make sure max_one_row_size is enough
+        // todo make sure agg_key_buf size is enough
+        const size_t max_one_row_size = 512;
+        for (const auto & group_by_col : agg_process_info.key_columns)
+        {
+            group_by_col->serializeAll(agg_key_buf, max_one_row_size, slice_sizes);
+        }
+
         for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
         {
             AggregateDataPtr aggregate_data = nullptr;
+            // auto key_holder = 
+            //     SerializedKeyHolder{
+            //         serializeKeysToPoolContiguous(i, agg_process_info.key_columns.size(), agg_process_info.key_columns, params.collators, sort_key_containers, *aggregates_pool),
+            //         *aggregates_pool};
+
+            // todo SerializedKeyHolder or not?
             auto key_holder = 
                 SerializedKeyHolder{
-                    serializeKeysToPoolContiguous(i, agg_process_info.key_columns.size(), agg_process_info.key_columns, params.collators, sort_key_containers, *aggregates_pool),
+                    // todo start from i or i - start_row
+                    StringRef(agg_key_buf + i * max_one_row_size, slice_sizes[i]),
                     *aggregates_pool};
             bool inserted = false;
             HashMap<StringRef, AggregateDataPtr>::LookupResult it;

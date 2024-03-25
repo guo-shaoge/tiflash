@@ -1451,6 +1451,7 @@ public:
 
     std::vector<AggregateDataPtr> aggregate_data_vec;
     size_t used_aggregate_data_index = 0;
+    char * agg_key_buf = nullptr;
 };
 
 /** Get the aggregation variant by its type. */

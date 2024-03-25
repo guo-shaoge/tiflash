@@ -181,6 +181,11 @@ public:
       */
     virtual void popBack(size_t n) = 0;
 
+    virtual void serializeAll(char * const, size_t, std::vector<size_t> &) const
+    {
+        throw Exception("serializeAll not implement for {}", getName());
+    }
+
     /** Serializes n-th element. Serialized element should be placed continuously inside Arena's memory.
       * Serialized value can be deserialized to reconstruct original object. Is used in aggregation.
       * The method is similar to getDataAt(), but can work when element's value cannot be mapped to existing continuous memory chunk,

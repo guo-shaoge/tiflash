@@ -49,15 +49,6 @@ LocalAggregateTransform::LocalAggregateTransform(
         });
     build_watch.reset();
     convergent_watch.reset();
-
-    try
-    {
-        throw DB::Exception("test");
-    }
-    catch (...)
-    {
-        LOG_INFO(log, "gjt stack {}", getCurrentExceptionMessage(true));
-    }
 }
 
 OperatorStatus LocalAggregateTransform::transformImpl(Block & block)

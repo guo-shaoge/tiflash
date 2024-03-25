@@ -298,6 +298,16 @@ public:
 
     void popBack(size_t n) override { data.resize_assume_reserved(data.size() - n); }
 
+    void serializeAll(char * const begin, size_t max_one_row, std::vector<size_t> & slice_sizes) const override
+    {
+        const size_t size = this->size();
+        for (size_t i = 0; i < size; ++i)
+        {
+            std::memcpy(begin + i * max_one_row + slice_sizes[i], &data[i], sizeof(T));
+            slice_sizes[i] += sizeof(T);
+        }
+    }
+
     StringRef serializeValueIntoArena(
         size_t n,
         Arena & arena,
