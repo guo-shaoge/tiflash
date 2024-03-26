@@ -129,6 +129,17 @@ public:
         emplace_hash_map += tmp;
     }
 
+    void stopAndSerializeAll()
+    {
+        stop();
+        serialize_all += elapsed();
+    }
+    UInt64 getSerializeAll() const { return serialize_all; }
+    void addSerializeAll(UInt64 tmp)
+    {
+        serialize_all += tmp;
+    }
+
     void stopAndCreateAggState()
     {
         stop();
@@ -225,6 +236,7 @@ private:
 
     UInt64 agg_build = 0;
     UInt64 emplace_hash_map = 0;
+    UInt64 serialize_all = 0;
     UInt64 create_agg_state = 0;
     UInt64 compute_agg_state = 0;
     UInt64 alloc_agg_state = 0;

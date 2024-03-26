@@ -33,8 +33,8 @@ public:
     ~LocalAggregateTransform() override
     {
         auto log = Logger::get();
-        LOG_INFO(log, "gjt debug emplace result: {}, compute agg state: {}; convergent: {}",
-                build_watch.getEmplaceHashMap(), build_watch.getComputeAggState(),
+        LOG_INFO(log, "gjt debug emplace result: {}, compute agg state: {}, serialize all: {}; convergent: {}",
+                build_watch.getEmplaceHashMap(), build_watch.getSerializeAll(), build_watch.getComputeAggState(),
                 convergent_watch.getAggConvergent());
     }
 

@@ -782,7 +782,7 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     {
         Stopwatch emplace_result_watch;
         SCOPE_EXIT({
-                emplace_result_watch.stop();
+            emplace_result_watch.stop();
             build_watch.addEmplaceHashMap(emplace_result_watch.elapsed());
         });
         if unlikely (agg_size > max_rows)
@@ -790,17 +790,24 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
             throw Exception(fmt::format("max one row size not enough, {}, {}", agg_size, max_rows));
         }
         std::vector<size_t> slice_sizes(agg_size, 0);
-        LOG_INFO(log, "gjt debug max_one_row_size: {}, agg_size: {}, start_row: {}, end_row: {}", max_one_row_size, agg_size, 
-                agg_process_info.start_row, agg_process_info.end_row);
-        for (const auto & group_by_col : agg_process_info.key_columns)
+        // LOG_INFO(log, "gjt debug max_one_row_size: {}, agg_size: {}, start_row: {}, end_row: {}", max_one_row_size, agg_size, 
+        //         agg_process_info.start_row, agg_process_info.end_row);
+        Stopwatch serialize_all_watch;
         {
-            LOG_INFO(log, "gjt debug group by col size: {}, {}", group_by_col->getName(), group_by_col->size());
-            group_by_col->serializeAll(agg_key_buf, max_one_row_size, slice_sizes);
+            SCOPE_EXIT({
+                serialize_all_watch.stop();
+                build_watch.addSerializeAll(serialize_all_watch.elapsed());
+            });
+            for (const auto & group_by_col : agg_process_info.key_columns)
+            {
+                // LOG_INFO(log, "gjt debug group by col size: {}, {}", group_by_col->getName(), group_by_col->size());
+                group_by_col->serializeAll(agg_key_buf, max_one_row_size, slice_sizes);
+            }
         }
-        for (const auto & size : slice_sizes)
-        {
-            LOG_INFO(log, "gjt debug slice size: {}", size);
-        }
+        // for (const auto & size : slice_sizes)
+        // {
+        //     LOG_INFO(log, "gjt debug slice size: {}", size);
+        // }
 
         for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
         {
