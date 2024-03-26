@@ -186,6 +186,11 @@ public:
         throw Exception("serializeAll not implement for {}", getName());
     }
 
+    virtual void deserializeAll(std::vector<StringRef *> &, size_t)
+    {
+        throw Exception("deserializeAll not impl for {}", getName());
+    }
+
     /** Serializes n-th element. Serialized element should be placed continuously inside Arena's memory.
       * Serialized value can be deserialized to reconstruct original object. Is used in aggregation.
       * The method is similar to getDataAt(), but can work when element's value cannot be mapped to existing continuous memory chunk,

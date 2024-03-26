@@ -110,6 +110,11 @@ public:
     /// Inserts results into a column.
     virtual void insertResultInto(ConstAggregateDataPtr __restrict place, IColumn & to, Arena * arena) const = 0;
 
+    virtual void insertResultByColumn(std::vector<AggregateDataPtr> &, size_t, IColumn &, Arena *) const
+    {
+        throw Exception(fmt::format("insertResultByColumn not impl {}", getName()));
+    }
+
     /** Returns true for aggregate functions of type -State.
       * They are executed as other aggregate functions, but not finalized (return an aggregation state that can be combined with another).
       */

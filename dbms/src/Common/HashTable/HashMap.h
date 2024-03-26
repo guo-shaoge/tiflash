@@ -81,7 +81,9 @@ struct HashMapCell
     {}
 
     /// Get the key (externally).
+    /// todo
     const Key & getKey() const { return value.first; }
+    Key & getKey() { return value.first; }
     Mapped & getMapped() { return value.second; }
     const Mapped & getMapped() const { return value.second; }
     const value_type & getValue() const { return value; }

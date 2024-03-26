@@ -1445,6 +1445,27 @@ void Aggregator::convertToBlocksImplPureTestMap(
     // data.clearAndShrink();
 }
 
+template <typename Mapped>
+inline void Aggregator::insertAggregateByColumn(
+    std::vector<Mapped> & values,
+    MutableColumns & final_aggregate_columns,
+    Arena * arena) const
+{
+    size_t insert_i = 0;
+
+    // todo try catch
+    /// Insert final values of aggregate functions into columns.
+    for (; insert_i < params.aggregates_size; ++insert_i)
+    {
+        aggregate_functions[insert_i]->insertResultByColumn(
+            values,
+            offsets_of_aggregate_states[insert_i],
+            *final_aggregate_columns[insert_i],
+            arena);
+    }
+
+    // todo destroy mapped?
+}
 
 template <typename Mapped>
 inline void Aggregator::insertAggregatesIntoColumns(
@@ -1643,6 +1664,15 @@ std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<Method>>> initAg
 }
 } // namespace
 
+void insertKeyByColumn(std::vector<StringRef *> & keys,
+        std::vector<IColumn *> & key_columns)
+{
+    for (auto & key_column : key_columns)
+    {
+        key_column->deserializeAll(keys, keys.size());
+    }
+}
+
 template <typename Method, typename Table>
 void NO_INLINE Aggregator::convertToBlocksImplFinal(
     Method & method,
@@ -1663,13 +1693,45 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     if constexpr (std::is_same<typename Method::Key, StringRef>::value)
     {
         // LOG_INFO(log, "gjt debug in convertToBlocksImplFinal");
-        test_map->forEachValue([&](const auto & key, auto & mapped) {
-            size_t key_columns_vec_index = data_index / params.max_block_size;
-            agg_keys_helpers[key_columns_vec_index]
-                ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
-            insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
-            ++data_index;
+        // each output block got an item in keys_vec/values_vec.
+        std::vector<std::vector<typename Method::Key *>> keys_vec;
+        std::vector<std::vector<typename Method::Mapped>> values_vec;
+
+        keys_vec.reserve(test_map->size() / params.max_block_size + 1);
+        values_vec.reserve(test_map->size() / params.max_block_size + 1);
+        keys_vec.push_back(std::vector<typename Method::Key *>());
+        values_vec.push_back(std::vector<typename Method::Mapped>());
+        keys_vec.back().reserve(params.max_block_size);
+        values_vec.back().reserve(params.max_block_size);
+
+        test_map->forEachValue([&](auto & key, auto & mapped) {
+            if unlikely (keys_vec.back().size() >= params.max_block_size)
+            {
+                keys_vec.push_back(std::vector<typename Method::Key *>());
+                values_vec.push_back(std::vector<typename Method::Mapped>());
+                keys_vec.back().reserve(params.max_block_size);
+                values_vec.back().reserve(params.max_block_size);
+            }
+            keys_vec.back().push_back(&key);
+            values_vec.back().push_back(mapped);
         });
+
+        for (size_t i = 0; i < keys_vec.size(); ++i)
+        {
+            insertKeyByColumn(keys_vec[i], key_columns_vec[i]);
+        }
+        for (size_t i = 0; i < values_vec.size(); ++i)
+        {
+            insertAggregateByColumn(values_vec[i], final_aggregate_columns_vec[i], arena);
+        }
+
+        // test_map->forEachValue([&](const auto & key, auto & mapped) {
+        //     size_t key_columns_vec_index = data_index / params.max_block_size;
+        //     agg_keys_helpers[key_columns_vec_index]
+        //         ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+        //     insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+        //     ++data_index;
+        // });
     }
     else
         data.forEachValue([&](const auto & key, auto & mapped) {

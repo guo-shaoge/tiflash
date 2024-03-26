@@ -1418,6 +1418,12 @@ public:
     template <typename Mapped>
     void insertAggregatesIntoColumns(Mapped & mapped, MutableColumns & final_aggregate_columns, Arena * arena) const;
 
+    template <typename Mapped>
+    void insertAggregateByColumn(
+        std::vector<Mapped> & values,
+        MutableColumns & final_aggregate_columns,
+        Arena * arena) const;
+
     void prepareAggregateInstructions(
         Columns columns,
         AggregateColumns & aggregate_columns,

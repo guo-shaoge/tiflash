@@ -412,6 +412,35 @@ public:
             static_cast<ColumnVector<TResult> &>(to).getData().push_back(this->data(place).get());
     }
 
+    void insertResultByColumn(std::vector<char *> & mapped_vec, size_t offset,
+            IColumn & to_icol, Arena *) const override
+    {
+        if constexpr (IsDecimal<TResult>)
+        {
+            auto & to = static_cast<ColumnDecimal<TResult> &>(to_icol);
+            auto & to_data = to.getData();
+            to_data.reserve(mapped_vec.size());
+            // todo for range
+            for (size_t i = 0; i < mapped_vec.size(); ++i)
+            {
+                // todo what's get()?
+                to_data.push_back(this->data(mapped_vec[i] + offset).get(), result_scale);
+                // mapped_vec[i] += sizeof(Data);
+            }
+        }
+        else
+        {
+            auto & to = static_cast<ColumnVector<TResult> &>(to_icol);
+            auto & to_data = to.getData();
+            to_data.reserve(mapped_vec.size());
+            for (size_t i = 0; i < mapped_vec.size(); ++i)
+            {
+                to_data.push_back(this->data(mapped_vec[i] + offset).get());
+                // mapped_vec[i] += sizeof(Data);
+            }
+        }
+    }
+
     const char * getHeaderFilePath() const override { return __FILE__; }
 };
 

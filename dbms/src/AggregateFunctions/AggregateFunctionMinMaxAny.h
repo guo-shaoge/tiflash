@@ -36,7 +36,8 @@ namespace DB
 template <typename T>
 struct SingleValueDataFixed
 {
-private:
+// todo remove private
+// private:
     using Self = SingleValueDataFixed<T>;
 
     bool has_value
@@ -183,7 +184,8 @@ public:
   */
 struct SingleValueDataString
 {
-private:
+// todo private
+// private:
     using Self = SingleValueDataString;
 
     Int32 size = -1; /// -1 indicates that there is no value.
@@ -427,7 +429,8 @@ static_assert(
 /// For any other value types.
 struct SingleValueDataGeneric
 {
-private:
+// todo: remove private
+// private:
     using Self = SingleValueDataGeneric;
 
     Field value;
@@ -769,6 +772,58 @@ public:
     void insertResultInto(ConstAggregateDataPtr __restrict place, IColumn & to, Arena *) const override
     {
         this->data(place).insertResultInto(to);
+    }
+
+    void insertResultByColumn(std::vector<AggregateDataPtr> & mapped_vec,
+            size_t offset,
+            IColumn & to_icol, Arena *) const override
+    {
+        if constexpr (std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataFixed<Decimal128>>>::value ||
+                std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataFixed<Int8>>>::value ||
+                std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataFixed<Int16>>>::value ||
+                std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataFixed<Int32>>>::value ||
+                std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataFixed<Int128>>>::value ||
+        std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Decimal128>>>::value ||
+                std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Int8>>>::value ||
+                std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Int16>>>::value ||
+                std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Int32>>>::value ||
+                std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Int128>>>::value)
+
+        {
+            auto & to = static_cast<typename Data::ColumnType &>(to_icol);
+            auto & to_data = to.getData();
+            to_data.reserve(mapped_vec.size());
+            for (auto & mapped : mapped_vec)
+            {
+                to_data.push_back(this->data(
+                            reinterpret_cast<const char *>(mapped) + offset).value);
+            }
+        }
+        else if constexpr (std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataString>>::value ||
+                std::is_same<Data, AggregateFunctionAnyData<SingleValueDataString>>::value)
+        {
+            auto & to = static_cast<ColumnString &>(to_icol);
+            to.reserve(mapped_vec.size());
+            for (auto & mapped : mapped_vec)
+            {
+                const auto & data_string = this->data(reinterpret_cast<const char *>(mapped) + offset);
+                to.insertDataWithTerminatingZero(data_string.getData(), data_string.size);
+            }
+        }
+        else if constexpr (std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataGeneric>>::value)
+        {
+            // todo UInt64?
+            auto & to = static_cast<ColumnVector<UInt64> &>(to_icol);
+            auto & to_data = to.getData();
+            to_data.reserve(mapped_vec.size());
+            for (auto & mapped : mapped_vec)
+            {
+                to_data.push_back(this->data(
+                            reinterpret_cast<const char *>(mapped) + offset).value.template get<UInt64>());
+            }
+        }
+        else
+            throw Exception(fmt::format("insertResultByColumn not impl: {}, {}, {}", to_icol.getName(), to_icol.getFamilyName(), getName()));
     }
 
     const char * getHeaderFilePath() const override { return __FILE__; }

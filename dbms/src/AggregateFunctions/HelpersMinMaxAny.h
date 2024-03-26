@@ -58,6 +58,10 @@ static IAggregateFunction * createAggregateFunctionSingleValue(
     if (typeid_cast<const DataTypeString *>(argument_type.get()))
         return new AggregateFunctionTemplate<Data<SingleValueDataString>>(argument_type);
 
+    // Generic MyDateTime
+    // auto log = Logger::get();
+    // LOG_INFO(log, "gjt debug SingleValueDataGeneric: {}, {}", argument_type->getName(),
+    //         argument_type->getFamilyName());
     return new AggregateFunctionTemplate<Data<SingleValueDataGeneric>>(argument_type);
 }
 

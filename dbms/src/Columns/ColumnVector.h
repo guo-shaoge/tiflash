@@ -308,6 +308,17 @@ public:
         }
     }
 
+    void deserializeAll(std::vector<StringRef *> & keys, size_t col_size) override
+    {
+        // todo check empty first
+        data.reserve(col_size * sizeof(T));
+        for (auto * & key : keys)
+        {
+            data.push_back(*(reinterpret_cast<const T *>(key->data)));
+            key->data = reinterpret_cast<const char *>(key->data) + sizeof(T);
+        }
+    }
+
     StringRef serializeValueIntoArena(
         size_t n,
         Arena & arena,

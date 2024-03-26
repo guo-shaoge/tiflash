@@ -217,6 +217,23 @@ public:
         }
     }
 
+    void deserializeAll(std::vector<StringRef *> & keys, size_t col_size) override
+    {
+        // todo check empty first
+        auto init_str_size = *(reinterpret_cast<const size_t *>(keys[0]->data));
+        chars.reserve(col_size * init_str_size * 2);
+        offsets.reserve(col_size + 1);
+        for (StringRef * & key : keys)
+        {
+            auto cur_str_size = *(reinterpret_cast<const size_t *>(key->data));
+            key->data = reinterpret_cast<const char *>(key->data) + sizeof(size_t);
+            chars.insert(chars.end(), key->data, key->data + cur_str_size);
+            key->data = reinterpret_cast<const char *>(key->data) + cur_str_size;
+            offsets.push_back(cur_str_size);
+        }
+        offsets.pop_back();
+    }
+
     StringRef serializeValueIntoArena(
         size_t n,
         Arena & arena,
