@@ -362,22 +362,31 @@ Aggregator::Aggregator(
         agg_spill_context->buildSpiller(getHeader(false));
     }
 
-    batchAllocAggData(aggregates_pool);
-
     // todo make sure max_one_row_size is enough
     // todo make sure agg_key_buf size is enough
     agg_key_buf = new char[max_one_row_size * max_rows];
 }
 
-void Aggregator::batchAllocAggData(Arena * aggregates_pool)
+AggregateDataPtr Aggregator::batchAllocAggData(Arena * aggregates_pool)
 {
-    auto ori_size = aggregate_data_vec.size();
-    const auto alloc_size = 4096;
-    aggregate_data_vec.reserve(ori_size + alloc_size);
-    for (size_t i = 0; i < alloc_size; ++i)
+    static const auto alloc_size = 4096;
+    const auto aligned_agg_size = total_size_of_aggregate_states + align_aggregate_states;
+    if unlikely (aggregate_data_vec.empty() || aggregate_data_vec.back().second == alloc_size)
     {
-        aggregate_data_vec.push_back(aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states));
+        aggregate_data_vec.push_back({
+                aggregates_pool->alignedAlloc(aligned_agg_size * alloc_size, 16), 0});
     }
+    auto & back = aggregate_data_vec.back();
+    return static_cast<char *>(back.first) + aligned_agg_size * back.second++;
+
+    // auto ori_size = aggregate_data_vec.size();
+    // const auto alloc_size = 4096;
+    // aggregate_data_vec.reserve(ori_size + alloc_size);
+    // for (size_t i = 0; i < alloc_size; ++i)
+    // {
+    //     // todo reserve
+    //     aggregate_data_vec.push_back(aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states));
+    // }
 }
 
 inline bool IsTypeNumber64(const DataTypePtr & type)
@@ -645,6 +654,7 @@ AggregatedDataVariants::Type Aggregator::chooseAggregationMethod()
 }
 
 
+// gjt todo: make it inline
 void Aggregator::createAggregateStates(AggregateDataPtr & aggregate_data) const
 {
     for (size_t j = 0; j < params.aggregates_size; ++j)
@@ -830,12 +840,12 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
 
             if (inserted)
             {
-                if unlikely (used_aggregate_data_index >= aggregate_data_vec.size())
+                aggregate_data = batchAllocAggData(aggregates_pool);
+                // createAggregateStates(aggregate_data);
+                for (size_t j = 0; j < params.aggregates_size; ++j)
                 {
-                    batchAllocAggData(aggregates_pool);
+                    aggregate_functions[j]->create(aggregate_data + offsets_of_aggregate_states[j]);
                 }
-                aggregate_data = aggregate_data_vec[used_aggregate_data_index++];
-                createAggregateStates(aggregate_data);
                 it->setMapped(aggregate_data);
             }
             else

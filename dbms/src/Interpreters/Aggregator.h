@@ -1201,7 +1201,7 @@ public:
         bool final,
         size_t max_threads) const;
 
-    void batchAllocAggData(Arena * aggregates_pool);
+    AggregateDataPtr batchAllocAggData(Arena * aggregates_pool);
 
     /// Merge several partially aggregated blocks into one.
     BlocksList vstackBlocks(BlocksList & blocks, bool final);
@@ -1454,8 +1454,8 @@ public:
     template <typename Method>
     friend class AggHashTableToBlocksBlockInputStream;
 
-    std::vector<AggregateDataPtr> aggregate_data_vec;
-    size_t used_aggregate_data_index = 0;
+    std::vector<std::pair<char *, size_t>> aggregate_data_vec;
+    // size_t used_aggregate_data_index = 0;
     char * agg_key_buf = nullptr;
     size_t max_one_row_size = 128;
     size_t max_rows = 20000;
