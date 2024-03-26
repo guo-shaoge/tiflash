@@ -363,6 +363,10 @@ Aggregator::Aggregator(
     }
 
     batchAllocAggData(aggregates_pool);
+
+    // todo make sure max_one_row_size is enough
+    // todo make sure agg_key_buf size is enough
+    agg_key_buf = new char[max_one_row_size * max_rows];
 }
 
 void Aggregator::batchAllocAggData(Arena * aggregates_pool)
@@ -781,14 +785,21 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
                 emplace_result_watch.stop();
             build_watch.addEmplaceHashMap(emplace_result_watch.elapsed());
         });
+        if unlikely (agg_size > max_rows)
+        {
+            throw Exception(fmt::format("max one row size not enough, {}, {}", agg_size, max_rows));
+        }
         std::vector<size_t> slice_sizes(agg_size, 0);
-        // todo make sure max_one_row_size is enough
-        // todo make sure agg_key_buf size is enough
-        const size_t max_one_row_size = 1024;
-        agg_key_buf = aggregates_pool->alloc(max_one_row_size * agg_size);
+        LOG_INFO(log, "gjt debug max_one_row_size: {}, agg_size: {}, start_row: {}, end_row: {}", max_one_row_size, agg_size, 
+                agg_process_info.start_row, agg_process_info.end_row);
         for (const auto & group_by_col : agg_process_info.key_columns)
         {
+            LOG_INFO(log, "gjt debug group by col size: {}, {}", group_by_col->getName(), group_by_col->size());
             group_by_col->serializeAll(agg_key_buf, max_one_row_size, slice_sizes);
+        }
+        for (const auto & size : slice_sizes)
+        {
+            LOG_INFO(log, "gjt debug slice size: {}", size);
         }
 
         for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
@@ -802,9 +813,9 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
             // todo SerializedKeyHolder or not?
             const auto row_idx = i - agg_process_info.start_row;
             auto key_holder = 
-                SerializedKeyHolder{
+                ArenaKeyHolder{
                     // todo start from i or i - start_row
-                    StringRef(agg_key_buf + row_idx * max_one_row_size, slice_sizes[i]),
+                    StringRef(agg_key_buf + row_idx * max_one_row_size, slice_sizes[row_idx]),
                     *aggregates_pool};
             bool inserted = false;
             HashMap<StringRef, AggregateDataPtr>::LookupResult it;

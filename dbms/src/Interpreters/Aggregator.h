@@ -1125,6 +1125,11 @@ public:
         const RegisterOperatorSpillContext & register_operator_spill_context,
     Arena * aggregates_pool = nullptr);
 
+    ~Aggregator()
+    {
+        delete [] agg_key_buf;
+    }
+
     /// Aggregate the source. Get the result in the form of one of the data structures.
     void execute(const BlockInputStreamPtr & stream, AggregatedDataVariants & result, size_t thread_num);
 
@@ -1452,6 +1457,8 @@ public:
     std::vector<AggregateDataPtr> aggregate_data_vec;
     size_t used_aggregate_data_index = 0;
     char * agg_key_buf = nullptr;
+    size_t max_one_row_size = 128;
+    size_t max_rows = 20000;
 };
 
 /** Get the aggregation variant by its type. */
