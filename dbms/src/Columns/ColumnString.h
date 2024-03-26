@@ -211,8 +211,8 @@ public:
             size_t offset = offsetAt(i);
             const void * src = &chars[offset];
             const size_t arena_offset = slice_sizes[i] + i * max_one_row;
-            std::memcpy(begin + arena_offset, &string_size, sizeof(string_size));
-            std::memcpy(begin + sizeof(string_size) + arena_offset, src, string_size);
+            memcpy_inlined(begin + arena_offset, &string_size, sizeof(string_size));
+            memcpy_inlined(begin + sizeof(string_size) + arena_offset, src, string_size);
             slice_sizes[i] += sizeof(string_size) + string_size;
         }
     }
