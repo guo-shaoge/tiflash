@@ -1356,7 +1356,8 @@ public:
         Arena * arena,
         bool final,
         // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
-        HashMap<StringRef, AggregateDataPtr> * test_map) const;
+        HashMap<StringRef, AggregateDataPtr> * test_map,
+        Stopwatch & read_watch) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplFinal(
@@ -1374,7 +1375,8 @@ public:
         std::vector<MutableColumns> & final_aggregate_columns_vec,
         Arena * arena,
         // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const;
-        HashMap<StringRef, AggregateDataPtr> * test_map) const;
+        HashMap<StringRef, AggregateDataPtr> * test_map,
+        Stopwatch & read_watch) const;
 
     template <typename Method, typename Table>
     void convertToBlockImplNotFinal(
@@ -1397,7 +1399,7 @@ public:
     BlocksList prepareBlocksAndFill(AggregatedDataVariants & data_variants, bool final, size_t rows, Filler && filler)
         const;
 
-    BlocksList pureTestMapRead(AggregatedDataVariants & data_variants) const;
+    BlocksList pureTestMapRead(AggregatedDataVariants & data_variants, Stopwatch & read_watch) const;
 
     template <typename Method>
     Block convertOneBucketToBlock(

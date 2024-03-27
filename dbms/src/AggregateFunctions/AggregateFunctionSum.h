@@ -419,7 +419,7 @@ public:
         {
             auto & to = static_cast<ColumnDecimal<TResult> &>(to_icol);
             auto & to_data = to.getData();
-            to_data.reserve(mapped_vec.size());
+            to_data.reserve(to_data.size() + mapped_vec.size());
             // todo for range
             for (size_t i = 0; i < mapped_vec.size(); ++i)
             {
@@ -432,7 +432,7 @@ public:
         {
             auto & to = static_cast<ColumnVector<TResult> &>(to_icol);
             auto & to_data = to.getData();
-            to_data.reserve(mapped_vec.size());
+            to_data.reserve(to_data.size() + mapped_vec.size());
             for (size_t i = 0; i < mapped_vec.size(); ++i)
             {
                 to_data.push_back(this->data(mapped_vec[i] + offset).get());

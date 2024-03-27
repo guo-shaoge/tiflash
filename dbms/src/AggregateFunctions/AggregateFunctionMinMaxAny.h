@@ -783,7 +783,7 @@ public:
                 std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataFixed<Int16>>>::value ||
                 std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataFixed<Int32>>>::value ||
                 std::is_same<Data, AggregateFunctionFirstRowData<SingleValueDataFixed<Int128>>>::value ||
-        std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Decimal128>>>::value ||
+                std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Decimal128>>>::value ||
                 std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Int8>>>::value ||
                 std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Int16>>>::value ||
                 std::is_same<Data, AggregateFunctionAnyData<SingleValueDataFixed<Int32>>>::value ||
@@ -792,7 +792,7 @@ public:
         {
             auto & to = static_cast<typename Data::ColumnType &>(to_icol);
             auto & to_data = to.getData();
-            to_data.reserve(mapped_vec.size());
+            to_data.reserve(to_data.size() + mapped_vec.size());
             for (auto & mapped : mapped_vec)
             {
                 to_data.push_back(this->data(
@@ -803,7 +803,7 @@ public:
                 std::is_same<Data, AggregateFunctionAnyData<SingleValueDataString>>::value)
         {
             auto & to = static_cast<ColumnString &>(to_icol);
-            to.reserve(mapped_vec.size());
+            to.reserve(to.size() + mapped_vec.size());
             for (auto & mapped : mapped_vec)
             {
                 const auto & data_string = this->data(reinterpret_cast<const char *>(mapped) + offset);
@@ -815,7 +815,7 @@ public:
             // todo UInt64?
             auto & to = static_cast<ColumnVector<UInt64> &>(to_icol);
             auto & to_data = to.getData();
-            to_data.reserve(mapped_vec.size());
+            to_data.reserve(to_data.size() + mapped_vec.size());
             for (auto & mapped : mapped_vec)
             {
                 to_data.push_back(this->data(

@@ -1399,8 +1399,9 @@ void Aggregator::convertToBlocksImpl(
         raw_key_columns_vec.push_back(raw_key_columns);
     }
 
+    Stopwatch tmp_watch;
     if (final)
-        convertToBlocksImplFinal(method, data, std::move(raw_key_columns_vec), final_aggregate_columns_vec, arena, nullptr);
+        convertToBlocksImplFinal(method, data, std::move(raw_key_columns_vec), final_aggregate_columns_vec, arena, nullptr, tmp_watch);
     else
         convertToBlocksImplNotFinal(method, data, std::move(raw_key_columns_vec), aggregate_columns_vec);
 
@@ -1418,7 +1419,8 @@ void Aggregator::convertToBlocksImplPureTestMap(
     Arena * arena,
     bool final,
     // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
-    HashMap<StringRef, AggregateDataPtr> * test_map) const
+    HashMap<StringRef, AggregateDataPtr> * test_map,
+    Stopwatch & read_watch) const
 {
     std::vector<std::vector<IColumn *>> raw_key_columns_vec;
     raw_key_columns_vec.reserve(key_columns_vec.size());
@@ -1437,7 +1439,8 @@ void Aggregator::convertToBlocksImplPureTestMap(
     }
 
     if (final)
-        convertToBlocksImplFinal(method, data, std::move(raw_key_columns_vec), final_aggregate_columns_vec, arena, test_map);
+        convertToBlocksImplFinal(method, data, std::move(raw_key_columns_vec), final_aggregate_columns_vec, arena, test_map,
+                read_watch);
     else
         convertToBlocksImplNotFinal(method, data, std::move(raw_key_columns_vec), aggregate_columns_vec);
 
@@ -1681,7 +1684,8 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     std::vector<MutableColumns> & final_aggregate_columns_vec,
     Arena * arena,
     // HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>> * test_map) const
-    HashMap<StringRef, AggregateDataPtr> * test_map) const
+    HashMap<StringRef, AggregateDataPtr> * test_map,
+    Stopwatch & read_watch) const
 {
     assert(!key_columns_vec.empty());
     auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
@@ -1704,25 +1708,74 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
         keys_vec.back().reserve(params.max_block_size);
         values_vec.back().reserve(params.max_block_size);
 
-        test_map->forEachValue([&](auto & key, auto & mapped) {
-            if unlikely (keys_vec.back().size() >= params.max_block_size)
-            {
-                keys_vec.push_back(std::vector<typename Method::Key *>());
-                values_vec.push_back(std::vector<typename Method::Mapped>());
-                keys_vec.back().reserve(params.max_block_size);
-                values_vec.back().reserve(params.max_block_size);
-            }
-            keys_vec.back().push_back(&key);
-            values_vec.back().push_back(mapped);
-        });
-
-        for (size_t i = 0; i < keys_vec.size(); ++i)
+        Stopwatch tmp_watch;
         {
-            insertKeyByColumn(keys_vec[i], key_columns_vec[i]);
+            tmp_watch.start();
+            SCOPE_EXIT({
+                tmp_watch.stop();
+                read_watch.addIterHashMap(tmp_watch.elapsed());
+            });
+            test_map->forEachValue([&](auto & key, auto & mapped) {
+                if unlikely (keys_vec.back().size() >= params.max_block_size)
+                {
+                    keys_vec.push_back(std::vector<typename Method::Key *>());
+                    values_vec.push_back(std::vector<typename Method::Mapped>());
+                    keys_vec.back().reserve(params.max_block_size);
+                    values_vec.back().reserve(params.max_block_size);
+                }
+                keys_vec.back().push_back(&key);
+                values_vec.back().push_back(mapped);
+            });
         }
-        for (size_t i = 0; i < values_vec.size(); ++i)
+
         {
-            insertAggregateByColumn(values_vec[i], final_aggregate_columns_vec[i], arena);
+            tmp_watch.reset();
+            tmp_watch.start();
+            SCOPE_EXIT({
+                tmp_watch.stop();
+                read_watch.addInsertKeyColumns(tmp_watch.elapsed());
+            });
+
+            for (size_t i = 0; i < keys_vec.size(); ++i)
+            {
+                insertKeyByColumn(keys_vec[i], key_columns_vec[i]);
+            }
+        }
+        {
+            tmp_watch.reset();
+            tmp_watch.start();
+            SCOPE_EXIT({
+                tmp_watch.stop();
+                read_watch.addInsertAggVals(tmp_watch.elapsed());
+            });
+            LOG_INFO(log, "gjt debug in get data, agg size: {}", params.aggregates_size);
+            std::vector<Stopwatch> insert_agg_state_watchs;
+            insert_agg_state_watchs.reserve(params.aggregates_size);
+            for (size_t insert_i = 0; insert_i < params.aggregates_size; ++insert_i)
+            {
+                insert_agg_state_watchs.push_back(Stopwatch());
+            }
+            for (size_t i = 0; i < values_vec.size(); ++i)
+            {
+                // insertAggregateByColumn(values_vec[i], final_aggregate_columns_vec[i], arena);
+                for (size_t insert_i = 0; insert_i < params.aggregates_size; ++insert_i)
+                {
+                    insert_agg_state_watchs[insert_i].start();
+                    SCOPE_EXIT({
+                        insert_agg_state_watchs[insert_i].stopAndInsertAggVals();
+                    });
+                    aggregate_functions[insert_i]->insertResultByColumn(
+                            values_vec[i],
+                            offsets_of_aggregate_states[insert_i],
+                            *(final_aggregate_columns_vec[i][insert_i]),
+                            arena);
+                }
+                LOG_INFO(log, "gjt debug in get data, state size: {}", final_aggregate_columns_vec[i][0]->size());
+            }
+            for (size_t insert_i = 0; insert_i < params.aggregates_size; ++insert_i)
+            {
+                LOG_INFO(log, "gjt debug in get data, agg size: {}, {}, {}", insert_i, aggregate_functions[insert_i]->getName(), insert_agg_state_watchs[insert_i].getInsertAggVals());
+            }
         }
 
         // test_map->forEachValue([&](const auto & key, auto & mapped) {
@@ -1868,7 +1921,7 @@ Block Aggregator::prepareBlockAndFill(AggregatedDataVariants & data_variants, bo
     return res;
 }
 
-BlocksList Aggregator::pureTestMapRead(AggregatedDataVariants & data_variants) const
+BlocksList Aggregator::pureTestMapRead(AggregatedDataVariants & data_variants, Stopwatch & read_watch) const
 {
     auto filler = [&](
                       std::vector<MutableColumns> & key_columns_vec,
@@ -1887,7 +1940,8 @@ BlocksList Aggregator::pureTestMapRead(AggregatedDataVariants & data_variants) c
             final_aggregate_columns_vec,                                               
             data_variants.aggregates_pool,                                             
             final_,
-            data_variants.test_map);                                                                   
+            data_variants.test_map,
+            read_watch);                                                                   
     };
     auto rows = data_variants.test_map->size();
     // LOG_INFO(log, "gjt debug in pureTestMapRead rows: {}", rows);

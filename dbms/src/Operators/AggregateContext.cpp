@@ -191,7 +191,7 @@ void AggregateContext::initConvergent(Stopwatch & convergent_watch)
     // RUNTIME_CHECK(!merging_buckets || merging_buckets->getConcurrency() > 0);
 
     auto & data_variants = many_data[0];
-    block_list = aggregator->pureTestMapRead(*data_variants);
+    block_list = aggregator->pureTestMapRead(*data_variants, convergent_watch);
 }
 
 size_t AggregateContext::getConvergentConcurrency()

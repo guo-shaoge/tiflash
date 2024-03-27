@@ -33,9 +33,12 @@ public:
     ~LocalAggregateTransform() override
     {
         auto log = Logger::get();
-        LOG_INFO(log, "gjt debug emplace result: {}, compute agg state: {}, serialize all: {}; convergent: {}",
+        LOG_INFO(log, "gjt debug emplace result: {}, compute agg state: {}, serialize all: {}; convergent: {}, iter map: {}, insert key: {}, insert agg: {}",
                 build_watch.getEmplaceHashMap(), build_watch.getSerializeAll(), build_watch.getComputeAggState(),
-                convergent_watch.getAggConvergent());
+                convergent_watch.getAggConvergent(),
+                convergent_watch.getIterHashMap(),
+                convergent_watch.getInsertKeyColumns(),
+                convergent_watch.getInsertAggVals());
     }
 
     String getName() const override { return "LocalAggregateTransform"; }

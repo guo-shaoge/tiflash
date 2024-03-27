@@ -174,7 +174,7 @@ public:
         const size_t new_size = old_size + length + (add_terminating_zero ? 1 : 0);
 
         chars.resize(new_size);
-        inline_memcpy(&chars[old_size], pos, length);
+        memcpy_inlined(&chars[old_size], pos, length);
 
         if constexpr (add_terminating_zero)
             chars[old_size + length] = 0;
