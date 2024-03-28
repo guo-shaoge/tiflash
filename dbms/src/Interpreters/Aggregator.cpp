@@ -1696,95 +1696,95 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     size_t data_index = 0;
     if constexpr (std::is_same<typename Method::Key, StringRef>::value)
     {
-        // LOG_INFO(log, "gjt debug in convertToBlocksImplFinal");
-        // each output block got an item in keys_vec/values_vec.
-        std::vector<std::vector<typename Method::Key *>> keys_vec;
-        std::vector<std::vector<typename Method::Mapped>> values_vec;
+        // // LOG_INFO(log, "gjt debug in convertToBlocksImplFinal");
+        // // each output block got an item in keys_vec/values_vec.
+        // std::vector<std::vector<typename Method::Key *>> keys_vec;
+        // std::vector<std::vector<typename Method::Mapped>> values_vec;
 
-        keys_vec.reserve(test_map->size() / params.max_block_size + 1);
-        values_vec.reserve(test_map->size() / params.max_block_size + 1);
-        keys_vec.push_back(std::vector<typename Method::Key *>());
-        values_vec.push_back(std::vector<typename Method::Mapped>());
-        keys_vec.back().reserve(params.max_block_size);
-        values_vec.back().reserve(params.max_block_size);
+        // keys_vec.reserve(test_map->size() / params.max_block_size + 1);
+        // values_vec.reserve(test_map->size() / params.max_block_size + 1);
+        // keys_vec.push_back(std::vector<typename Method::Key *>());
+        // values_vec.push_back(std::vector<typename Method::Mapped>());
+        // keys_vec.back().reserve(params.max_block_size);
+        // values_vec.back().reserve(params.max_block_size);
 
-        Stopwatch tmp_watch;
-        {
-            tmp_watch.start();
-            SCOPE_EXIT({
-                tmp_watch.stop();
-                read_watch.addIterHashMap(tmp_watch.elapsed());
-            });
-            test_map->forEachValue([&](auto & key, auto & mapped) {
-                if unlikely (keys_vec.back().size() >= params.max_block_size)
-                {
-                    keys_vec.push_back(std::vector<typename Method::Key *>());
-                    values_vec.push_back(std::vector<typename Method::Mapped>());
-                    keys_vec.back().reserve(params.max_block_size);
-                    values_vec.back().reserve(params.max_block_size);
-                }
-                keys_vec.back().push_back(&key);
-                values_vec.back().push_back(mapped);
-            });
-        }
+        // Stopwatch tmp_watch;
+        // {
+        //     tmp_watch.start();
+        //     SCOPE_EXIT({
+        //         tmp_watch.stop();
+        //         read_watch.addIterHashMap(tmp_watch.elapsed());
+        //     });
+        //     test_map->forEachValue([&](auto & key, auto & mapped) {
+        //         if unlikely (keys_vec.back().size() >= params.max_block_size)
+        //         {
+        //             keys_vec.push_back(std::vector<typename Method::Key *>());
+        //             values_vec.push_back(std::vector<typename Method::Mapped>());
+        //             keys_vec.back().reserve(params.max_block_size);
+        //             values_vec.back().reserve(params.max_block_size);
+        //         }
+        //         keys_vec.back().push_back(&key);
+        //         values_vec.back().push_back(mapped);
+        //     });
+        // }
 
-        {
-            tmp_watch.reset();
-            tmp_watch.start();
-            SCOPE_EXIT({
-                tmp_watch.stop();
-                read_watch.addInsertKeyColumns(tmp_watch.elapsed());
-            });
+        // {
+        //     tmp_watch.reset();
+        //     tmp_watch.start();
+        //     SCOPE_EXIT({
+        //         tmp_watch.stop();
+        //         read_watch.addInsertKeyColumns(tmp_watch.elapsed());
+        //     });
 
-            for (size_t i = 0; i < keys_vec.size(); ++i)
-            {
-                insertKeyByColumn(keys_vec[i], key_columns_vec[i]);
-            }
-        }
-        {
-            tmp_watch.reset();
-            tmp_watch.start();
-            SCOPE_EXIT({
-                tmp_watch.stop();
-                read_watch.addInsertAggVals(tmp_watch.elapsed());
-            });
-            LOG_INFO(log, "gjt debug in get data, agg size: {}", params.aggregates_size);
-            std::vector<Stopwatch> insert_agg_state_watchs;
-            insert_agg_state_watchs.reserve(params.aggregates_size);
-            for (size_t insert_i = 0; insert_i < params.aggregates_size; ++insert_i)
-            {
-                insert_agg_state_watchs.push_back(Stopwatch());
-            }
-            for (size_t i = 0; i < values_vec.size(); ++i)
-            {
-                // insertAggregateByColumn(values_vec[i], final_aggregate_columns_vec[i], arena);
-                for (size_t insert_i = 0; insert_i < params.aggregates_size; ++insert_i)
-                {
-                    insert_agg_state_watchs[insert_i].start();
-                    SCOPE_EXIT({
-                        insert_agg_state_watchs[insert_i].stopAndInsertAggVals();
-                    });
-                    aggregate_functions[insert_i]->insertResultByColumn(
-                            values_vec[i],
-                            offsets_of_aggregate_states[insert_i],
-                            *(final_aggregate_columns_vec[i][insert_i]),
-                            arena);
-                }
-                LOG_INFO(log, "gjt debug in get data, state size: {}", final_aggregate_columns_vec[i][0]->size());
-            }
-            for (size_t insert_i = 0; insert_i < params.aggregates_size; ++insert_i)
-            {
-                LOG_INFO(log, "gjt debug in get data, agg size: {}, {}, {}", insert_i, aggregate_functions[insert_i]->getName(), insert_agg_state_watchs[insert_i].getInsertAggVals());
-            }
-        }
+        //     for (size_t i = 0; i < keys_vec.size(); ++i)
+        //     {
+        //         insertKeyByColumn(keys_vec[i], key_columns_vec[i]);
+        //     }
+        // }
+        // {
+        //     tmp_watch.reset();
+        //     tmp_watch.start();
+        //     SCOPE_EXIT({
+        //         tmp_watch.stop();
+        //         read_watch.addInsertAggVals(tmp_watch.elapsed());
+        //     });
+        //     LOG_INFO(log, "gjt debug in get data, agg size: {}", params.aggregates_size);
+        //     std::vector<Stopwatch> insert_agg_state_watchs;
+        //     insert_agg_state_watchs.reserve(params.aggregates_size);
+        //     for (size_t insert_i = 0; insert_i < params.aggregates_size; ++insert_i)
+        //     {
+        //         insert_agg_state_watchs.push_back(Stopwatch());
+        //     }
+        //     for (size_t i = 0; i < values_vec.size(); ++i)
+        //     {
+        //         // insertAggregateByColumn(values_vec[i], final_aggregate_columns_vec[i], arena);
+        //         for (size_t insert_i = 0; insert_i < params.aggregates_size; ++insert_i)
+        //         {
+        //             insert_agg_state_watchs[insert_i].start();
+        //             SCOPE_EXIT({
+        //                 insert_agg_state_watchs[insert_i].stopAndInsertAggVals();
+        //             });
+        //             aggregate_functions[insert_i]->insertResultByColumn(
+        //                     values_vec[i],
+        //                     offsets_of_aggregate_states[insert_i],
+        //                     *(final_aggregate_columns_vec[i][insert_i]),
+        //                     arena);
+        //         }
+        //         LOG_INFO(log, "gjt debug in get data, state size: {}", final_aggregate_columns_vec[i][0]->size());
+        //     }
+        //     for (size_t insert_i = 0; insert_i < params.aggregates_size; ++insert_i)
+        //     {
+        //         LOG_INFO(log, "gjt debug in get data, agg size: {}, {}, {}", insert_i, aggregate_functions[insert_i]->getName(), insert_agg_state_watchs[insert_i].getInsertAggVals());
+        //     }
+        // }
 
-        // test_map->forEachValue([&](const auto & key, auto & mapped) {
-        //     size_t key_columns_vec_index = data_index / params.max_block_size;
-        //     agg_keys_helpers[key_columns_vec_index]
-        //         ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
-        //     insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
-        //     ++data_index;
-        // });
+        test_map->forEachValue([&](const auto & key, auto & mapped) {
+            size_t key_columns_vec_index = data_index / params.max_block_size;
+            agg_keys_helpers[key_columns_vec_index]
+                ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+            insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+            ++data_index;
+        });
     }
     else
         data.forEachValue([&](const auto & key, auto & mapped) {
