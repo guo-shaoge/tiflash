@@ -65,7 +65,8 @@ PhysicalPlanNodePtr PhysicalAggregation::build(
             aggregated_columns,
             aggregation_keys,
             agg_key_set,
-            AggregationInterpreterHelper::isGroupByCollationSensitive(context),
+            false,
+            // AggregationInterpreterHelper::isGroupByCollationSensitive(context),
             collators);
     }
 
