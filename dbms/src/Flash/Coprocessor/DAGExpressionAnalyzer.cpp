@@ -577,38 +577,39 @@ void DAGExpressionAnalyzer::buildAggGroupBy(
         /// the final stage of the aggregation, even if TiFlash do the aggregation without collation
         /// info, the correctness of the query result is guaranteed by TiDB itself, so add a flag to
         /// let TiDB/TiFlash to decide whether aggregate the data with collation info or not
-        if (group_by_collation_sensitive)
-        {
-            auto type = actions->getSampleBlock().getByName(name).type;
-            TiDB::TiDBCollatorPtr collator = nullptr;
-            if (removeNullable(type)->isString())
-                collator = getCollatorFromExpr(expr);
-            if (!duplicated_key)
-                collators.push_back(collator);
-            if (collator != nullptr)
-            {
-                /// if the column is a string with collation info, the `sort_key` of the column is used during
-                /// aggregation, but we can not reconstruct the origin column by `sort_key`, so add an extra
-                /// extra aggregation function any(group_by_column) here as the output of the group by column
-                TiDB::TiDBCollators arg_collators{collator};
-                appendAggDescription(
-                    {name},
-                    {type},
-                    arg_collators,
-                    "any",
-                    aggregate_descriptions,
-                    aggregated_columns,
-                    false);
-            }
-            else
-            {
-                aggregated_columns.emplace_back(name, actions->getSampleBlock().getByName(name).type);
-            }
-        }
-        else
-        {
-            aggregated_columns.emplace_back(name, actions->getSampleBlock().getByName(name).type);
-        }
+        // if (group_by_collation_sensitive)
+        // {
+        //     auto type = actions->getSampleBlock().getByName(name).type;
+        //     TiDB::TiDBCollatorPtr collator = nullptr;
+        //     if (removeNullable(type)->isString())
+        //         collator = getCollatorFromExpr(expr);
+        //     if (!duplicated_key)
+        //         collators.push_back(collator);
+        //     if (collator != nullptr)
+        //     {
+        //         /// if the column is a string with collation info, the `sort_key` of the column is used during
+        //         /// aggregation, but we can not reconstruct the origin column by `sort_key`, so add an extra
+        //         /// extra aggregation function any(group_by_column) here as the output of the group by column
+        //         TiDB::TiDBCollators arg_collators{collator};
+        //         appendAggDescription(
+        //             {name},
+        //             {type},
+        //             arg_collators,
+        //             "any",
+        //             aggregate_descriptions,
+        //             aggregated_columns,
+        //             false);
+        //     }
+        //     else
+        //     {
+        //         aggregated_columns.emplace_back(name, actions->getSampleBlock().getByName(name).type);
+        //     }
+        // }
+        // else
+        // {
+        //     aggregated_columns.emplace_back(name, actions->getSampleBlock().getByName(name).type);
+        // }
+        aggregated_columns.emplace_back(name, actions->getSampleBlock().getByName(name).type);
     }
 }
 
