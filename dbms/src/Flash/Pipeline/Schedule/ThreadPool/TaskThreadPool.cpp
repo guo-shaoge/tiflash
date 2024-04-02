@@ -35,7 +35,6 @@ TaskThreadPool<Impl>::TaskThreadPool(TaskScheduler & scheduler_, const ThreadPoo
     threads.reserve(config.pool_size);
     for (size_t i = 0; i < config.pool_size; ++i)
     {
-        LOG_INFO(logger, "task thread pool is start {}", i);
         threads.emplace_back(&TaskThreadPool::loop, this, i);
     }
 }
