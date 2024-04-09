@@ -47,6 +47,8 @@ LocalAggregateTransform::LocalAggregateTransform(
             else if (exec_context.getRegisterOperatorSpillContext() != nullptr)
                 exec_context.getRegisterOperatorSpillContext()(operator_spill_context);
         });
+    build_side_watch.reset();
+    probe_side_watch.reset();
 }
 
 OperatorStatus LocalAggregateTransform::transformImpl(Block & block)
@@ -61,7 +63,7 @@ OperatorStatus LocalAggregateTransform::transformImpl(Block & block)
                 ? fromBuildToFinalSpillOrRestore()
                 : fromBuildToConvergent(block);
         }
-        agg_context.buildOnBlock(task_index, block);
+        agg_context.buildOnBlock(task_index, block, build_side_watch);
         return tryFromBuildToSpill();
     default:
         throw Exception(fmt::format("Unexpected status: {}", magic_enum::enum_name(status)));
@@ -73,9 +75,9 @@ OperatorStatus LocalAggregateTransform::fromBuildToConvergent(Block & block)
     // status from build to convergent.
     assert(status == LocalAggStatus::build);
     status = LocalAggStatus::convergent;
-    agg_context.initConvergent();
+    agg_context.initConvergent(probe_side_watch);
     RUNTIME_CHECK(agg_context.getConvergentConcurrency() == local_concurrency);
-    block = agg_context.readForConvergent(task_index);
+    block = agg_context.readForConvergent(task_index, probe_side_watch);
     return OperatorStatus::HAS_OUTPUT;
 }
 
@@ -113,13 +115,13 @@ OperatorStatus LocalAggregateTransform::tryOutputImpl(Block & block)
     case LocalAggStatus::build:
         while (agg_context.hasLocalDataToBuild(task_index))
         {
-            agg_context.buildOnLocalData(task_index);
+            agg_context.buildOnLocalData(task_index, build_side_watch);
             if (tryFromBuildToSpill() == OperatorStatus::IO_OUT)
                 return OperatorStatus::IO_OUT;
         }
         return agg_context.isTaskMarkedForSpill(task_index) ? tryFromBuildToSpill() : OperatorStatus::NEED_INPUT;
     case LocalAggStatus::convergent:
-        block = agg_context.readForConvergent(task_index);
+        block = agg_context.readForConvergent(task_index, probe_side_watch);
         return OperatorStatus::HAS_OUTPUT;
     case LocalAggStatus::restore:
         return restorer->tryPop(block) ? OperatorStatus::HAS_OUTPUT : OperatorStatus::IO_IN;

@@ -17,6 +17,8 @@
 #include <Core/FineGrainedOperatorSpillContext.h>
 #include <Operators/AggregateContext.h>
 #include <Operators/Operator.h>
+#include <Common/Logger.h>
+#include <common/logger_useful.h>
 
 namespace DB
 {
@@ -29,6 +31,15 @@ public:
         const String & req_id,
         const Aggregator::Params & params_,
         const std::shared_ptr<FineGrainedOperatorSpillContext> & fine_grained_spill_context);
+
+    ~LocalAggregateTransform() override
+    {
+        auto log = Logger::get();
+        LOG_INFO(log, "gjt debug build side: {}, emplace hash map: {}, compute agg state: {}; probe side: {}",
+                build_side_watch.getAggBuild(), build_side_watch.getEmplaceHashMap(),
+                build_side_watch.getComputeAggState(),
+                probe_side_watch.getAggConvergent());
+    }
 
     String getName() const override { return "LocalAggregateTransform"; }
 
@@ -75,5 +86,8 @@ private:
     LocalAggStatus status{LocalAggStatus::build};
 
     LocalAggregateRestorerPtr restorer;
+
+    Stopwatch build_side_watch;
+    Stopwatch probe_side_watch;
 };
 } // namespace DB
