@@ -147,9 +147,10 @@ void ParallelAggregatingBlockInputStream::Handler::onBlock(Block & block, size_t
     auto & data = *parent.many_data[thread_num];
     auto & agg_process_info = parent.threads_data[thread_num].agg_process_info;
     agg_process_info.resetBlock(block);
+    Stopwatch tmp_watch;
     do
     {
-        parent.aggregator.executeOnBlock(agg_process_info, data, thread_num);
+        parent.aggregator.executeOnBlock(agg_process_info, data, thread_num, tmp_watch);
         if (data.need_spill)
             parent.aggregator.spill(data, thread_num);
     } while (!agg_process_info.allBlockDataHandled());
@@ -268,12 +269,13 @@ void ParallelAggregatingBlockInputStream::execute()
 
     /// If there was no data, and we aggregate without keys, we must return single row with the result of empty aggregation.
     /// To do this, we pass a block with zero rows to aggregate.
+    Stopwatch tmp_watch;
     if (total_src_rows == 0 && params.keys_size == 0 && !params.empty_result_for_aggregation_by_empty_set)
     {
         auto & data = *many_data[0];
         auto & agg_process_info = threads_data[0].agg_process_info;
         agg_process_info.resetBlock(children.at(0)->getHeader());
-        aggregator.executeOnBlock(agg_process_info, data, 0);
+        aggregator.executeOnBlock(agg_process_info, data, 0, tmp_watch);
         if (data.need_spill)
             aggregator.spill(data, 0);
         assert(agg_process_info.allBlockDataHandled());

@@ -44,7 +44,8 @@ void PhysicalAggregationConvergent::buildPipelineExecGroupImpl(
     }
     else
     {
-        aggregate_context->initConvergent();
+        Stopwatch tmp_watch;
+        aggregate_context->initConvergent(tmp_watch);
         for (size_t index = 0; index < aggregate_context->getConvergentConcurrency(); ++index)
         {
             group_builder.addConcurrency(std::make_unique<AggregateConvergentSourceOp>(

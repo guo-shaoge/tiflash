@@ -27,6 +27,8 @@
 #include <array>
 #include <cassert>
 
+#include <ext/scope_guard.h>
+
 namespace DB
 {
 namespace ErrorCodes
@@ -656,11 +658,12 @@ void NO_INLINE Aggregator::executeImpl(
     Method & method,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
-    TiDB::TiDBCollators & collators) const
+    TiDB::TiDBCollators & collators,
+    Stopwatch & build_side_watch) const
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    executeImplBatch(method, state, aggregates_pool, agg_process_info);
+    executeImplBatch(method, state, aggregates_pool, agg_process_info, build_side_watch);
 }
 
 template <typename Method>
@@ -686,7 +689,8 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     Method & method,
     typename Method::State & state,
     Arena * aggregates_pool,
-    AggProcessInfo & agg_process_info) const
+    AggProcessInfo & agg_process_info,
+    Stopwatch & build_side_watch) const
 {
     std::vector<std::string> sort_key_containers;
     sort_key_containers.resize(params.keys_size, "");
@@ -748,39 +752,52 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[agg_size]);
     std::optional<size_t> processed_rows;
 
-    for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
+    Stopwatch tmp_watch;
     {
-        AggregateDataPtr aggregate_data = nullptr;
-
-        auto emplace_result_holder = emplaceKey(method, state, i, *aggregates_pool, sort_key_containers);
-        if unlikely (!emplace_result_holder.has_value())
+        tmp_watch.start();
+        SCOPE_EXIT({
+            tmp_watch.stop();
+            build_side_watch.addEmplaceHashMap(tmp_watch.elapsed());
+        });
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
         {
-            LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
-            break;
+            AggregateDataPtr aggregate_data = nullptr;
+
+            auto emplace_result_holder = emplaceKey(method, state, i, *aggregates_pool, sort_key_containers);
+            if unlikely (!emplace_result_holder.has_value())
+            {
+                LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
+                break;
+            }
+
+            auto & emplace_result = emplace_result_holder.value();
+
+            /// If a new key is inserted, initialize the states of the aggregate functions, and possibly something related to the key.
+            if (emplace_result.isInserted())
+            {
+                /// exception-safety - if you can not allocate memory or create states, then destructors will not be called.
+                emplace_result.setMapped(nullptr);
+
+                aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                createAggregateStates(aggregate_data);
+
+                emplace_result.setMapped(aggregate_data);
+            }
+            else
+                aggregate_data = emplace_result.getMapped();
+
+            places[i - agg_process_info.start_row] = aggregate_data;
+            processed_rows = i;
         }
-
-        auto & emplace_result = emplace_result_holder.value();
-
-        /// If a new key is inserted, initialize the states of the aggregate functions, and possibly something related to the key.
-        if (emplace_result.isInserted())
-        {
-            /// exception-safety - if you can not allocate memory or create states, then destructors will not be called.
-            emplace_result.setMapped(nullptr);
-
-            aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-            createAggregateStates(aggregate_data);
-
-            emplace_result.setMapped(aggregate_data);
-        }
-        else
-            aggregate_data = emplace_result.getMapped();
-
-        places[i - agg_process_info.start_row] = aggregate_data;
-        processed_rows = i;
     }
 
     if (processed_rows)
     {
+        tmp_watch.start();
+        SCOPE_EXIT({
+            tmp_watch.stop();
+            build_side_watch.addComputeAggState(tmp_watch.elapsed());
+        });
         /// Add values to the aggregate functions.
         for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
              ++inst)
@@ -899,8 +916,13 @@ void Aggregator::AggProcessInfo::prepareForAgg()
     prepare_for_agg_done = true;
 }
 
-bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num)
+bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num,
+        Stopwatch & build_side_watch)
 {
+    build_side_watch.start();
+    SCOPE_EXIT({
+        build_side_watch.stopAndAggBuild();
+    });
     assert(!result.need_spill);
 
     if (is_cancelled())
@@ -948,7 +970,7 @@ bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDat
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
-            params.collators);                                             \
+            params.collators, build_side_watch);                                             \
         break;                                                             \
     }
 
@@ -1149,6 +1171,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
     size_t src_bytes = 0;
     AggProcessInfo agg_process_info(this);
 
+    Stopwatch tmp_watch;
     /// Read all the data
     while (Block block = stream->read())
     {
@@ -1158,7 +1181,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
         {
             if unlikely (is_cancelled())
                 return;
-            if (!executeOnBlock(agg_process_info, result, thread_num))
+            if (!executeOnBlock(agg_process_info, result, thread_num, tmp_watch))
             {
                 should_stop = true;
                 break;
@@ -1179,7 +1202,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
     if (result.empty() && params.keys_size == 0 && !params.empty_result_for_aggregation_by_empty_set)
     {
         agg_process_info.resetBlock(stream->getHeader());
-        executeOnBlock(agg_process_info, result, thread_num);
+        executeOnBlock(agg_process_info, result, thread_num, tmp_watch);
         if (result.need_spill)
             spill(result, thread_num);
         assert(agg_process_info.allBlockDataHandled());

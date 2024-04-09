@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Operators/AggregateContext.h>
+#include <ext/scope_guard.h>
 
 namespace DB
 {
@@ -42,10 +43,10 @@ void AggregateContext::initBuild(
     LOG_TRACE(log, "Aggregate Context inited");
 }
 
-void AggregateContext::buildOnLocalData(size_t task_index)
+void AggregateContext::buildOnLocalData(size_t task_index, Stopwatch & build_side_watch)
 {
     auto & agg_process_info = threads_data[task_index]->agg_process_info;
-    aggregator->executeOnBlock(agg_process_info, *many_data[task_index], task_index);
+    aggregator->executeOnBlock(agg_process_info, *many_data[task_index], task_index, build_side_watch);
     if likely (agg_process_info.allBlockDataHandled())
     {
         threads_data[task_index]->src_bytes += agg_process_info.block.bytes();
@@ -70,12 +71,12 @@ bool AggregateContext::hasLocalDataToBuild(size_t task_index)
     return !threads_data[task_index]->agg_process_info.allBlockDataHandled();
 }
 
-void AggregateContext::buildOnBlock(size_t task_index, const Block & block)
+void AggregateContext::buildOnBlock(size_t task_index, const Block & block, Stopwatch & build_side_watch)
 {
     assert(status.load() == AggStatus::build);
     auto & agg_process_info = threads_data[task_index]->agg_process_info;
     agg_process_info.resetBlock(block);
-    buildOnLocalData(task_index);
+    buildOnLocalData(task_index, build_side_watch);
 }
 
 bool AggregateContext::hasSpilledData() const
@@ -161,7 +162,8 @@ void AggregateContext::initConvergentPrefix()
     {
         auto & agg_process_info = threads_data[0]->agg_process_info;
         agg_process_info.resetBlock(this->getHeader());
-        aggregator->executeOnBlock(agg_process_info, *many_data[0], 0);
+        Stopwatch tmp_watch;
+        aggregator->executeOnBlock(agg_process_info, *many_data[0], 0, tmp_watch);
         /// Since this won't consume a lot of memory,
         /// even if it triggers marking need spill due to a low threshold setting,
         /// it's still reasonable not to spill disk.
@@ -171,8 +173,12 @@ void AggregateContext::initConvergentPrefix()
     }
 }
 
-void AggregateContext::initConvergent()
+void AggregateContext::initConvergent(Stopwatch & probe_side_watch)
 {
+    probe_side_watch.start();
+    SCOPE_EXIT({
+        probe_side_watch.stopAndInitConvergent();
+    });
     assert(status.load() == AggStatus::build);
 
     initConvergentPrefix();
@@ -194,8 +200,12 @@ Block AggregateContext::getHeader() const
     return aggregator->getHeader(true);
 }
 
-Block AggregateContext::readForConvergent(size_t index)
+Block AggregateContext::readForConvergent(size_t index, Stopwatch & probe_side_watch)
 {
+    probe_side_watch.start();
+    SCOPE_EXIT({
+        probe_side_watch.stopAndAggConvergent();
+    });
     assert(status.load() == AggStatus::convergent);
     if unlikely (!merging_buckets)
         return {};

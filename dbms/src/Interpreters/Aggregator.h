@@ -20,6 +20,7 @@
 #include <Columns/ColumnString.h>
 #include <Columns/ColumnVector.h>
 #include <Common/Arena.h>
+#include <Common/Stopwatch.h>
 #include <Common/ColumnsHashing.h>
 #include <Common/Decimal.h>
 #include <Common/HashTable/FixedHashMap.h>
@@ -1181,7 +1182,7 @@ public:
     };
 
     /// Process one block. Return false if the processing should be aborted.
-    bool executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num);
+    bool executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num, Stopwatch & build_side_watch);
 
     /** Merge several aggregation data structures and output the MergingBucketsPtr used to merge.
       * Return nullptr if there are no non empty data_variant.
@@ -1277,14 +1278,14 @@ protected:
         Method & method,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        TiDB::TiDBCollators & collators) const;
+        TiDB::TiDBCollators & collators, Stopwatch & build_side_watch) const;
 
     template <typename Method>
     void executeImplBatch(
         Method & method,
         typename Method::State & state,
         Arena * aggregates_pool,
-        AggProcessInfo & agg_process_info) const;
+        AggProcessInfo & agg_process_info, Stopwatch & build_side_watch) const;
 
     template <typename Method>
     std::optional<typename Method::EmplaceResult> emplaceKey(
