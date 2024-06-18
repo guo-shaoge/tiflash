@@ -16,6 +16,8 @@
 
 #include <Common/HashTable/HashMap.h>
 #include <Common/HashTable/HashTable.h>
+#include <Common/Logger.h>
+#include <common/logger_useful.h>
 
 #include <new>
 #include <variant>
@@ -434,6 +436,17 @@ public:
     size_t size() const { return m0.size() + m1.size() + m2.size() + m3.size() + ms.size(); }
     size_t getBufferSizeInCells() const
     {
+        LOG_DEBUG(DB::Logger::get(), "gjt debug getBufferSizeInCells() 0: {}, 1: {}, 2: {}, 3: {}, s: {}",
+                m0.getBufferSizeInCells() , m1.getBufferSizeInCells() , m2.getBufferSizeInCells()
+                , m3.getBufferSizeInCells() , ms.getBufferSizeInCells());
+
+        LOG_DEBUG(DB::Logger::get(), "gjt debug sizeof Cell: 0: {}, 1: {}, 2: {}, 3: {}, s: {}",
+            sizeof(T0::Cell), sizeof(T1::Cell), sizeof(T2::Cell), sizeof(Ts::Cell));
+
+        LOG_DEBUG(DB::Logger::get(), "gjt debug getBufferSizeInBytes() 0: {}, 1: {}, 2: {}, 3: {}, s: {}",
+                m0.getBufferSizeInBytes() , m1.getBufferSizeInBytes() , m2.getBufferSizeInBytes()
+                , m3.getBufferSizeInBytes() , ms.getBufferSizeInBytes());
+
         return m0.getBufferSizeInCells() + m1.getBufferSizeInCells() + m2.getBufferSizeInCells()
             + m3.getBufferSizeInCells() + ms.getBufferSizeInCells();
     }
