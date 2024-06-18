@@ -267,4 +267,13 @@ public:
 
         return res;
     }
+
+    size_t getBufferSizeInCells() const
+    {
+        size_t res = 0;
+        for (size_t i = 0; i < NUM_BUCKETS; ++i)
+            res += impls[i].getBufferSizeInCells();
+
+        return res;
+    }
 };

@@ -844,6 +844,11 @@ struct AggregatedDataVariants : private boost::noncopyable
         const auto * ptr = reinterpret_cast<const AggregatedDataVariants::AggregationMethod_one_key_strbinpadding *>(aggregation_method_impl);
         return ptr->data.getBufferSizeInCells();                                                                           
     }
+    case Type::one_key_strbinpadding_two_level:                                                                     
+    {                                                                                                      
+        const auto * ptr = reinterpret_cast<const AggregatedDataVariants::AggregationMethod_one_key_strbinpadding_two_level *>(aggregation_method_impl);
+        return ptr->data.getBufferSizeInCells();                                                                           
+    }
 
         default:
             throw Exception("Unknown aggregated data variant.", ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT);
