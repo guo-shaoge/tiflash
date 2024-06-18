@@ -134,7 +134,7 @@ std::unique_ptr<Aggregator::Params> buildParams(
         return p != nullptr;
     });
 
-    LOG_DEBUG(log, "gjt debug build agg params keys size: {}, agg func size: {}", key_names.size(), aggregate_descriptions.size());
+    LOG_DEBUG(Logger::get(), "gjt debug build agg params keys size: {}, agg func size: {}", key_names.size(), aggregate_descriptions.size());
     return std::make_unique<Aggregator::Params>(
         before_agg_header,
         keys,
