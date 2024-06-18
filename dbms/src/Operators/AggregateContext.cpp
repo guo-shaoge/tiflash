@@ -133,6 +133,8 @@ void AggregateContext::initConvergentPrefix()
     double elapsed_seconds = build_watch->elapsedSeconds();
     size_t total_src_rows = 0;
     size_t total_src_bytes = 0;
+    size_t total_hash_map_rows = 0;
+    size_t total_hash_map_bytes = 0;
     for (size_t i = 0; i < max_threads; ++i)
     {
         size_t rows = many_data[i]->size();
@@ -145,9 +147,19 @@ void AggregateContext::initConvergentPrefix()
             elapsed_seconds,
             threads_data[i]->src_rows / elapsed_seconds,
             threads_data[i]->src_bytes / elapsed_seconds / 1048576.0);
+        LOG_DEBUG(log, "gjt debug thread data [{}]: blocks bytes: {}, rows: {}, HashMap size: {}",
+                i, threads_data[i]->src_bytes, threads_data[i]->src_rows,
+                many_data[i]->bytesCount());
+
+        total_hash_map_bytes += many_data[i]->bytesCount();
+        total_hash_map_rows += rows;
+
         total_src_rows += threads_data[i]->src_rows;
         total_src_bytes += threads_data[i]->src_bytes;
     }
+
+    LOG_DEBUG(log, "gjt debug total blocks bytes: {}, rows: {}, HashMap size: {}, HashMap rows: {}",
+            total_src_bytes, total_src_rows, total_hash_map_bytes, total_hash_map_rows);
 
     LOG_TRACE(
         log,
