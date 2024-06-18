@@ -431,6 +431,11 @@ public:
     }
 
     size_t size() const { return m0.size() + m1.size() + m2.size() + m3.size() + ms.size(); }
+    size_t getBufferSizeInCells() const
+    {
+        return m0.getBufferSizeInCells() + m1.getBufferSizeInCells() + m2.getBufferSizeInCells()
+            + m3.getBufferSizeInCells() + ms.getBufferSizeInCells();
+    }
 
     bool empty() const { return m0.empty() && m1.empty() && m2.empty() && m3.empty() && ms.empty(); }
 

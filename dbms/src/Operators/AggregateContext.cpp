@@ -135,6 +135,7 @@ void AggregateContext::initConvergentPrefix()
     size_t total_src_bytes = 0;
     size_t total_hash_map_rows = 0;
     size_t total_hash_map_bytes = 0;
+    size_t total_cells = 0;
     for (size_t i = 0; i < max_threads; ++i)
     {
         size_t rows = many_data[i]->size();
@@ -147,10 +148,11 @@ void AggregateContext::initConvergentPrefix()
             elapsed_seconds,
             threads_data[i]->src_rows / elapsed_seconds,
             threads_data[i]->src_bytes / elapsed_seconds / 1048576.0);
-        LOG_DEBUG(log, "gjt debug thread data [{}]: blocks bytes: {}, rows: {}, HashMap size: {}",
+        LOG_DEBUG(log, "gjt debug thread data [{}]: blocks bytes: {}, rows: {}, HashMap size: {}, HashMap cell: {}",
                 i, threads_data[i]->src_bytes, threads_data[i]->src_rows,
-                many_data[i]->bytesCount());
+                many_data[i]->bytesCount(), many_data[i]->cells());
 
+        total_cells += many_data[i]->cells();
         total_hash_map_bytes += many_data[i]->bytesCount();
         total_hash_map_rows += rows;
 
@@ -158,8 +160,8 @@ void AggregateContext::initConvergentPrefix()
         total_src_bytes += threads_data[i]->src_bytes;
     }
 
-    LOG_DEBUG(log, "gjt debug total blocks bytes: {}, rows: {}, HashMap size: {}, HashMap rows: {}",
-            total_src_bytes, total_src_rows, total_hash_map_bytes, total_hash_map_rows);
+    LOG_DEBUG(log, "gjt debug total blocks bytes: {}, rows: {}, HashMap size: {}, HashMap rows: {}, HashMap Cell: {}",
+            total_src_bytes, total_src_rows, total_hash_map_bytes, total_hash_map_rows, total_cells);
 
     LOG_TRACE(
         log,

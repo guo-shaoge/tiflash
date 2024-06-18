@@ -830,6 +830,26 @@ struct AggregatedDataVariants : private boost::noncopyable
         }
     }
 
+    size_t cells() const
+    {
+        switch (type)
+        {
+        case Type::EMPTY:
+            return 0;
+        case Type::without_key:
+            return 1;
+
+    case Type::one_key_strbinpadding:                                                                     
+    {                                                                                                      
+        const auto * ptr = reinterpret_cast<const AggregatedDataVariants::AggregationMethod_one_key_strbinpadding *>(aggregation_method_impl);
+        return ptr->data.getBufferSizeInCells();                                                                           
+    }
+
+        default:
+            throw Exception("Unknown aggregated data variant.", ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT);
+        }
+    }
+
     size_t revocableBytes() const
     {
         if (empty())
