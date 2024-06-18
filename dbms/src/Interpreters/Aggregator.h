@@ -862,7 +862,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         return bytesCount();
     }
 
-    size_t bytesCount() const
+    size_t hmBytesCount() const
     {
         size_t bytes_count = 0;
         switch (type)
@@ -885,6 +885,12 @@ struct AggregatedDataVariants : private boost::noncopyable
         default:
             throw Exception("Unknown aggregated data variant.", ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT);
         }
+        return  bytes_count;
+    }
+
+    size_t bytesCount() const
+    {
+        size_t bytes_count = hmBytesCount();
         for (const auto & pool : aggregates_pools)
             bytes_count += pool->size();
         return bytes_count;
