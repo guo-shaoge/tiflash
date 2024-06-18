@@ -441,7 +441,7 @@ public:
                 , m3.getBufferSizeInCells() , ms.getBufferSizeInCells());
 
         LOG_DEBUG(DB::Logger::get(), "gjt debug sizeof Cell: 0: {}, 1: {}, 2: {}, 3: {}, s: {}",
-            0, sizeof(T1::Cell), sizeof(T2::Cell), sizeof(T3::Cell), sizeof(Ts::Cell));
+            0, sizeof(typename T1::Cell), sizeof(typename T2::Cell), sizeof(typename T3::Cell), sizeof(typename Ts::Cell));
 
         LOG_DEBUG(DB::Logger::get(), "gjt debug getBufferSizeInBytes() 0: {}, 1: {}, 2: {}, 3: {}, s: {}",
                 m0.getBufferSizeInBytes() , m1.getBufferSizeInBytes() , m2.getBufferSizeInBytes()
