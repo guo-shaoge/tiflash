@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <Common/ThresholdUtils.h>
+#include <common/logger_useful.h>
+#include <Common/Logger.h>
 #include <Common/TiFlashException.h>
 #include <Core/ColumnNumbers.h>
 #include <Flash/Coprocessor/AggregationInterpreterHelper.h>
@@ -132,6 +134,7 @@ std::unique_ptr<Aggregator::Params> buildParams(
         return p != nullptr;
     });
 
+    LOG_DEBUG(log, "gjt debug build agg params keys size: {}, agg func size: {}", key_names.size(), aggregate_descriptions.size());
     return std::make_unique<Aggregator::Params>(
         before_agg_header,
         keys,

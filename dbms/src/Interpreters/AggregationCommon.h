@@ -354,6 +354,7 @@ static inline StringRef ALWAYS_INLINE serializeKeysToPoolContiguous(
             sum_size
                 += key_columns[j]->serializeValueIntoArena(i, pool, begin, nullptr, TiDB::dummy_sort_key_contaner).size;
     }
+    LOG_DEBUG(Logger::get(), "gjt debug key size: {}", sum_size);
 
     return {begin, sum_size};
 }
