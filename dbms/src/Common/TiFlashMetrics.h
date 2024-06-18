@@ -212,6 +212,11 @@ static_assert(RAFT_REGION_BIG_WRITE_THRES * 4 < RAFT_REGION_BIG_WRITE_MAX, "Inva
       "The freshness of tiflash data with tikv data",                                                                               \
       Histogram,                                                                                                                    \
       F(type_syncing_data_freshness, {{"type", "data_freshness"}}, ExpBuckets{0.001, 2, 20}))                                       \
+    M(tiflash_memory_usage_by_class,                                                                                                \
+      "TiFlash memory consumes by class",                                                                                           \
+      Gauge,                                                                                                                        \
+      F(type_uni_page_ids, {"type", "uni_page_ids"}),                                                                               \
+      F(type_versioned_entries, {"type", "versioned_entries"}))                                                                     \
     M(tiflash_storage_read_tasks_count, "Total number of storage engine read tasks", Counter)                                       \
     M(tiflash_storage_command_count,                                                                                                \
       "Total number of storage's command, such as delete range / shutdown /startup",                                                \
@@ -428,6 +433,10 @@ static_assert(RAFT_REGION_BIG_WRITE_THRES * 4 < RAFT_REGION_BIG_WRITE_MAX, "Inva
       F(type_total, {{"type", "total"}}, ExpBucketsWithRange{0.2, 4, 300}),                                                         \
       F(type_queue_stage, {{"type", "queue_stage"}}, ExpBucketsWithRange{0.2, 4, 300}),                                             \
       F(type_phase1_total, {{"type", "phase1_total"}}, ExpBucketsWithRange{0.2, 4, 300}))                                           \
+    M(tiflash_raft_command_throughput,                                                                                              \
+      "",                                                                                                                           \
+      Histogram,                                                                                                                    \
+      F(type_prehandle_snapshot, {{"type", "prehandle_snapshot"}}, ExpBuckets{128, 2, 11}))                                         \
     M(tiflash_raft_command_duration_seconds,                                                                                        \
       "Bucketed histogram of some raft command: apply snapshot and ingest SST",                                                     \
       Histogram, /* these command usually cost several seconds, increase the start bucket to 50ms */                                \
@@ -496,6 +505,7 @@ static_assert(RAFT_REGION_BIG_WRITE_THRES * 4 < RAFT_REGION_BIG_WRITE_MAX, "Inva
       F(type_flush_log_gap, {{"type", "flush_log_gap"}}),                                                                           \
       F(type_flush_size, {{"type", "flush_size"}}),                                                                                 \
       F(type_flush_rowcount, {{"type", "flush_rowcount"}}),                                                                         \
+      F(type_prehandle, {{"type", "prehandle"}}),                                                                                   \
       F(type_flush_eager_gc, {{"type", "flush_eager_gc"}}))                                                                         \
     M(tiflash_raft_raft_frequent_events_count,                                                                                      \
       "Raft frequent event counter",                                                                                                \
