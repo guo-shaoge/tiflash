@@ -157,6 +157,7 @@ public:
     size_t size() const { return hasZero() ? 1 : 0; }
     bool empty() const { return !hasZero(); }
     size_t getBufferSizeInBytes() const { return sizeof(Cell); }
+    size_t getBufferSizeInCells() const { return size(); }
     void setResizeCallback(const ResizeCallback &) {}
     size_t getCollisions() const { return 0; }
 };
