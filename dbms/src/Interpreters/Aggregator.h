@@ -900,22 +900,32 @@ struct AggregatedDataVariants : private boost::noncopyable
         return bytes_count;
     }
 
-    size_t realUsedBytes() const
+    size_t alignAllocRealUsedBytes() const
     {
         size_t res = 0;
         for (const auto & pool : aggregates_pools)
         {
-            res += pool->realUsedBytes();
+            res += pool->alignAllocRealUsedBytes();
         }
         return res;
     }
 
-    size_t wastedBytes() const
+    size_t alignAllocWastedBytes() const
     {
         size_t res = 0;
         for (const auto & pool : aggregates_pools)
         {
-            res += pool->wastedBytes();
+            res += pool->alignAllocWastedBytes();
+        }
+        return res;
+    }
+
+    size_t allocRealUsedBytes() const
+    {
+        size_t res = 0;
+        for (const auto & pool : aggregates_pools)
+        {
+            res += pool->allocRealUsedBytes();
         }
         return res;
     }

@@ -75,8 +75,9 @@ private:
 
     ResizeCallback resize_callback;
 
-    size_t real_used_bytes = 0;
-    size_t wasted_bytes = 0;
+    size_t align_alloc_real_used_bytes = 0;
+    size_t align_alloc_wasted_bytes = 0;
+    size_t alloc_real_used_bytes = 0;
 
     static size_t roundUpToPageSize(size_t s) { return (s + 4096 - 1) / 4096 * 4096; }
 
@@ -136,20 +137,22 @@ public:
             auto * res = static_cast<char *>(std::align(alignment, size, head_pos, space));
             if (res)
             {
-                real_used_bytes += size;
-                wasted_bytes += (ori_space - space);
+                align_alloc_real_used_bytes += size;
+                align_alloc_wasted_bytes += (ori_space - space);
                 head->pos = static_cast<char *>(head_pos);
                 head->pos += size;
                 return res;
             }
 
-            wasted_bytes += space;
+            align_alloc_wasted_bytes += space;
             addChunk(size + alignment);
         } while (true);
     }
 
-    size_t realUsedBytes() const { return real_used_bytes; }
-    size_t wastedBytes() const { return wasted_bytes; }
+    size_t alignAllocRealUsedBytes() const { return align_alloc_real_used_bytes; }
+    size_t alignAllocWastedBytes() const { return align_alloc_wasted_bytes; }
+
+    size_t allocRealUsedBytes() const { return alloc_real_used_bytes; }
 
     /// Get piece of memory, without alignment.
     char * alloc(size_t size)
@@ -159,6 +162,7 @@ public:
 
         char * res = head->pos;
         head->pos += size;
+        alloc_real_used_bytes += size;
         return res;
     }
 

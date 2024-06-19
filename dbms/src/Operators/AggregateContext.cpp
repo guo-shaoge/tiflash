@@ -137,8 +137,9 @@ void AggregateContext::initConvergentPrefix()
     size_t total_hash_map_and_arena_bytes = 0;
     size_t total_hash_map_bytes = 0;
     size_t total_cells = 0;
-    size_t total_real_used_bytes = 0;
-    size_t total_wasted_bytes = 0;
+    size_t total_align_alloc_real_used_bytes = 0;
+    size_t total_align_alloc_wasted_bytes = 0;
+    size_t total_alloc_real_used_bytes = 0;
     for (size_t i = 0; i < max_threads; ++i)
     {
         size_t rows = many_data[i]->size();
@@ -152,24 +153,26 @@ void AggregateContext::initConvergentPrefix()
             threads_data[i]->src_rows / elapsed_seconds,
             threads_data[i]->src_bytes / elapsed_seconds / 1048576.0);
 
-        LOG_DEBUG(log, "gjt debug thread data [{}]: hashmap kv pair num: {}, hashmap total cells: {}, hashmap bytes size: {}, hashmap and arena byte size: {}, real used bytes: {}, wasted bytes: {}",
+        LOG_DEBUG(log, "gjt debug thread data [{}]: hashmap kv pair num: {}, hashmap total cells: {}, hashmap bytes size: {}, hashmap and arena byte size: {}, align alloc real used bytes: {}, align alloc wasted bytes: {}, alloc real used bytes: {}",
                 i, many_data[i]->size(), many_data[i]->cells(), many_data[i]->hmBytesCount(), many_data[i]->bytesCount(),
-                many_data[i]->realUsedBytes(), many_data[i]->wastedBytes());
+                many_data[i]->alignAllocRealUsedBytes(), many_data[i]->alignAllocWastedBytes(),
+                many_data[i]->allocRealUsedBytes());
 
         total_cells += many_data[i]->cells();
         total_hash_map_and_arena_bytes += many_data[i]->bytesCount();
         total_hash_map_bytes += many_data[i]->hmBytesCount();
         total_hash_map_rows += rows;
 
-        total_real_used_bytes += many_data[i]->realUsedBytes();
-        total_wasted_bytes += many_data[i]->wastedBytes();
+        total_align_alloc_real_used_bytes += many_data[i]->alignAllocRealUsedBytes();
+        total_align_alloc_wasted_bytes += many_data[i]->alignAllocWastedBytes();
+        total_alloc_real_used_bytes += many_data[i]->allocRealUsedBytes();
 
         total_src_rows += threads_data[i]->src_rows;
         total_src_bytes += threads_data[i]->src_bytes;
     }
 
-    LOG_DEBUG(log, "gjt debug total block bytes: hashmap kv pair num: {}, hashmap total cells: {}, hashmap bytes size: {}, hashmap and arena byte size: {}, arena real used bytes: {}, arena wasted bytes: {}",
-            total_hash_map_rows, total_cells, total_hash_map_bytes, total_hash_map_and_arena_bytes, total_real_used_bytes, total_wasted_bytes);
+    LOG_DEBUG(log, "gjt debug total block bytes: hashmap kv pair num: {}, hashmap total cells: {}, hashmap bytes size: {}, hashmap and arena byte size: {}, arena align alloc real used bytes: {}, arena align alloc wasted bytes: {}, alloc real used bytes: {}",
+            total_hash_map_rows, total_cells, total_hash_map_bytes, total_hash_map_and_arena_bytes, total_align_alloc_real_used_bytes, total_align_alloc_wasted_bytes, total_alloc_real_used_bytes);
 
     LOG_TRACE(
         log,
