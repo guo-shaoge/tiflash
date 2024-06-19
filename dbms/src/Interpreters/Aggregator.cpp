@@ -23,6 +23,7 @@
 #include <DataTypes/DataTypeAggregateFunction.h>
 #include <DataTypes/DataTypeNullable.h>
 #include <Interpreters/Aggregator.h>
+#include <AggregateFunctions/AggregateFunctionMinMaxAny.h>
 
 #include <array>
 #include <cassert>
@@ -311,7 +312,7 @@ Aggregator::Aggregator(
         // aggreate states are aligned based on maximum requirement
         align_aggregate_states = std::max(align_aggregate_states, params.aggregates[i].function->alignOfData());
 
-        LOG_DEBUG(log, "gjt debug agg name: {}, agg size of data: {}, align agg: {}, sizeof(Field): {}", params.aggregates[i].function->getName(), params.aggregates[i].function->sizeOfData(), params.aggregates[i].function->alignOfData(), sizeof(Field));
+        LOG_DEBUG(log, "gjt debug agg name: {}, agg size of data: {}, align agg: {}, sizeof(Field): {}, sizeof(SingleValueDataString): {}", params.aggregates[i].function->getName(), params.aggregates[i].function->sizeOfData(), params.aggregates[i].function->alignOfData(), sizeof(Field), sizeof(DB::SingleValueDataString));
 
         // If not the last aggregate_state, we need pad it so that next aggregate_state will be aligned.
         if (i + 1 < params.aggregates_size)
