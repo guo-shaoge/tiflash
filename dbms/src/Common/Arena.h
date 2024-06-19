@@ -79,6 +79,9 @@ private:
     size_t align_alloc_wasted_bytes = 0;
     size_t alloc_real_used_bytes = 0;
 
+    size_t alloc_continue_real_used_bytes = 0;
+    size_t alloc_continue_wasted_bytes = 0;
+
     static size_t roundUpToPageSize(size_t s) { return (s + 4096 - 1) / 4096 * 4096; }
 
     /// If chunks size is less than 'linear_growth_threshold', then use exponential growth, otherwise - linear growth
@@ -154,6 +157,9 @@ public:
 
     size_t allocRealUsedBytes() const { return alloc_real_used_bytes; }
 
+    size_t allocContinueRealUsedBytes() const { return alloc_continue_real_used_bytes; }
+    size_t allocContinueWastedBytes() const { return alloc_continue_wasted_bytes; }
+
     /// Get piece of memory, without alignment.
     char * alloc(size_t size)
     {
@@ -182,6 +188,8 @@ public:
     {
         while (unlikely(head->pos + size > head->end))
         {
+            alloc_continue_wasted_bytes += (head->end - head->pos);
+
             char * prev_end = head->pos;
             addChunk(size);
 
@@ -193,6 +201,8 @@ public:
 
         char * res = head->pos;
         head->pos += size;
+
+        alloc_continue_real_used_bytes += size;
 
         if (!begin)
             begin = res;

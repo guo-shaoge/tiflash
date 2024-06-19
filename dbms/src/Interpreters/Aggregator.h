@@ -930,6 +930,26 @@ struct AggregatedDataVariants : private boost::noncopyable
         return res;
     }
 
+    size_t allocContinueRealUsedBytes() const
+    {
+        size_t res = 0;
+        for (const auto & pool : aggregates_pools)
+        {
+            res += pool->allocContinueRealUsedBytes();
+        }
+        return res;
+    }
+
+    size_t allocContinueWastedBytes() const
+    {
+        size_t res = 0;
+        for (const auto & pool : aggregates_pools)
+        {
+            res += pool->allocContinueWastedBytes();
+        }
+        return res;
+    }
+
     const char * getMethodName() const { return getMethodName(type); }
     static const char * getMethodName(Type type)
     {
