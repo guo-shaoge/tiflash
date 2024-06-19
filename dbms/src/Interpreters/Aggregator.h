@@ -891,8 +891,12 @@ struct AggregatedDataVariants : private boost::noncopyable
     size_t bytesCount() const
     {
         size_t bytes_count = hmBytesCount();
+        size_t i = 0;
         for (const auto & pool : aggregates_pools)
+        {
             bytes_count += pool->size();
+            LOG_DEBUG(Logger::get(), "gjt debug pool {} size: {}", i++, pool->size());
+        }
         return bytes_count;
     }
 
