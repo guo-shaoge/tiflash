@@ -328,6 +328,7 @@ Aggregator::Aggregator(
             all_aggregates_has_trivial_destructor = false;
     }
 
+    LOG_DEBUG(log, "gjt debug align_aggregate_states: {}", align_aggregate_states);
     method_chosen = chooseAggregationMethod();
     RUNTIME_CHECK_MSG(method_chosen != AggregatedDataVariants::Type::EMPTY, "Invalid aggregation method");
     agg_spill_context = std::make_shared<AggSpillContext>(

@@ -75,6 +75,9 @@ private:
 
     ResizeCallback resize_callback;
 
+    size_t real_used_bytes = 0;
+    size_t wasted_bytes = 0;
+
     static size_t roundUpToPageSize(size_t s) { return (s + 4096 - 1) / 4096 * 4096; }
 
     /// If chunks size is less than 'linear_growth_threshold', then use exponential growth, otherwise - linear growth
@@ -128,18 +131,25 @@ public:
         {
             void * head_pos = head->pos;
             size_t space = head->end - head->pos;
+            size_t ori_space = space;
 
             auto * res = static_cast<char *>(std::align(alignment, size, head_pos, space));
             if (res)
             {
+                real_used_bytes += size;
+                wasted_bytes += (ori_space - space);
                 head->pos = static_cast<char *>(head_pos);
                 head->pos += size;
                 return res;
             }
 
+            wasted_bytes += space;
             addChunk(size + alignment);
         } while (true);
     }
+
+    size_t realUsedBytes() const { return real_used_bytes; }
+    size_t wastedBytes() const { return wasted_bytes; }
 
     /// Get piece of memory, without alignment.
     char * alloc(size_t size)
