@@ -311,6 +311,8 @@ Aggregator::Aggregator(
         // aggreate states are aligned based on maximum requirement
         align_aggregate_states = std::max(align_aggregate_states, params.aggregates[i].function->alignOfData());
 
+        LOG_DEBUG(log, "gjt debug agg name: {}, agg size of data: {}, align agg: {}", params.aggregates[i].function->getName(), params.aggregates[i].function->sizeOfData(), params.aggregates[i].function->alignOfData());
+
         // If not the last aggregate_state, we need pad it so that next aggregate_state will be aligned.
         if (i + 1 < params.aggregates_size)
         {
