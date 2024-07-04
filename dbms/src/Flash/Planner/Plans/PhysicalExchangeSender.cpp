@@ -50,7 +50,7 @@ PhysicalPlanNodePtr PhysicalExchangeSender::build(
         partition_col_collators,
         exchange_sender.tp(),
         exchange_sender.compression(),
-        false);
+        auto_pass_through_agg_flag);
     // executeUnion will be call after sender.transform, so don't need to restore concurrency.
     physical_exchange_sender->disableRestoreConcurrency();
     return physical_exchange_sender;
