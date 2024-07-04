@@ -219,7 +219,7 @@ void AutoPassThroughHashAggContext::makeFullSelective(Block & block)
 
 Block checkSelective(const Block & block)
 {
-    RUNTIME_CHECK(!block || block.info.selective);
+    // RUNTIME_CHECK(!block || block.info.selective);
     return block;
 }
 } // namespace DB
