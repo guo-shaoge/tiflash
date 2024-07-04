@@ -80,7 +80,6 @@ public:
     template <bool force_streaming>
     void onBlock(Block & block)
     {
-        statistics.update(state, block.rows());
         if constexpr (force_streaming)
             onBlockForceStreaming(block);
         else

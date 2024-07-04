@@ -24,6 +24,7 @@ void AutoPassThroughHashAggContext::onBlockAuto(Block & block)
 
     forceState();
     agg_process_info->resetBlock(block);
+       statistics.update(state, block.rows());
     switch (state)
     {
     case State::Init:
@@ -83,6 +84,8 @@ void AutoPassThroughHashAggContext::onBlockForceStreaming(Block & block)
 
 void AutoPassThroughHashAggContext::forceState()
 {
+	state = State::PreHashAgg;
+return;
     if (many_data[0]->need_spill)
         state = State::PassThrough;
 }
