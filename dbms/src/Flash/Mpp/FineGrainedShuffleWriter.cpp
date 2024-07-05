@@ -34,7 +34,8 @@ FineGrainedShuffleWriter<ExchangeWriterPtr>::FineGrainedShuffleWriter(
     uint64_t fine_grained_shuffle_stream_count_,
     UInt64 fine_grained_shuffle_batch_size_,
     MPPDataPacketVersion data_codec_version_,
-    tipb::CompressionMode compression_mode_)
+    tipb::CompressionMode compression_mode_,
+    String req_id_)
     : DAGResponseWriter(/*records_per_chunk=*/-1, dag_context_)
     , writer(writer_)
     , partition_col_ids(std::move(partition_col_ids_))
@@ -45,6 +46,7 @@ FineGrainedShuffleWriter<ExchangeWriterPtr>::FineGrainedShuffleWriter(
     , hash(0)
     , data_codec_version(data_codec_version_)
     , compression_method(ToInternalCompressionMethod(compression_mode_))
+    , req_id(req_id_)
 {
     rows_in_blocks = 0;
     partition_num = writer_->getPartitionNum();
@@ -192,6 +194,7 @@ void FineGrainedShuffleWriter<ExchangeWriterPtr>::batchWriteFineGrainedShuffleIm
 template <class ExchangeWriterPtr>
 void FineGrainedShuffleWriter<ExchangeWriterPtr>::batchWriteFineGrainedShuffle()
 {
+    LOG_DEBUG(Logger::get(req_id), "gjt debug fine graind shuffle batch write");
     switch (data_codec_version)
     {
     case MPPDataPacketV0:

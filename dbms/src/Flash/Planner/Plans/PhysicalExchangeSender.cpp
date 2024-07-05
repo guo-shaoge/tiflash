@@ -112,6 +112,7 @@ void PhysicalExchangeSender::buildPipelineExecGroupImpl(
             fine_grained_shuffle.stream_count);
     }
 
+    LOG_DEBUG(Logger::get(req_id), "gjt debug exchange sender group_builder groupCnt: {}", group_builder.groupCnt());
     group_builder.transform([&](auto & builder) {
         // construct writer
         std::unique_ptr<DAGResponseWriter> response_writer = newMPPExchangeWriter(

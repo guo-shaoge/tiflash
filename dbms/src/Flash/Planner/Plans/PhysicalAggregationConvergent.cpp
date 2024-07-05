@@ -44,6 +44,7 @@ void PhysicalAggregationConvergent::buildPipelineExecGroupImpl(
     }
     else
     {
+        LOG_DEBUG(Logger::get(req_id), "gjt debug convergent concurrency: {}", aggregate_context->getConvergentConcurrency());
         aggregate_context->initConvergent();
         for (size_t index = 0; index < aggregate_context->getConvergentConcurrency(); ++index)
         {

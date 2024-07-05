@@ -37,7 +37,8 @@ std::unique_ptr<DAGResponseWriter> buildMPPExchangeWriter(
     UInt64 fine_grained_shuffle_stream_count,
     UInt64 fine_grained_shuffle_batch_size,
     tipb::CompressionMode compression_mode,
-    Int64 batch_send_min_limit_compression)
+    Int64 batch_send_min_limit_compression,
+    String req_id)
 {
     if (dag_context.isRootMPPTask())
     {
@@ -71,7 +72,8 @@ std::unique_ptr<DAGResponseWriter> buildMPPExchangeWriter(
                     fine_grained_shuffle_stream_count,
                     fine_grained_shuffle_batch_size,
                     data_codec_version,
-                    compression_mode);
+                    compression_mode,
+                    req_id);
             }
             else
             {
@@ -132,7 +134,8 @@ std::unique_ptr<DAGResponseWriter> newMPPExchangeWriter(
             fine_grained_shuffle_stream_count,
             fine_grained_shuffle_batch_size,
             compression_mode,
-            batch_send_min_limit_compression);
+            batch_send_min_limit_compression,
+            req_id);
     }
     else
     {
@@ -150,7 +153,8 @@ std::unique_ptr<DAGResponseWriter> newMPPExchangeWriter(
             fine_grained_shuffle_stream_count,
             fine_grained_shuffle_batch_size,
             compression_mode,
-            batch_send_min_limit_compression);
+            batch_send_min_limit_compression,
+            req_id);
     }
 }
 } // namespace DB

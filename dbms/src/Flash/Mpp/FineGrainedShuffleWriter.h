@@ -42,7 +42,8 @@ public:
         UInt64 fine_grained_shuffle_stream_count_,
         UInt64 fine_grained_shuffle_batch_size,
         MPPDataPacketVersion data_codec_version_,
-        tipb::CompressionMode compression_mode_);
+        tipb::CompressionMode compression_mode_,
+        String req_id_);
     void prepare(const Block & sample_block) override;
     void write(const Block & block) override;
     bool isWritable() const override;
@@ -77,6 +78,8 @@ private:
     DataTypes expected_types;
     MPPDataPacketVersion data_codec_version;
     CompressionMethod compression_method{};
+
+    String req_id;
 };
 
 } // namespace DB
