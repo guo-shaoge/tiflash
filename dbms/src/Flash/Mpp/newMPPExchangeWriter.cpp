@@ -121,6 +121,7 @@ std::unique_ptr<DAGResponseWriter> newMPPExchangeWriter(
     bool selective_block)
 {
     RUNTIME_CHECK_MSG(dag_context.isMPPTask() && dag_context.tunnel_set != nullptr, "exchange writer only run in MPP");
+    RUNTIME_CHECK(!selective_block);
     if (is_async)
     {
         auto writer
