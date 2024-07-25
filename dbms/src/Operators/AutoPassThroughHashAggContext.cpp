@@ -160,6 +160,10 @@ void AutoPassThroughHashAggContext::trySwitchBackAdjustState(size_t block_rows)
         state = State::Adjust;
         state_processed_rows = 0;
     }
+    else
+    {
+        other_state_row_limit = std::min(65535 * 100, other_state_row_limit * 2);
+    }
 }
 
 void AutoPassThroughHashAggContext::pushPassThroughBuffer(const Block & block)
