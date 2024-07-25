@@ -177,6 +177,8 @@ void PhysicalAggregation::buildBlockInputStreamImpl(DAGPipeline & pipeline, Cont
     }
     else if (auto_pass_through_switcher.enable())
     {
+        // auto pass through hashagg is only for MPP.
+        RUNTIME_CHECK(context.getDAGContext()->isMPPTask() || context.isTest());
         if (auto_pass_through_switcher.forceStreaming())
         {
             pipeline.transform([&](auto & stream) {
