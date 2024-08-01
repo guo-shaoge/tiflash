@@ -923,6 +923,8 @@ struct AggregatedDataVariants : private boost::noncopyable
     Type type{Type::EMPTY};
 
     bool need_spill = false;
+    bool disable_convert_to_two_level = false;
+    bool convert_to_two_level_flag = false;
 
     bool tryMarkNeedSpill();
 
