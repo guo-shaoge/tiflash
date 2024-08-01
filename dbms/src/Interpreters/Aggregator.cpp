@@ -1055,6 +1055,8 @@ bool Aggregator::executeOnBlockImpl(
       */
     if (result.isConvertibleToTwoLevel() && worth_convert_to_two_level)
     {
+        LOG_DEBUG(log, "gjt debug convert to two level, use_two_level_hash_table: {}, group_by_two_level_threshold: {}, result_size: {}, group_by_two_level_threshold_bytes: {}, result_size_bytes: {}",
+                use_two_level_hash_table, group_by_two_level_threshold, result_size, group_by_two_level_threshold_bytes, result_size_bytes);
         result.convertToTwoLevel();
         result.setResizeCallbackIfNeeded(thread_num);
     }
