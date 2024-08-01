@@ -1061,13 +1061,13 @@ bool Aggregator::executeOnBlockImpl(
                 use_two_level_hash_table, group_by_two_level_threshold, result_size, group_by_two_level_threshold_bytes, result_size_bytes);
             result.convert_to_two_level_flag = true;
         }
-        else
-        {
-            result.convertToTwoLevel();
-            result.setResizeCallbackIfNeeded(thread_num);
-        LOG_DEBUG(log, "gjt debug convert to two level done!, use_two_level_hash_table: {}, group_by_two_level_threshold: {}, result_size: {}, group_by_two_level_threshold_bytes: {}, result_size_bytes: {}",
-                use_two_level_hash_table, group_by_two_level_threshold, result_size, group_by_two_level_threshold_bytes, result_size_bytes);
-        }
+        // else
+        // {
+        //     result.convertToTwoLevel();
+        //     result.setResizeCallbackIfNeeded(thread_num);
+        // LOG_DEBUG(log, "gjt debug convert to two level done!, use_two_level_hash_table: {}, group_by_two_level_threshold: {}, result_size: {}, group_by_two_level_threshold_bytes: {}, result_size_bytes: {}",
+        //         use_two_level_hash_table, group_by_two_level_threshold, result_size, group_by_two_level_threshold_bytes, result_size_bytes);
+        // }
     }
 
     /** Flush data to disk if too much RAM is consumed.
