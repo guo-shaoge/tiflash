@@ -112,7 +112,7 @@ using AggregatedDataWithKeys256Hash64 = HashMap<UInt256, AggregateDataPtr, Defau
 
 /// For the case where there is one numeric key.
 /// FieldType is UInt8/16/32/64 for any type with corresponding bit width.
-template <typename FieldType, typename TData, bool consecutive_keys_optimization = false>
+template <typename FieldType, typename TData, bool consecutive_keys_optimization = true>
 struct AggregationMethodOneNumber
 {
     using Data = TData;
