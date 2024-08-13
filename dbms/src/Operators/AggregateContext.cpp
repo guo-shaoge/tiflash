@@ -45,7 +45,11 @@ void AggregateContext::initBuild(
 void AggregateContext::buildOnLocalData(size_t task_index)
 {
     auto & agg_process_info = threads_data[task_index]->agg_process_info;
+
+    Stopwatch tmp_watch;
     aggregator->executeOnBlock(agg_process_info, *many_data[task_index], task_index);
+    threads_data[task_index]->build_ns += tmp_watch.elapsed();
+
     if likely (agg_process_info.allBlockDataHandled())
     {
         threads_data[task_index]->src_bytes += agg_process_info.block.bytes();
@@ -178,7 +182,10 @@ void AggregateContext::initConvergent()
 
     initConvergentPrefix();
 
+    Stopwatch tmp_watch;
     merging_buckets = aggregator->mergeAndConvertToBlocks(many_data, true, max_threads);
+    threads_data[0]->merge_ns += tmp_watch.elapsed();
+
     status = AggStatus::convergent;
     RUNTIME_CHECK(!merging_buckets || merging_buckets->getConcurrency() > 0);
 }
@@ -206,7 +213,11 @@ Block AggregateContext::readForConvergent(size_t index)
     assert(status.load() == AggStatus::convergent);
     if unlikely (!merging_buckets)
         return {};
-    return merging_buckets->getData(index);
+
+    Stopwatch tmp_watch;
+    auto block = merging_buckets->getData(index);
+    threads_data[index]->get_ns += tmp_watch.elapsed();
+    return block;
 }
 
 bool AggregateContext::hasAtLeastOneTwoLevel()
