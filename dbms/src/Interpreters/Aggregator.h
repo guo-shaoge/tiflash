@@ -35,6 +35,7 @@
 #include <TiDB/Collation/Collator.h>
 #include <common/StringRef.h>
 #include <common/logger_useful.h>
+#include <Common/phmap/phmap.h>
 
 #include <functional>
 #include <memory>
@@ -78,6 +79,7 @@ using AggregatedDataWithUInt16Key = FixedImplicitZeroHashMap<UInt16, AggregateDa
 
 using AggregatedDataWithUInt32Key = HashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
 using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
+using AggregatedDataWithUInt64KeyPhMap = phmap::flat_hash_map<UInt64, AggregateDataPtr, std::hash<UInt64>>;
 
 using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
 using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr>;
@@ -115,6 +117,7 @@ using AggregatedDataWithKeys256Hash64 = HashMap<UInt256, AggregateDataPtr, Defau
 template <typename FieldType, typename TData, bool consecutive_keys_optimization = false>
 struct AggregationMethodOneNumber
 {
+    static constexpr bool using_ph_map = false;
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
@@ -165,10 +168,66 @@ struct AggregationMethodOneNumber
     }
 };
 
+template <typename FieldType, typename TData>
+struct AggregationMethodOneNumberPhMap
+{
+    static constexpr bool using_ph_map = true;
+    using Data = TData;
+    using Key = typename Data::key_type;
+    using Mapped = typename Data::mapped_type;
+
+    Data data;
+
+    AggregationMethodOneNumberPhMap() = default;
+
+    template <typename Other>
+    explicit AggregationMethodOneNumberPhMap(const Other & other)
+        : data(other.data)
+    {}
+
+    using State = ColumnsHashing::HashMethodOneNumberPhMap<typename Data::value_type, Mapped, FieldType>;
+
+    template <bool only_lookup>
+    struct EmplaceOrFindKeyResult
+    {
+    };
+
+    template <>
+    struct EmplaceOrFindKeyResult<true>
+    {
+        // todo only lookup not impl yet.
+        using ResultType = std::pair<Mapped, bool>;
+    };
+
+    template <>
+    struct EmplaceOrFindKeyResult<false>
+    {
+        using ResultType = std::pair<Mapped, bool>;
+    };
+
+    // todo ?
+    static bool canUseKeyRefAggFuncOptimization() { return true; }
+    /// Shuffle key columns before `insertKeyIntoColumns` call if needed.
+    std::optional<Sizes> shuffleKeyColumns(std::vector<IColumn *> &, const Sizes &) { return {}; }
+
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumns(
+        const Key & key,
+        std::vector<IColumn *> & key_columns,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        const auto * key_holder = reinterpret_cast<const char *>(&key);
+        auto * column = static_cast<ColumnVectorHelper *>(key_columns[0]);
+        column->insertRawData<sizeof(FieldType)>(key_holder);
+    }
+};
+
 /// For the case where there is one string key.
 template <typename TData>
 struct AggregationMethodString
 {
+    static constexpr bool using_ph_map = false;
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
@@ -217,6 +276,7 @@ struct AggregationMethodString
 template <typename TData>
 struct AggregationMethodStringNoCache
 {
+    static constexpr bool using_ph_map = false;
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
@@ -266,6 +326,7 @@ struct AggregationMethodStringNoCache
 template <bool bin_padding, typename TData>
 struct AggregationMethodOneKeyStringNoCache
 {
+    static constexpr bool using_ph_map = false;
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
@@ -346,6 +407,7 @@ struct AggregationMethodMultiStringNoCache
 template <typename Key1Desc, typename Key2Desc, typename TData>
 struct AggregationMethodFastPathTwoKeysNoCache
 {
+    static constexpr bool using_ph_map = false;
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
@@ -466,6 +528,7 @@ struct AggregationMethodFastPathTwoKeysNoCache
 template <typename TData>
 struct AggregationMethodFixedString
 {
+    static constexpr bool using_ph_map = false;
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
@@ -514,6 +577,7 @@ struct AggregationMethodFixedString
 template <typename TData>
 struct AggregationMethodFixedStringNoCache
 {
+    static constexpr bool using_ph_map = false;
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
@@ -562,6 +626,7 @@ struct AggregationMethodFixedStringNoCache
 template <typename TData, bool has_nullable_keys_ = false, bool use_cache = true>
 struct AggregationMethodKeysFixed
 {
+    static constexpr bool using_ph_map = false;
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
@@ -670,6 +735,7 @@ struct AggregationMethodKeysFixed
 template <typename TData>
 struct AggregationMethodSerialized
 {
+    static constexpr bool using_ph_map = false;
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
@@ -759,6 +825,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     using AggregationMethod_key16 = AggregationMethodOneNumber<UInt16, AggregatedDataWithUInt16Key, false>;
     using AggregationMethod_key32 = AggregationMethodOneNumber<UInt32, AggregatedDataWithUInt64Key>;
     using AggregationMethod_key64 = AggregationMethodOneNumber<UInt64, AggregatedDataWithUInt64Key>;
+    using AggregationMethod_key64_phmap = AggregationMethodOneNumberPhMap<UInt64, AggregatedDataWithUInt64KeyPhMap>;
     using AggregationMethod_key_int256 = AggregationMethodOneNumber<Int256, AggregatedDataWithInt256Key>;
     using AggregationMethod_key_string = AggregationMethodStringNoCache<AggregatedDataWithShortStringKey>;
     using AggregationMethod_one_key_strbin
@@ -864,6 +931,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(key16, false)                                         \
     M(key32, false)                                         \
     M(key64, false)                                         \
+    M(key64_phmap, false)                                         \
     M(key_string, false)                                    \
     M(key_fixed_string, false)                              \
     M(keys16, false)                                        \
@@ -974,30 +1042,37 @@ struct AggregatedDataVariants : private boost::noncopyable
 
     size_t bytesCount() const
     {
-        size_t bytes_count = 0;
-        switch (type)
-        {
-        case Type::EMPTY:
-        case Type::without_key:
-            break;
-
-#define M(NAME, IS_TWO_LEVEL)                                                                              \
-    case Type::NAME:                                                                                       \
-    {                                                                                                      \
-        const auto * ptr = reinterpret_cast<const AggregationMethodName(NAME) *>(aggregation_method_impl); \
-        bytes_count = ptr->data.getBufferSizeInBytes();                                                    \
-        break;                                                                                             \
-    }
-
-            APPLY_FOR_AGGREGATED_VARIANTS(M)
-#undef M
-
-        default:
-            throw Exception("Unknown aggregated data variant.", ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT);
-        }
-        for (const auto & pool : aggregates_pools)
-            bytes_count += pool->size();
-        return bytes_count;
+        return 100;
+//         size_t bytes_count = 0;
+//         switch (type)
+//         {
+//         case Type::EMPTY:
+//         case Type::without_key:
+//             break;
+//         case Type::key64_phmap: // todo flat_hash_map miss func
+//         {
+//             const auto * ptr = reinterpret_cast<const AggregationMethodName(key64_phmap) *>(aggregation_method_impl);
+//             bytes_count =  ptr->data.size() * sizeof(UInt64);
+//             break;
+//         }
+// 
+// #define M(NAME, IS_TWO_LEVEL)                                                                              \
+//     case Type::NAME:                                                                                       \
+//     {                                                                                                      \
+//         const auto * ptr = reinterpret_cast<const AggregationMethodName(NAME) *>(aggregation_method_impl); \
+//         bytes_count = ptr->data.getBufferSizeInBytes();                                                    \
+//         break;                                                                                             \
+//     }
+// 
+//             APPLY_FOR_AGGREGATED_VARIANTS(M)
+// #undef M
+// 
+//         default:
+//             throw Exception("Unknown aggregated data variant.", ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT);
+//         }
+//         for (const auto & pool : aggregates_pools)
+//             bytes_count += pool->size();
+//         return bytes_count;
     }
 
     const char * getMethodName() const { return getMethodName(type); }
@@ -1064,6 +1139,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(one_key_strbinpadding)
 
 
+    // todo key64_phmap
 #define APPLY_FOR_VARIANTS_NOT_CONVERTIBLE_TO_TWO_LEVEL(M) \
     M(key8)                                                \
     M(key16)                                               \
@@ -1455,7 +1531,7 @@ protected:
         AggProcessInfo & agg_process_info,
         TiDB::TiDBCollators & collators) const;
 
-    template <bool collect_hit_rate, bool only_loopup, typename Method>
+    template <bool collect_hit_rate, bool only_loopup, bool using_ph_map, typename Method>
     void executeImplBatch(
         Method & method,
         typename Method::State & state,

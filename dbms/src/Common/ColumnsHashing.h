@@ -84,6 +84,75 @@ struct HashMethodOneNumber
     const FieldType * getKeyData() const { return vec; }
 };
 
+// No LookupResult in flag_hash_map
+/// For the case when there is one numeric key.
+/// UInt8/16/32/64 for any type with corresponding bit width.
+/// todo del Value, no use
+template <typename Value, typename Mapped, typename FieldType>
+struct HashMethodOneNumberPhMap
+{
+    using Self = HashMethodOneNumberPhMap<Value, Mapped, FieldType>;
+
+    const FieldType * vec;
+
+    /// If the keys of a fixed length then key_sizes contains their lengths, empty otherwise.
+    HashMethodOneNumberPhMap(const ColumnRawPtrs & key_columns, const Sizes & /*key_sizes*/, const TiDB::TiDBCollators &)
+    {
+        vec = &static_cast<const ColumnVector<FieldType> *>(key_columns[0])->getData()[0];
+    }
+
+    explicit HashMethodOneNumberPhMap(const IColumn * column)
+    {
+        vec = &static_cast<const ColumnVector<FieldType> *>(column)->getData()[0];
+    }
+
+    template <typename Data, typename AllocFunc>
+    ALWAYS_INLINE inline std::pair<Mapped, bool> emplaceKeyPhMap(
+            Data & data,
+            size_t row,
+            Arena & pool,
+            std::vector<String> & sort_key_containers,
+            const AllocFunc & alloc_func)
+    {
+        auto key_holder = getKeyHolder(row, &pool, sort_key_containers);
+        return emplaceImplPhMap(key_holder, data, alloc_func);
+    }
+
+    template <typename Data, typename KeyHolder, typename AllocFunc>
+    ALWAYS_INLINE inline std::pair<Mapped, bool> emplaceImplPhMap(KeyHolder & key_holder, Data & data, const AllocFunc & alloc_func)
+    {
+        // todo assume HahsMethodOneNumber, so key_holder is just key.
+        bool found = true;
+        auto iter = data.lazy_emplace(key_holder, [&](const auto & ctor) {
+            ctor(key_holder, alloc_func());
+            found = false;
+        });
+        return {iter->second, found};
+    }
+
+    /// Emplace key into HashTable or HashMap. If Data is HashMap, returns ptr to value, otherwise nullptr.
+    /// Data is a HashTable where to insert key from column's row.
+    /// For Serialized method, key may be placed in pool.
+    // using Base::emplaceKey; /// (Data & data, size_t row, Arena & pool) -> EmplaceResult
+
+    /// Find key into HashTable or HashMap. If Data is HashMap and key was found, returns ptr to value, otherwise nullptr.
+    // using Base::findKey; /// (Data & data, size_t row, Arena & pool) -> FindResult
+
+    /// Get hash value of row.
+    // using Base::getHash; /// (const Data & data, size_t row, Arena & pool) -> size_t
+
+    /// Is used for default implementation in HashMethodBase.
+    ALWAYS_INLINE inline FieldType getKeyHolder(size_t row, Arena *, std::vector<String> &) const
+    {
+        if constexpr (std::is_same_v<FieldType, Int256>)
+            return vec[row];
+        else
+            return unalignedLoad<FieldType>(vec + row);
+    }
+
+    const FieldType * getKeyData() const { return vec; }
+};
+
 
 /// For the case when there is one string key.
 template <typename Value, typename Mapped, bool place_string_to_arena = true, bool use_cache = true>
