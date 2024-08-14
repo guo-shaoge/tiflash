@@ -782,6 +782,29 @@ struct AggregationMethodSerialized
     }
 };
 
+struct AggregateStatesBatchAllocator
+{
+    const size_t batch_size = 1024;
+
+    size_t total_size_of_aggregate_states = 0;
+    size_t align_aggregate_states = 0;
+
+    std::vector<std::pair<void *, size_t>> batch_agg_states;
+    Arena * aggregates_pool = nullptr;
+
+    AggregateDataPtr allocate()
+    {
+        if (batch_agg_states.empty() || batch_agg_states.back().second == batch_size)
+        {
+            auto * batch_agg_states_ptr = aggregates_pool->alignedAlloc(
+                    total_size_of_aggregate_states * batch_size, align_aggregate_states);
+            RUNTIME_CHECK(batch_agg_states_ptr);
+            batch_agg_states.emplace_back(batch_agg_states_ptr, 0);
+        }
+        auto & last_ele = batch_agg_states.back();
+        return static_cast<AggregateDataPtr>(last_ele.first) + last_ele.second++ * total_size_of_aggregate_states;
+    }
+};
 
 class Aggregator;
 
@@ -816,10 +839,14 @@ struct AggregatedDataVariants : private boost::noncopyable
     Arena * aggregates_pool{}; /// The pool that is currently used for allocation.
 
     void * aggregation_method_impl{};
+    // todo fix just use method to check
+    bool using_ph_map = false;
 
     /** Specialization for the case when there are no keys.
       */
     AggregatedDataWithoutKey without_key = nullptr;
+
+    AggregateStatesBatchAllocator agg_states_batch_allocator;
 
     using AggregationMethod_key8 = AggregationMethodOneNumber<UInt8, AggregatedDataWithUInt8Key, false>;
     using AggregationMethod_key16 = AggregationMethodOneNumber<UInt16, AggregatedDataWithUInt16Key, false>;
@@ -1233,6 +1260,8 @@ private:
 
     void doLevelMerge(Int32 bucket_num, size_t concurrency_index);
 
+    Block getDataForPhMap();
+
 private:
     const LoggerPtr log;
     const Aggregator & aggregator;
@@ -1529,14 +1558,16 @@ protected:
         Method & method,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        TiDB::TiDBCollators & collators) const;
+        TiDB::TiDBCollators & collators,
+        AggregateStatesBatchAllocator * agg_states_batch_allocator = nullptr) const;
 
     template <bool collect_hit_rate, bool only_loopup, bool using_ph_map, typename Method>
     void executeImplBatch(
         Method & method,
         typename Method::State & state,
         Arena * aggregates_pool,
-        AggProcessInfo & agg_process_info) const;
+        AggProcessInfo & agg_process_info,
+        AggregateStatesBatchAllocator * agg_states_batch_allocator = nullptr) const;
 
     template <bool only_lookup, typename Method>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(
@@ -1544,7 +1575,8 @@ protected:
         typename Method::State & state,
         size_t index,
         Arena & aggregates_pool,
-        std::vector<std::string> & sort_key_containers) const;
+        std::vector<std::string> & sort_key_containers,
+        AggregateStatesBatchAllocator * agg_states_batch_allocator = nullptr) const;
 
     /// For case when there are no keys (all aggregate into one row).
     static void executeWithoutKeyImpl(AggregatedDataWithoutKey & res, AggProcessInfo & agg_process_info, Arena * arena);

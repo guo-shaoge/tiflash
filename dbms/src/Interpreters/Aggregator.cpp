@@ -301,6 +301,8 @@ Aggregator::Aggregator(
     offsets_of_aggregate_states.resize(params.aggregates_size);
     total_size_of_aggregate_states = 0;
     all_aggregates_has_trivial_destructor = true;
+    // todo hack for ph map
+    total_size_of_aggregate_states += sizeof(UInt64);
 
     // aggreate_states will be aligned as below:
     // |<-- state_1 -->|<-- pad_1 -->|<-- state_2 -->|<-- pad_2 -->| .....
@@ -662,11 +664,12 @@ void NO_INLINE Aggregator::executeImpl(
     Method & method,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
-    TiDB::TiDBCollators & collators) const
+    TiDB::TiDBCollators & collators,
+    AggregateStatesBatchAllocator * agg_states_batch_allocator) const
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    executeImplBatch<collect_hit_rate, only_lookup, Method::using_ph_map>(method, state, aggregates_pool, agg_process_info);
+    executeImplBatch<collect_hit_rate, only_lookup, Method::using_ph_map>(method, state, aggregates_pool, agg_process_info, agg_states_batch_allocator);
 }
 
 template <bool only_lookup, typename Method>
@@ -675,15 +678,18 @@ std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::Res
     typename Method::State & state,
     size_t index,
     Arena & aggregates_pool,
-    std::vector<std::string> & sort_key_containers) const
+    std::vector<std::string> & sort_key_containers,
+    AggregateStatesBatchAllocator * agg_states_batch_allocator) const
 {
     try
     {
+        // todo finish this
         if constexpr (Method::using_ph_map)
         {
-            state.emplaceKeyPhMap(method.data, index, aggregates_pool, sort_key_containers,
-                    [&aggregates_pool, this]() {
-                        auto * aggregate_data = aggregates_pool.alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+            return state.emplaceKeyPhMap(method.data, index, aggregates_pool, sort_key_containers,
+                    [this, agg_states_batch_allocator](typename Method::Key & key) {
+                        auto * aggregate_data = agg_states_batch_allocator->allocate();
+                        *reinterpret_cast<typename Method::Key *>(aggregate_data) = key;
                         createAggregateStates(aggregate_data);
                         return aggregate_data;
                     });
@@ -707,7 +713,8 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     Method & method,
     typename Method::State & state,
     Arena * aggregates_pool,
-    AggProcessInfo & agg_process_info) const
+    AggProcessInfo & agg_process_info,
+    AggregateStatesBatchAllocator * agg_states_batch_allocator) const
 {
     // collect_hit_rate and only_lookup cannot be true at the same time.
     static_assert(!(collect_hit_rate && only_lookup));
@@ -819,7 +826,7 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
         AggregateDataPtr aggregate_data = nullptr;
 
         auto emplace_result_holder
-            = emplaceOrFindKey<only_lookup>(method, state, i, *aggregates_pool, sort_key_containers);
+            = emplaceOrFindKey<only_lookup>(method, state, i, *aggregates_pool, sort_key_containers, agg_states_batch_allocator);
         if unlikely (!emplace_result_holder.has_value())
         {
             LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
@@ -1031,8 +1038,15 @@ bool Aggregator::executeOnBlockImpl(
     if (!result.inited())
     {
         result.init(method_chosen);
+        // todo fix, using method check
+        if (method_chosen == AggregatedDataVariants::Type::key64_phmap)
+            result.using_ph_map = true;
         result.keys_size = params.keys_size;
         result.key_sizes = key_sizes;
+        // todo init func
+        result.agg_states_batch_allocator.total_size_of_aggregate_states = total_size_of_aggregate_states;
+        result.agg_states_batch_allocator.align_aggregate_states = align_aggregate_states;
+        result.agg_states_batch_allocator.aggregates_pool = result.aggregates_pool;
         LOG_TRACE(log, "Aggregation method: `{}`", result.getMethodName());
     }
 
@@ -1066,7 +1080,8 @@ bool Aggregator::executeOnBlockImpl(
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
-            params.collators);                                             \
+            params.collators,                                              \
+            &result.agg_states_batch_allocator);                           \
         break;                                                             \
     }
 
@@ -2271,6 +2286,17 @@ MergingBucketsPtr Aggregator::mergeAndConvertToBlocks(
             });
     }
 
+    if (data_variants[0]->using_ph_map)
+    {
+        for (const auto & iter_variant : data_variants)
+        {
+            RUNTIME_CHECK(iter_variant->using_ph_map);
+        }
+
+        RUNTIME_CHECK_MSG(max_threads == 1, "ph map only impl for fine grained, so merging buckets concurrency should be 1");
+        return std::make_shared<MergingBuckets>(*this, non_empty_data, final, 1);
+    }
+
     /// If at least one of the options is two-level, then convert all the options into two-level ones, if there are not such.
     /// Note - perhaps it would be more optimal not to convert single-level versions before the merge, but merge them separately, at the end.
 
@@ -2808,7 +2834,90 @@ Block MergingBuckets::getData(size_t concurrency_index)
 
     FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_aggregate_merge_failpoint);
 
+    const auto & one_data = *data[0];
+    if (one_data.type == AggregatedDataVariants::Type::key64_phmap)
+    {
+        return getDataForPhMap();
+    }
     return is_two_level ? getDataForTwoLevel(concurrency_index) : getDataForSingleLevel();
+}
+
+Block MergingBuckets::getDataForPhMap()
+{
+    assert(!data.empty());
+
+    // todo assume ph map always is single level
+    Block out_block = popBlocksListFront(single_level_blocks);
+    if (likely(out_block))
+    {
+        return out_block;
+    }
+
+    if (current_bucket_num > 0)
+        return {};
+
+    // convert agg states to blocks
+    
+    // todo only for fine grained, so no merge phmap
+    const auto & header = aggregator.getHeader(true);
+    const auto & params = aggregator.params;
+
+    auto key_column = header.getByPosition(0).type->createColumn();
+    key_column->reserve(params.max_block_size);
+
+    auto create_agg_column = [&]() {
+        std::vector<MutableColumnPtr> tmp_agg_func_columns;
+        for (size_t i = 0; i < params.aggregates_size; ++i)
+        {
+            auto tmp_col = header.getByName(params.aggregates[i].column_name).type->createColumn();
+            tmp_col->reserve(params.max_block_size);
+            tmp_agg_func_columns.push_back(std::move(tmp_col));
+        }
+        return tmp_agg_func_columns;
+    };
+    std::vector<MutableColumnPtr> agg_func_columns = create_agg_column();
+
+    const auto & all_batch_agg_states = data[0]->agg_states_batch_allocator.batch_agg_states;
+    for (const auto & one_batch : all_batch_agg_states)
+    {
+        for (size_t i = 0; i < one_batch.second; ++i)
+        {
+            const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
+                i * data[0]->agg_states_batch_allocator.total_size_of_aggregate_states;
+            UInt64 key = *reinterpret_cast<const UInt64 *>(agg_states);
+            // todo Method::insertKeyIntoColumns
+            key_column->insert(Field(static_cast<Int64>(key)));
+
+            for (size_t j = 0; j < params.aggregates_size; ++j)
+            {
+                aggregator.aggregate_functions[j]->insertResultInto(
+                        agg_states + aggregator.offsets_of_aggregate_states[j],
+                        *agg_func_columns[j],
+                        data[0]->aggregates_pool);
+            }
+
+            if unlikely (key_column->size() >= params.max_block_size)
+            {
+                Block res = header.cloneEmpty();
+
+                res.getByPosition(0).column = std::move(key_column);
+                key_column = header.getByPosition(0).type->createColumn();
+
+                for (size_t agg_func_idx = 0; agg_func_idx < params.aggregates_size; ++agg_func_idx)
+                {
+                    res.getByName(params.aggregates[agg_func_idx].column_name).column = 
+                        std::move(agg_func_columns[agg_func_idx]);
+                }
+                agg_func_columns = create_agg_column();
+
+                single_level_blocks.push_back(res);
+            }
+
+            // todo destroy
+        }
+    }
+    current_bucket_num++;
+    return popBlocksListFront(single_level_blocks);
 }
 
 Block MergingBuckets::getDataForSingleLevel()

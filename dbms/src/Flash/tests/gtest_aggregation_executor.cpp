@@ -175,6 +175,18 @@ public:
                 {{"key", TiDB::TP::TypeLong}, {"value", TiDB::TP::TypeString}},
                 {toNullableVec<Int32>("key", key), toNullableVec<String>("value", value)});
         }
+
+        {
+            context.addMockTable(
+                {"test_db", "ph_map_tbl"},
+                {{"l_orderkey", TiDB::TP::TypeLongLong}, {"l_quantity", TiDB::TP::TypeDecimal}},
+                {toVec<Int64>("l_orderkey", {1, 2, 3, 4}),
+                 toVec<Decimal128>("l_quantity", {
+                         DecimalField<Decimal128>(100, 1),
+                         DecimalField<Decimal128>(100, 1),
+                         DecimalField<Decimal128>(100, 1),
+                         DecimalField<Decimal128>(100, 1)})});
+        }
     }
 
     std::shared_ptr<tipb::DAGRequest> buildDAGRequest(
@@ -1156,6 +1168,25 @@ try
             toVec<Int32>("col_int", ColumnWithInt32{0, 1, 2, 3})};
         executeAndAssertColumnsEqual(request, expected);
     }
+}
+CATCH
+
+TEST_F(AggExecutorTestRunner, testPhMap)
+try
+{
+    auto agg_funcs = {Sum(col("l_quantity")), makeASTFunction("first_row", col("l_orderkey"))};
+    auto keys = {col("l_orderkey")};
+
+    auto request = context.scan("test_db", "ph_map_tbl").aggregation(agg_funcs, keys).build(context);
+    auto expected = {
+        toVec<Decimal128>("sum(l_quantity)", 
+            {DecimalField<Decimal128>(100, 1),
+            DecimalField<Decimal128>(100, 1),
+            DecimalField<Decimal128>(100, 1),
+            DecimalField<Decimal128>(100, 1)}),
+        toVec<Int64>("first_row(l_orderkey)", {1, 2, 3, 4}),
+        toVec<Int64>("l_orderkey", {1, 2, 3, 4})};
+    executeAndAssertColumnsEqual(request, expected);
 }
 CATCH
 

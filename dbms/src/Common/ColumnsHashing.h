@@ -124,7 +124,7 @@ struct HashMethodOneNumberPhMap
         // todo assume HahsMethodOneNumber, so key_holder is just key.
         bool found = true;
         auto iter = data.lazy_emplace(key_holder, [&](const auto & ctor) {
-            ctor(key_holder, alloc_func());
+            ctor(key_holder, alloc_func(key_holder));
             found = false;
         });
         return {iter->second, found};
