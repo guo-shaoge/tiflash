@@ -72,6 +72,40 @@ class AggHashTableToBlocksBlockInputStream;
   *  best suited for different cases, and this approach is just one of them, chosen for a combination of reasons.
   */
 
+enum PhmapSeed { PhmapSeed1, PhmapSeed2 };
+
+template <int n, PhmapSeed seed>
+class phmap_mix_with_seed {
+public:
+    inline size_t operator()(size_t) const;
+};
+
+template <>
+class phmap_mix_with_seed<4, PhmapSeed1> {
+public:
+    inline size_t operator()(size_t a) const {
+        static constexpr uint64_t kmul = 0xcc9e2d51UL;
+        uint64_t l = a * kmul;
+        return static_cast<size_t>(l ^ (l >> 32u));
+    }
+};
+
+template <>
+class phmap_mix_with_seed<8, PhmapSeed1> {
+public:
+    inline size_t operator()(size_t a) const {
+        static constexpr uint64_t k = 0xde5fb9d2630458e9ULL;
+        uint64_t h;
+        uint64_t l = umul128(a, k, &h);
+        return static_cast<size_t>(h + l);
+    }
+};
+template <typename T, PhmapSeed seed>
+struct MyStdHash
+{
+    std::size_t operator()(T value) const { return phmap_mix_with_seed<sizeof(size_t), seed>()(std::hash<T>()(value)); }
+};
+
 using AggregatedDataWithoutKey = AggregateDataPtr;
 
 using AggregatedDataWithUInt8Key = FixedImplicitZeroHashMapWithCalculatedSize<UInt8, AggregateDataPtr>;
@@ -79,7 +113,7 @@ using AggregatedDataWithUInt16Key = FixedImplicitZeroHashMap<UInt16, AggregateDa
 
 using AggregatedDataWithUInt32Key = HashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
 using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
-using AggregatedDataWithUInt64KeyPhMap = phmap::flat_hash_map<UInt64, AggregateDataPtr, std::hash<UInt64>>;
+using AggregatedDataWithUInt64KeyPhMap = phmap::flat_hash_map<UInt64, AggregateDataPtr, MyStdHash<UInt64, PhmapSeed1>>;
 
 using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
 using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr>;
