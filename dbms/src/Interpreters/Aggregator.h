@@ -786,23 +786,27 @@ struct AggregateStatesBatchAllocator
 {
     const size_t batch_size = 1024;
 
-    size_t total_size_of_aggregate_states = 0;
-    size_t align_aggregate_states = 0;
+    size_t one_agg_state_size = 0;
+    // todo not fixed type
+    std::vector<UInt64> keys;
 
     std::vector<std::pair<void *, size_t>> batch_agg_states;
     Arena * aggregates_pool = nullptr;
 
-    AggregateDataPtr allocate()
+    // todo fixed type
+    AggregateDataPtr allocate(UInt64 key)
     {
         if (batch_agg_states.empty() || batch_agg_states.back().second == batch_size)
         {
-            auto * batch_agg_states_ptr = aggregates_pool->alignedAlloc(
-                    total_size_of_aggregate_states * batch_size, align_aggregate_states);
+            auto * batch_agg_states_ptr = aggregates_pool->alloc(one_agg_state_size * batch_size);
             RUNTIME_CHECK(batch_agg_states_ptr);
             batch_agg_states.emplace_back(batch_agg_states_ptr, 0);
+
+            keys.reserve(keys.size() + batch_size);
         }
         auto & last_ele = batch_agg_states.back();
-        return static_cast<AggregateDataPtr>(last_ele.first) + last_ele.second++ * total_size_of_aggregate_states;
+        keys.push_back(key);
+        return static_cast<AggregateDataPtr>(last_ele.first) + last_ele.second++ * one_agg_state_size;
     }
 };
 

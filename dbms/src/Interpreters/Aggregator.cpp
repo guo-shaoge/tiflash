@@ -302,7 +302,7 @@ Aggregator::Aggregator(
     total_size_of_aggregate_states = 0;
     all_aggregates_has_trivial_destructor = true;
     // todo hack for ph map
-    total_size_of_aggregate_states += sizeof(UInt64);
+    // total_size_of_aggregate_states += sizeof(UInt64);
 
     // aggreate_states will be aligned as below:
     // |<-- state_1 -->|<-- pad_1 -->|<-- state_2 -->|<-- pad_2 -->| .....
@@ -646,6 +646,7 @@ void Aggregator::createAggregateStates(AggregateDataPtr & aggregate_data) const
         }
         catch (...)
         {
+            LOG_DEBUG(log, "gjt debug create agg state failed");
             for (size_t rollback_j = 0; rollback_j < j; ++rollback_j)
                 aggregate_functions[rollback_j]->destroy(aggregate_data + offsets_of_aggregate_states[rollback_j]);
 
@@ -688,8 +689,8 @@ std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::Res
         {
             return state.emplaceKeyPhMap(method.data, index, aggregates_pool, sort_key_containers,
                     [this, agg_states_batch_allocator](typename Method::Key & key) {
-                        auto * aggregate_data = agg_states_batch_allocator->allocate();
-                        *reinterpret_cast<typename Method::Key *>(aggregate_data) = key;
+                        auto * aggregate_data = agg_states_batch_allocator->allocate(key);
+                        // *reinterpret_cast<typename Method::Key *>(aggregate_data) = key;
                         createAggregateStates(aggregate_data);
                         return aggregate_data;
                     });
@@ -836,6 +837,7 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
         if constexpr (using_ph_map)
         {
             aggregate_data = emplace_result_holder->first;
+            RUNTIME_CHECK(aggregate_data);
         }
         else
         {
@@ -1044,8 +1046,7 @@ bool Aggregator::executeOnBlockImpl(
         result.keys_size = params.keys_size;
         result.key_sizes = key_sizes;
         // todo init func
-        result.agg_states_batch_allocator.total_size_of_aggregate_states = total_size_of_aggregate_states;
-        result.agg_states_batch_allocator.align_aggregate_states = align_aggregate_states;
+        result.agg_states_batch_allocator.one_agg_state_size = total_size_of_aggregate_states + align_aggregate_states;
         result.agg_states_batch_allocator.aggregates_pool = result.aggregates_pool;
         LOG_TRACE(log, "Aggregation method: `{}`", result.getMethodName());
     }
@@ -2878,15 +2879,16 @@ Block MergingBuckets::getDataForPhMap()
     std::vector<MutableColumnPtr> agg_func_columns = create_agg_column();
 
     const auto & all_batch_agg_states = data[0]->agg_states_batch_allocator.batch_agg_states;
+    size_t key_idx = 0;
     for (const auto & one_batch : all_batch_agg_states)
     {
         for (size_t i = 0; i < one_batch.second; ++i)
         {
             const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
-                i * data[0]->agg_states_batch_allocator.total_size_of_aggregate_states;
-            UInt64 key = *reinterpret_cast<const UInt64 *>(agg_states);
+                i * data[0]->agg_states_batch_allocator.one_agg_state_size;
+            // UInt64 key = *reinterpret_cast<const UInt64 *>(agg_states);
             // todo Method::insertKeyIntoColumns
-            key_column->insert(Field(static_cast<Int64>(key)));
+            key_column->insert(Field(static_cast<Int64>(data[0]->agg_states_batch_allocator.keys[key_idx++])));
 
             for (size_t j = 0; j < params.aggregates_size; ++j)
             {
@@ -2896,7 +2898,7 @@ Block MergingBuckets::getDataForPhMap()
                         data[0]->aggregates_pool);
             }
 
-            if unlikely (key_column->size() >= params.max_block_size)
+            if unlikely (key_column->size() >= params.max_block_size || (key_idx == data[0]->agg_states_batch_allocator.keys.size()))
             {
                 Block res = header.cloneEmpty();
 
