@@ -405,15 +405,7 @@ public:
     void insertResultInto(ConstAggregateDataPtr __restrict place, IColumn & to, Arena *) const override
     {
         if constexpr (IsDecimal<TResult>)
-        {
-            LOG_DEBUG(Logger::get(), "this: {}, place: {}, data size: {}, reinterpret_cast: {}", (void*)this, (void*)place, to.size(), (void*)(&(this->data(place))));
-            auto & datav = this->data(place);
-            LOG_DEBUG(Logger::get(), "gjt debug v: {}", (void*)(&datav));
-            LOG_DEBUG(Logger::get(), "gjt debug v: {}, vv: {}", (void*)(&datav), (void*)(&datav.sum));
-            auto v = datav.get();
-            LOG_DEBUG(Logger::get(), "gjt debug v: {}", (void*)(&v));
             static_cast<ColumnDecimal<TResult> &>(to).getData().push_back(this->data(place).get(), result_scale);
-        }
         else
             static_cast<ColumnVector<TResult> &>(to).getData().push_back(this->data(place).get());
     }

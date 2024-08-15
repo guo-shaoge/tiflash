@@ -787,25 +787,20 @@ struct AggregateStatesBatchAllocator
     const size_t batch_size = 1024;
 
     size_t one_agg_state_size = 0;
-    // todo not fixed type
-    std::vector<UInt64> keys;
 
     std::vector<std::pair<void *, size_t>> batch_agg_states;
     Arena * aggregates_pool = nullptr;
 
     // todo fixed type
-    AggregateDataPtr allocate(UInt64 key)
+    AggregateDataPtr allocate()
     {
         if (batch_agg_states.empty() || batch_agg_states.back().second == batch_size)
         {
             auto * batch_agg_states_ptr = aggregates_pool->alloc(one_agg_state_size * batch_size);
             RUNTIME_CHECK(batch_agg_states_ptr);
             batch_agg_states.emplace_back(batch_agg_states_ptr, 0);
-
-            keys.reserve(keys.size() + batch_size);
         }
         auto & last_ele = batch_agg_states.back();
-        keys.push_back(key);
         return static_cast<AggregateDataPtr>(last_ele.first) + last_ele.second++ * one_agg_state_size;
     }
 };
@@ -1548,7 +1543,7 @@ protected:
 
     /** Create states of aggregate functions for one key.
       */
-    void createAggregateStates(AggregateDataPtr & aggregate_data) const;
+    void createAggregateStates(AggregateDataPtr aggregate_data) const;
 
     /** Call `destroy` methods for states of aggregate functions.
       * Used in the exception handler for aggregation, since RAII in this case is not applicable.
