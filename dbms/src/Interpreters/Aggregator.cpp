@@ -685,7 +685,7 @@ void Aggregator::emplacePhMap(Method & method, AggProcessInfo & agg_process_info
     Arena * aggregates_pool) const
 {
     const size_t total_rows = agg_process_info.end_row - agg_process_info.start_row;
-    std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[total_rows]);
+    AggregateDataPtr places[total_rows];
 
     const auto alloc_func = [this, agg_states_batch_allocator](const typename Method::FT & key) {
         auto * aggregate_data = agg_states_batch_allocator->allocate();
@@ -696,10 +696,21 @@ void Aggregator::emplacePhMap(Method & method, AggProcessInfo & agg_process_info
     };
 
     const auto & key_col_data = static_cast<const ColumnVector<typename Method::FT> *>(agg_process_info.key_columns[0])->getData();
+    auto * hash_vals = reinterpret_cast<size_t *>(&places[0]);
+    for (size_t i = 0; i < total_rows; ++i)
+    {
+        hash_vals[i] = method.data.hash_function()(key_col_data[i]);
+    }
+    size_t __prefetch_idx = 16;
+
     for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
     {
+        if (__prefetch_idx < agg_process_info.end_row)
+        {
+            method.data.prefetch_hash(hash_vals[__prefetch_idx++]);
+        }
         const auto & key = key_col_data[i];
-        auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
+        auto iter = method.data.lazy_emplace_with_hash(key, hash_vals[i], [&](const auto & ctor) {
             ctor(key, alloc_func(key));
         });
         places[i] = iter->second;
@@ -711,7 +722,7 @@ void Aggregator::emplacePhMap(Method & method, AggProcessInfo & agg_process_info
         inst->batch_that->addBatch(
                 agg_process_info.start_row,
                 total_rows,
-                places.get(),
+                &places[0],
                 inst->state_offset,
                 inst->batch_arguments,
                 aggregates_pool);
