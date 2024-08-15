@@ -667,9 +667,56 @@ void NO_INLINE Aggregator::executeImpl(
     TiDB::TiDBCollators & collators,
     AggregateStatesBatchAllocator * agg_states_batch_allocator) const
 {
-    typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
+    if constexpr (Method::using_ph_map)
+    {
+        emplacePhMap(method, agg_process_info, agg_states_batch_allocator, aggregates_pool);
+    }
+    else
+    {
+        typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    executeImplBatch<collect_hit_rate, only_lookup, Method::using_ph_map>(method, state, aggregates_pool, agg_process_info, agg_states_batch_allocator);
+        executeImplBatch<collect_hit_rate, only_lookup, Method::using_ph_map>(method, state, aggregates_pool, agg_process_info, agg_states_batch_allocator);
+    }
+}
+
+template <typename Method>
+void Aggregator::emplacePhMap(Method & method, AggProcessInfo & agg_process_info,
+    AggregateStatesBatchAllocator * agg_states_batch_allocator,
+    Arena * aggregates_pool) const
+{
+    const size_t total_rows = agg_process_info.end_row - agg_process_info.start_row;
+    std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[total_rows]);
+
+    const auto alloc_func = [this, agg_states_batch_allocator](const typename Method::FT & key) {
+        auto * aggregate_data = agg_states_batch_allocator->allocate();
+        *reinterpret_cast<UInt64*>(aggregate_data) = key;
+        // todo better align method
+        createAggregateStates(aggregate_data);
+        return aggregate_data;
+    };
+
+    const auto & key_col_data = static_cast<const ColumnVector<typename Method::FT> *>(agg_process_info.key_columns[0])->getData();
+    for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
+    {
+        const auto & key = key_col_data[i];
+        auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
+            ctor(key, alloc_func(key));
+        });
+        places[i] = iter->second;
+    }
+
+    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
+            ++inst)
+    {
+        inst->batch_that->addBatch(
+                agg_process_info.start_row,
+                total_rows,
+                places.get(),
+                inst->state_offset,
+                inst->batch_arguments,
+                aggregates_pool);
+    }
+    agg_process_info.start_row = total_rows;
 }
 
 template <bool only_lookup, typename Method>
@@ -687,7 +734,7 @@ std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::Res
         if constexpr (Method::using_ph_map)
         {
             return state.emplaceKeyPhMap(method.data, index, aggregates_pool, sort_key_containers,
-                    [this, agg_states_batch_allocator](typename Method::Key & key) {
+                    [this, agg_states_batch_allocator](const typename Method::Key & key) {
                         auto * aggregate_data = agg_states_batch_allocator->allocate();
                         *reinterpret_cast<UInt64*>(aggregate_data) = key;
                         // todo better align method
@@ -836,7 +883,7 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
 
         if constexpr (using_ph_map)
         {
-            aggregate_data = emplace_result_holder->first;
+            aggregate_data = *emplace_result_holder;
             RUNTIME_CHECK(aggregate_data);
         }
         else

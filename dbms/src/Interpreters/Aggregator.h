@@ -175,6 +175,7 @@ struct AggregationMethodOneNumberPhMap
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
+    using FT = FieldType;
 
     Data data;
 
@@ -196,13 +197,14 @@ struct AggregationMethodOneNumberPhMap
     struct EmplaceOrFindKeyResult<true>
     {
         // todo only lookup not impl yet.
-        using ResultType = std::pair<Mapped, bool>;
+        // using ResultType = std::pair<Mapped, bool>;
+        using ResultType = Mapped;
     };
 
     template <>
     struct EmplaceOrFindKeyResult<false>
     {
-        using ResultType = std::pair<Mapped, bool>;
+        using ResultType = Mapped;
     };
 
     // todo ?
@@ -1559,6 +1561,11 @@ protected:
         AggProcessInfo & agg_process_info,
         TiDB::TiDBCollators & collators,
         AggregateStatesBatchAllocator * agg_states_batch_allocator = nullptr) const;
+
+    template <typename Method>
+    void emplacePhMap(Method & method, AggProcessInfo & agg_process_info,
+            AggregateStatesBatchAllocator * agg_states_batch_allocator,
+            Arena * aggregates_pool) const;
 
     template <bool collect_hit_rate, bool only_loopup, bool using_ph_map, typename Method>
     void executeImplBatch(

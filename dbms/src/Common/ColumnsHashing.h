@@ -107,7 +107,7 @@ struct HashMethodOneNumberPhMap
     }
 
     template <typename Data, typename AllocFunc>
-    ALWAYS_INLINE inline std::pair<Mapped, bool> emplaceKeyPhMap(
+    ALWAYS_INLINE inline Mapped emplaceKeyPhMap(
             Data & data,
             size_t row,
             Arena & pool,
@@ -119,15 +119,13 @@ struct HashMethodOneNumberPhMap
     }
 
     template <typename Data, typename KeyHolder, typename AllocFunc>
-    ALWAYS_INLINE inline std::pair<Mapped, bool> emplaceImplPhMap(KeyHolder & key_holder, Data & data, const AllocFunc & alloc_func)
+    ALWAYS_INLINE inline Mapped emplaceImplPhMap(KeyHolder & key_holder, Data & data, const AllocFunc & alloc_func)
     {
         // todo assume HahsMethodOneNumber, so key_holder is just key.
-        bool found = true;
         auto iter = data.lazy_emplace(key_holder, [&](const auto & ctor) {
             ctor(key_holder, alloc_func(key_holder));
-            found = false;
         });
-        return {iter->second, found};
+        return iter->second;
     }
 
     /// Emplace key into HashTable or HashMap. If Data is HashMap, returns ptr to value, otherwise nullptr.
