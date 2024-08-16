@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Core/OperatorSpillContext.h"
 #include <AggregateFunctions/AggregateFunctionArray.h>
 #include <AggregateFunctions/AggregateFunctionState.h>
 #include <Common/FailPoint.h>
@@ -669,7 +670,11 @@ void NO_INLINE Aggregator::executeImpl(
 {
     if constexpr (Method::using_ph_map)
     {
-        emplacePhMap(method, agg_process_info, agg_states_batch_allocator, aggregates_pool);
+        if (method.data.bucket_count() < 8192)
+            emplacePhMap<false, Method>(method, agg_process_info, agg_states_batch_allocator, aggregates_pool);
+        else
+            emplacePhMap<true, Method>(method, agg_process_info, agg_states_batch_allocator, aggregates_pool);
+
     }
     else
     {
@@ -679,7 +684,7 @@ void NO_INLINE Aggregator::executeImpl(
     }
 }
 
-template <typename Method>
+template <bool enable_prefetch, typename Method>
 void Aggregator::emplacePhMap(Method & method, AggProcessInfo & agg_process_info,
     AggregateStatesBatchAllocator * agg_states_batch_allocator,
     Arena * aggregates_pool) const
@@ -696,24 +701,38 @@ void Aggregator::emplacePhMap(Method & method, AggProcessInfo & agg_process_info
     };
 
     const auto & key_col_data = static_cast<const ColumnVector<typename Method::FT> *>(agg_process_info.key_columns[0])->getData();
-    auto * hash_vals = reinterpret_cast<size_t *>(&places[0]);
-    for (size_t i = 0; i < total_rows; ++i)
+    if constexpr (enable_prefetch)
     {
-        hash_vals[i] = method.data.hash_function()(key_col_data[i]);
-    }
-    size_t __prefetch_idx = 16;
-
-    for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
-    {
-        if (__prefetch_idx < agg_process_info.end_row)
+        auto * hash_vals = reinterpret_cast<size_t *>(&places[0]);
+        for (size_t i = 0; i < total_rows; ++i)
         {
-            method.data.prefetch_hash(hash_vals[__prefetch_idx++]);
+            hash_vals[i] = method.data.hash_function()(key_col_data[i]);
         }
-        const auto & key = key_col_data[i];
-        auto iter = method.data.lazy_emplace_with_hash(key, hash_vals[i], [&](const auto & ctor) {
-            ctor(key, alloc_func(key));
-        });
-        places[i] = iter->second;
+        size_t __prefetch_idx = 16;
+
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
+        {
+            if (__prefetch_idx < agg_process_info.end_row)
+            {
+                method.data.prefetch_hash(hash_vals[__prefetch_idx++]);
+            }
+            const auto & key = key_col_data[i];
+            auto iter = method.data.lazy_emplace_with_hash(key, hash_vals[i], [&](const auto & ctor) {
+                    ctor(key, alloc_func(key));
+                    });
+            places[i] = iter->second;
+        }
+    }
+    else
+    {
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
+        {
+            const auto & key = key_col_data[i];
+            auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
+                    ctor(key, alloc_func(key));
+                    });
+            places[i] = iter->second;
+        }
     }
 
     for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;

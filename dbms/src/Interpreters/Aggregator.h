@@ -1596,7 +1596,7 @@ protected:
         TiDB::TiDBCollators & collators,
         AggregateStatesBatchAllocator * agg_states_batch_allocator = nullptr) const;
 
-    template <typename Method>
+    template <bool enable_prefetch, typename Method>
     void emplacePhMap(Method & method, AggProcessInfo & agg_process_info,
             AggregateStatesBatchAllocator * agg_states_batch_allocator,
             Arena * aggregates_pool) const;
