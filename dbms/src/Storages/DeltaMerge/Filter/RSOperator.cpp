@@ -28,6 +28,7 @@
 #include <Storages/DeltaMerge/Filter/Or.h>
 #include <Storages/DeltaMerge/Filter/RSOperator.h>
 #include <Storages/DeltaMerge/Filter/Unsupported.h>
+#include <Storages/DeltaMerge/Filter/WithANNQueryInfo.h>
 #include <Storages/DeltaMerge/FilterParser/FilterParser.h>
 
 namespace DB::DM
@@ -51,7 +52,7 @@ RSOperatorPtr createUnsupported(const String & reason)                          
 
 RSOperatorPtr RSOperator::build(
     const std::unique_ptr<DAGQueryInfo> & dag_query,
-    const ColumnInfos & scan_column_infos,
+    const TiDB::ColumnInfos & scan_column_infos,
     const ColumnDefines & table_column_defines,
     bool enable_rs_filter,
     const LoggerPtr & tracing_logger)
@@ -84,6 +85,11 @@ RSOperatorPtr RSOperator::build(
         LOG_DEBUG(tracing_logger, "Rough set filter: {}", rs_operator->toDebugString());
 
     return rs_operator;
+}
+
+RSOperatorPtr wrapWithANNQueryInfo(const RSOperatorPtr & op, const ANNQueryInfoPtr & ann_query_info)
+{
+    return std::make_shared<WithANNQueryInfo>(op, ann_query_info);
 }
 
 } // namespace DB::DM

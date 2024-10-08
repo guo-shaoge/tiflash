@@ -46,6 +46,8 @@ public:
     std::atomic<uint64_t> rs_pack_filter_none{0};
     std::atomic<uint64_t> rs_pack_filter_some{0};
     std::atomic<uint64_t> rs_pack_filter_all{0};
+    std::atomic<uint64_t> rs_pack_filter_all_null{0};
+    std::atomic<uint64_t> rs_dmfile_read_with_all{0};
 
     std::atomic<uint64_t> total_remote_region_num{0};
     std::atomic<uint64_t> total_local_region_num{0};
@@ -86,6 +88,16 @@ public:
     // Building bitmap
     std::atomic<uint64_t> build_bitmap_time_ns{0};
 
+    std::atomic<uint64_t> total_vector_idx_load_from_s3{0};
+    std::atomic<uint64_t> total_vector_idx_load_from_disk{0};
+    std::atomic<uint64_t> total_vector_idx_load_from_cache{0};
+    std::atomic<uint64_t> total_vector_idx_load_time_ms{0};
+    std::atomic<uint64_t> total_vector_idx_search_time_ms{0};
+    std::atomic<uint64_t> total_vector_idx_search_visited_nodes{0};
+    std::atomic<uint64_t> total_vector_idx_search_discarded_nodes{0};
+    std::atomic<uint64_t> total_vector_idx_read_vec_time_ms{0};
+    std::atomic<uint64_t> total_vector_idx_read_others_time_ms{0};
+
     const String resource_group_name;
 
     explicit ScanContext(const String & name = "")
@@ -101,7 +113,8 @@ public:
         dmfile_lm_filter_scanned_rows = tiflash_scan_context_pb.dmfile_lm_filter_scanned_rows();
         dmfile_lm_filter_skipped_rows = tiflash_scan_context_pb.dmfile_lm_filter_skipped_rows();
         total_rs_pack_filter_check_time_ns = tiflash_scan_context_pb.total_dmfile_rs_check_ms() * 1000000;
-        // TODO: rs_pack_filter_none, rs_pack_filter_some, rs_pack_filter_all
+        // TODO: rs_pack_filter_none, rs_pack_filter_some, rs_pack_filter_all,rs_pack_filter_all_null
+        // rs_dmfile_read_with_all
         total_dmfile_read_time_ns = tiflash_scan_context_pb.total_dmfile_read_ms() * 1000000;
         create_snapshot_time_ns = tiflash_scan_context_pb.total_build_snapshot_ms() * 1000000;
         total_remote_region_num = tiflash_scan_context_pb.remote_regions();
@@ -132,6 +145,16 @@ public:
             tiflash_scan_context_pb.max_remote_stream_ms() * 1000000);
 
         deserializeRegionNumberOfInstance(tiflash_scan_context_pb);
+
+        total_vector_idx_load_from_s3 = tiflash_scan_context_pb.total_vector_idx_load_from_s3();
+        total_vector_idx_load_from_disk = tiflash_scan_context_pb.total_vector_idx_load_from_disk();
+        total_vector_idx_load_from_cache = tiflash_scan_context_pb.total_vector_idx_load_from_cache();
+        total_vector_idx_load_time_ms = tiflash_scan_context_pb.total_vector_idx_load_time_ms();
+        total_vector_idx_search_time_ms = tiflash_scan_context_pb.total_vector_idx_search_time_ms();
+        total_vector_idx_search_visited_nodes = tiflash_scan_context_pb.total_vector_idx_search_visited_nodes();
+        total_vector_idx_search_discarded_nodes = tiflash_scan_context_pb.total_vector_idx_search_discarded_nodes();
+        total_vector_idx_read_vec_time_ms = tiflash_scan_context_pb.total_vector_idx_read_vec_time_ms();
+        total_vector_idx_read_others_time_ms = tiflash_scan_context_pb.total_vector_idx_read_others_time_ms();
     }
 
     tipb::TiFlashScanContext serialize()
@@ -175,6 +198,16 @@ public:
 
         serializeRegionNumOfInstance(tiflash_scan_context_pb);
 
+        tiflash_scan_context_pb.set_total_vector_idx_load_from_s3(total_vector_idx_load_from_s3);
+        tiflash_scan_context_pb.set_total_vector_idx_load_from_disk(total_vector_idx_load_from_disk);
+        tiflash_scan_context_pb.set_total_vector_idx_load_from_cache(total_vector_idx_load_from_cache);
+        tiflash_scan_context_pb.set_total_vector_idx_load_time_ms(total_vector_idx_load_time_ms);
+        tiflash_scan_context_pb.set_total_vector_idx_search_time_ms(total_vector_idx_search_time_ms);
+        tiflash_scan_context_pb.set_total_vector_idx_search_visited_nodes(total_vector_idx_search_visited_nodes);
+        tiflash_scan_context_pb.set_total_vector_idx_search_discarded_nodes(total_vector_idx_search_discarded_nodes);
+        tiflash_scan_context_pb.set_total_vector_idx_read_vec_time_ms(total_vector_idx_read_vec_time_ms);
+        tiflash_scan_context_pb.set_total_vector_idx_read_others_time_ms(total_vector_idx_read_others_time_ms);
+
         return tiflash_scan_context_pb;
     }
 
@@ -190,6 +223,8 @@ public:
         rs_pack_filter_none += other.rs_pack_filter_none;
         rs_pack_filter_some += other.rs_pack_filter_some;
         rs_pack_filter_all += other.rs_pack_filter_all;
+        rs_pack_filter_all_null += other.rs_pack_filter_all_null;
+        rs_dmfile_read_with_all += other.rs_dmfile_read_with_all;
         total_dmfile_read_time_ns += other.total_dmfile_read_time_ns;
 
         total_local_region_num += other.total_local_region_num;
@@ -224,6 +259,16 @@ public:
             other.remote_max_stream_cost_ns);
 
         mergeRegionNumberOfInstance(other);
+
+        total_vector_idx_load_from_s3 += other.total_vector_idx_load_from_s3;
+        total_vector_idx_load_from_disk += other.total_vector_idx_load_from_disk;
+        total_vector_idx_load_from_cache += other.total_vector_idx_load_from_cache;
+        total_vector_idx_load_time_ms += other.total_vector_idx_load_time_ms;
+        total_vector_idx_search_time_ms += other.total_vector_idx_search_time_ms;
+        total_vector_idx_search_visited_nodes += other.total_vector_idx_search_visited_nodes;
+        total_vector_idx_search_discarded_nodes += other.total_vector_idx_search_discarded_nodes;
+        total_vector_idx_read_vec_time_ms += other.total_vector_idx_read_vec_time_ms;
+        total_vector_idx_read_others_time_ms += other.total_vector_idx_read_others_time_ms;
     }
 
     void merge(const tipb::TiFlashScanContext & other)
@@ -235,7 +280,8 @@ public:
         dmfile_lm_filter_scanned_rows += other.dmfile_lm_filter_scanned_rows();
         dmfile_lm_filter_skipped_rows += other.dmfile_lm_filter_skipped_rows();
         total_rs_pack_filter_check_time_ns += other.total_dmfile_rs_check_ms() * 1000000;
-        // TODO: rs_pack_filter_none, rs_pack_filter_some, rs_pack_filter_all
+        // TODO: rs_pack_filter_none, rs_pack_filter_some, rs_pack_filter_all, rs_pack_filter_all_null
+        // rs_dmfile_read_with_all
         total_dmfile_read_time_ns += other.total_dmfile_read_ms() * 1000000;
         create_snapshot_time_ns += other.total_build_snapshot_ms() * 1000000;
         total_local_region_num += other.local_regions();
@@ -266,6 +312,16 @@ public:
             other.max_remote_stream_ms() * 1000000);
 
         mergeRegionNumberOfInstance(other);
+
+        total_vector_idx_load_from_s3 += other.total_vector_idx_load_from_s3();
+        total_vector_idx_load_from_disk += other.total_vector_idx_load_from_disk();
+        total_vector_idx_load_from_cache += other.total_vector_idx_load_from_cache();
+        total_vector_idx_load_time_ms += other.total_vector_idx_load_time_ms();
+        total_vector_idx_search_time_ms += other.total_vector_idx_search_time_ms();
+        total_vector_idx_search_visited_nodes += other.total_vector_idx_search_visited_nodes();
+        total_vector_idx_search_discarded_nodes += other.total_vector_idx_search_discarded_nodes();
+        total_vector_idx_read_vec_time_ms += other.total_vector_idx_read_vec_time_ms();
+        total_vector_idx_read_others_time_ms += other.total_vector_idx_read_others_time_ms();
     }
 
     String toJson() const;

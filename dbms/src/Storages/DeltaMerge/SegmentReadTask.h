@@ -83,7 +83,8 @@ public:
         StoreID store_id,
         const String & store_address,
         KeyspaceID keyspace_id,
-        TableID physical_table_id);
+        TableID physical_table_id,
+        ColumnID pk_col_id);
 
     ~SegmentReadTask();
 
@@ -110,6 +111,9 @@ public:
         RUNTIME_CHECK(input_stream != nullptr);
         return input_stream;
     }
+
+    // WN calls hasColumnFileToFetch to check whether a SegmentReadTask need to fetch column files from it
+    bool hasColumnFileToFetch() const;
 
     String toString() const;
 
@@ -146,6 +150,8 @@ private:
         ReadMode read_mode,
         size_t expected_block_size);
 
+    void finishPagesPacketStream(std::unique_ptr<grpc::ClientReader<disaggregated::PagesPacket>> & stream);
+
     BlockInputStreamPtr input_stream;
 
     friend tests::SegmentReadTaskTest;
@@ -166,7 +172,7 @@ struct fmt::formatter<DB::DM::SegmentReadTask>
     auto format(const DB::DM::SegmentReadTask & t, FormatContext & ctx) const
     {
         return fmt::format_to(ctx.out(), "{}", t.toString());
-    };
+    }
 };
 
 template <>

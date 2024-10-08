@@ -25,6 +25,7 @@
 #include <Storages/FormatVersion.h>
 #include <Storages/KVStore/Types.h>
 #include <Storages/MutableSupport.h>
+#include <TiDB/Schema/VectorIndex.h>
 
 #include <limits>
 #include <memory>
@@ -168,6 +169,14 @@ static_assert(
     "Unsupported compiler!");
 
 static constexpr bool DM_RUN_CHECK = true;
+
+struct Attr
+{
+    String col_name;
+    ColId col_id;
+    DataTypePtr type;
+};
+using Attrs = std::vector<Attr>;
 
 } // namespace DM
 } // namespace DB

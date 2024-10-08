@@ -136,6 +136,7 @@ public:
                     /* page_id= */ 0,
                     path,
                     DMFileMeta::ReadMode::none(),
+                    0 /* a meta version that must exist */,
                     path_pool->getKeyspaceID());
                 if (unlikely(!dmfile))
                 {
@@ -389,7 +390,7 @@ bool DeltaMergeStore::handleBackgroundTask(bool heavy)
     // Foreground task don't get GC safe point from remote, but we better make it as up to date as possible.
     if (updateGCSafePoint())
     {
-        /// Note that `task.dm_context->db_context` will be free after query is finish. We should not use that in background task.
+        /// Note that `task.dm_context->global_context` will be free after query is finish. We should not use that in background task.
         task.dm_context->min_version = latest_gc_safe_point.load(std::memory_order_relaxed);
         LOG_DEBUG(log, "Task {} GC safe point: {}", magic_enum::enum_name(task.type), task.dm_context->min_version);
     }
@@ -634,8 +635,8 @@ bool shouldCompactStableWithTooMuchDataOutOfSegmentRange(
             "GC - shouldCompactStableWithTooMuchDataOutOfSegmentRange checked false "
             "because segment DTFile is shared with a neighbor segment, "
             "first_pack_inc={} last_pack_inc={} prev_seg_files=[{}] next_seg_files=[{}] my_files=[{}] segment={}",
-            magic_enum::enum_name(at_least_result.first_pack_intersection),
-            magic_enum::enum_name(at_least_result.last_pack_intersection),
+            at_least_result.first_pack_intersection,
+            at_least_result.last_pack_intersection,
             fmt::join(prev_segment_file_ids, ","),
             fmt::join(next_segment_file_ids, ","),
             [&] {
@@ -687,8 +688,8 @@ bool shouldCompactStableWithTooMuchDataOutOfSegmentRange(
         "check_result={} first_pack_inc={} last_pack_inc={} rows_at_least={} bytes_at_least={} file_rows={} "
         "file_bytes={} segment={} ",
         check_result,
-        magic_enum::enum_name(at_least_result.first_pack_intersection),
-        magic_enum::enum_name(at_least_result.last_pack_intersection),
+        at_least_result.first_pack_intersection,
+        at_least_result.last_pack_intersection,
         at_least_result.rows,
         at_least_result.bytes,
         file_rows,
