@@ -2369,16 +2369,17 @@ MergingBucketsPtr Aggregator::mergeAndConvertToBlocks(
             });
     }
 
-    if (data_variants[0]->using_ph_map)
-    {
-        for (const auto & iter_variant : data_variants)
-        {
-            RUNTIME_CHECK(iter_variant->using_ph_map);
-        }
+    // doesn't support merge ph map for now. so cannot be used for parallel hash agg.
+    // if (data_variants[0]->using_ph_map)
+    // {
+    //     for (const auto & iter_variant : data_variants)
+    //     {
+    //         RUNTIME_CHECK(iter_variant->using_ph_map);
+    //     }
 
-        RUNTIME_CHECK_MSG(max_threads == 1, "ph map only impl for fine grained, so merging buckets concurrency should be 1");
-        return std::make_shared<MergingBuckets>(*this, non_empty_data, final, 1);
-    }
+    //     RUNTIME_CHECK_MSG(max_threads == 1, "ph map only impl for fine grained, so merging buckets concurrency should be 1");
+    //     return std::make_shared<MergingBuckets>(*this, non_empty_data, final, 1);
+    // }
 
     /// If at least one of the options is two-level, then convert all the options into two-level ones, if there are not such.
     /// Note - perhaps it would be more optimal not to convert single-level versions before the merge, but merge them separately, at the end.
@@ -2925,6 +2926,46 @@ Block MergingBuckets::getData(size_t concurrency_index)
     return is_two_level ? getDataForTwoLevel(concurrency_index) : getDataForSingleLevel();
 }
 
+template <typename TData>
+void Aggregator::mergePhMap(TData & dst, TData & src, Arena * arena) const
+{
+    for (auto src_iter = src.begin(); src_iter != src.end(); ++src_iter)
+    {
+        // TODO other types of key
+        const UInt64 key = src_iter->first;
+        auto * src_aggregate_data = src_iter->second;
+        auto [dst_iter, ok] = dst.try_emplace(key, src_aggregate_data);
+        if (!ok) {
+            auto * dst_aggregate_data = dst_iter->second;
+            for (size_t i = 0; i < aggregate_functions.size(); ++i)
+            {
+                aggregate_functions[i]->merge(
+                        dst_aggregate_data + offsets_of_aggregate_states[i],
+                        src_aggregate_data + offsets_of_aggregate_states[i],
+                        arena
+                        );
+            }
+        }
+    }
+    src.clear();
+}
+
+void Aggregator::mergeSingleLevelDataPhMap(ManyAggregatedDataVariants & non_empty_data) const
+{
+    AggregatedDataVariantsPtr & res = non_empty_data[0];
+    for (size_t i = 1; i < non_empty_data.size(); ++i)
+    {
+        AggregatedDataVariantsPtr & cur = non_empty_data[i];
+        // TODO for all other AggregationMethod, use getDataVariant macro APPLY_FOR_VARIANTS_SINGLE_LEVEL
+        mergePhMap(
+                getDataVariant<AggregatedDataVariants::AggregationMethod_key64_phmap>(*res).data,
+                getDataVariant<AggregatedDataVariants::AggregationMethod_key64_phmap>(*cur).data,
+                res->aggregates_pool);
+
+        cur->aggregator = nullptr;
+    }
+}
+
 Block MergingBuckets::getDataForPhMap()
 {
     assert(!data.empty());
@@ -2938,6 +2979,8 @@ Block MergingBuckets::getDataForPhMap()
 
     if (current_bucket_num > 0)
         return {};
+
+    aggregator.mergeSingleLevelDataPhMap(data);
 
     // convert agg states to blocks
     

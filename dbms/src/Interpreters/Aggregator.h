@@ -1633,6 +1633,10 @@ protected:
     template <typename Method>
     void mergeSingleLevelDataImpl(ManyAggregatedDataVariants & non_empty_data) const;
 
+    void mergeSingleLevelDataPhMap(ManyAggregatedDataVariants & non_empty_data) const;
+    template <typename TData>
+    void mergePhMap(TData & dst, TData & src, Arena * arena) const;
+
     template <typename Method, typename Table, bool skip_convert_key>
     void convertToBlockImpl(
         Method & method,
