@@ -401,6 +401,7 @@ public:
     using Hash = HashType;
     using Grower = GrowerType;
     using Allocator = AllocatorType;
+    static constexpr bool isPhMap = false;
 
 protected:
     friend class const_iterator;

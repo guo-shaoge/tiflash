@@ -74,19 +74,16 @@ class AggHashTableToBlocksBlockInputStream;
 
 using AggregatedDataWithoutKey = AggregateDataPtr;
 
-using AggregatedDataWithUInt8Key = FixedImplicitZeroHashMapWithCalculatedSize<UInt8, AggregateDataPtr>;
-using AggregatedDataWithUInt16Key = FixedImplicitZeroHashMap<UInt16, AggregateDataPtr>;
+// using AggregatedDataWithUInt8Key = FixedImplicitZeroHashMapWithCalculatedSize<UInt8, AggregateDataPtr>;
+// using AggregatedDataWithUInt16Key = FixedImplicitZeroHashMap<UInt16, AggregateDataPtr>;
+// using AggregatedDataWithUInt32Key = HashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
+// using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
+// using AggregatedDataWithInt256Key = HashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
+// using AggregatedDataWithKeys128 = HashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
+// using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
 
-using AggregatedDataWithUInt32Key = HashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
-using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
-
-using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
-using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr>;
-
-using AggregatedDataWithInt256Key = HashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
-
-using AggregatedDataWithKeys128 = HashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
-using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
+// using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
+// using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr>;
 
 using AggregatedDataWithUInt32KeyTwoLevel = TwoLevelHashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
 using AggregatedDataWithUInt64KeyTwoLevel = TwoLevelHashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
@@ -98,6 +95,18 @@ using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringR
 
 using AggregatedDataWithKeys128TwoLevel = TwoLevelHashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 using AggregatedDataWithKeys256TwoLevel = TwoLevelHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
+
+// FlatPhMap instead of original ClickHouse HashMap
+using AggregatedDataWithUInt8Key = FlatPhMap<UInt8, AggregateDataPtr>;
+using AggregatedDataWithUInt16Key = FlatPhMap<UInt16, AggregateDataPtr>;
+using AggregatedDataWithUInt32Key = FlatPhMap<UInt32, AggregateDataPtr>;
+using AggregatedDataWithUInt64Key = FlatPhMap<UInt64, AggregateDataPtr>;
+using AggregatedDataWithInt256Key = FlatPhMap<Int256, AggregateDataPtr>;
+using AggregatedDataWithKeys128 = FlatPhMap<UInt128, AggregateDataPtr>;
+using AggregatedDataWithKeys256 = FlatPhMap<UInt256, AggregateDataPtr>;
+// TODO: ?
+using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
+using AggregatedDataWithStringKey = FlatPhMap<StringRef, AggregateDataPtr>;
 
 /** Variants with better hash function, using more than 32 bits for hash.
   * Using for merging phase of external aggregation, where number of keys may be far greater than 4 billion,

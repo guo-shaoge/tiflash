@@ -17,7 +17,7 @@
 #include <Common/HashTable/Hash.h>
 #include <Common/HashTable/HashTable.h>
 #include <Common/HashTable/HashTableAllocator.h>
-
+#include <Common/phmap/phmap.h>
 
 /** NOTE HashMap could only be used for memmoveable (position independent) types.
   * Example: std::string is not position independent in libstdc++ with C++11 ABI or in libc++.
@@ -428,3 +428,41 @@ template <
     typename Allocator = HashTableAllocator>
 using ConcurrentHashMapWithSavedHash
     = ConcurrentHashMapTable<Key, HashMapCellWithSavedHash<Key, Mapped, Hash>, Hash, Grower, Allocator>;
+
+// TODO is this ok?
+enum PhmapSeed { PhmapSeed1, PhmapSeed2 };
+
+template <int n, PhmapSeed seed>
+class phmap_mix_with_seed { // NOLINT
+public:
+    inline size_t operator()(size_t) const;
+};
+
+template <>
+class phmap_mix_with_seed<4, PhmapSeed1> {
+public:
+    inline size_t operator()(size_t a) const {
+        static constexpr uint64_t kmul = 0xcc9e2d51UL;
+        uint64_t l = a * kmul;
+        return static_cast<size_t>(l ^ (l >> 32u));
+    }
+};
+
+template <>
+class phmap_mix_with_seed<8, PhmapSeed1> {
+public:
+    inline size_t operator()(size_t a) const {
+        static constexpr uint64_t k = 0xde5fb9d2630458e9ULL;
+        uint64_t h;
+        uint64_t l = umul128(a, k, &h);
+        return static_cast<size_t>(h + l);
+    }
+};
+template <typename T, PhmapSeed seed>
+struct MyStdHash
+{
+    std::size_t operator()(T value) const { return phmap_mix_with_seed<sizeof(size_t), seed>()(std::hash<T>()(value)); }
+};
+
+template <typename Key, typename Value>
+using FlatPhMap = phmap::flat_hash_map<Key, Value, MyStdHash<Key, PhmapSeed1>>;

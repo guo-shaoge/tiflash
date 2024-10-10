@@ -82,6 +82,25 @@ struct HashMethodOneNumber
     }
 
     const FieldType * getKeyData() const { return vec; }
+
+    template <typename Data, bool enable_prefetch>
+    ALWAYS_INLINE inline void emplaceKeyPhMap(
+            Data & data,
+            Arena & pool,
+            std::vector<String> &,
+            AggProcessInfo & agg_process_info)
+    {
+        const size_t total_rows = agg_process_info.end_row - agg_process_info.start_row;
+        AggregateDataPtr places[total_rows];
+
+        if constexpr (enable_prefetch)
+        {
+            data.lazy_emplace_with_hash()
+        }
+        else
+        {
+        }
+    }
 };
 
 
@@ -136,6 +155,15 @@ struct HashMethodString
         }
     }
 
+    template <typename Data>
+    ALWAYS_INLINE inline void emplaceKeyPhMap(
+            Data &,
+            Arena &,
+            std::vector<String> &)
+    {
+        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap for this HashMethod");
+    }
+
 protected:
     friend class columns_hashing_impl::HashMethodBase<Self, Value, Mapped, use_cache>;
 };
@@ -164,6 +192,15 @@ struct HashMethodStringBin
         StringRef key(chars + last_offset, offsets[row] - last_offset - 1);
         key = BinCollatorSortKey<padding>(key.data, key.size);
         return ArenaKeyHolder{key, *pool};
+    }
+
+    template <typename Data>
+    ALWAYS_INLINE inline void emplaceKeyPhMap(
+            Data &,
+            Arena &,
+            std::vector<String> &)
+    {
+        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap for this HashMethod");
     }
 
 protected:
@@ -364,6 +401,15 @@ struct HashMethodFastPathTwoKeysSerialized
         return ret;
     }
 
+    template <typename Data>
+    ALWAYS_INLINE inline void emplaceKeyPhMap(
+            Data &,
+            Arena &,
+            std::vector<String> &)
+    {
+        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap for this HashMethod");
+    }
+
 protected:
     friend class columns_hashing_impl::HashMethodBase<Self, Value, Mapped, false>;
 };
@@ -418,6 +464,15 @@ struct HashMethodFixedString
         {
             return key;
         }
+    }
+
+    template <typename Data>
+    ALWAYS_INLINE inline void emplaceKeyPhMap(
+            Data &,
+            Arena &,
+            std::vector<String> &)
+    {
+        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap for this HashMethod");
     }
 
 protected:
@@ -578,6 +633,15 @@ struct HashMethodKeysFixed
         key_columns.swap(new_columns);
         return new_sizes;
     }
+
+    template <typename Data>
+    ALWAYS_INLINE inline void emplaceKeyPhMap(
+            Data &,
+            Arena &,
+            std::vector<String> &)
+    {
+        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap for this HashMethod");
+    }
 };
 
 
@@ -616,6 +680,15 @@ struct HashMethodSerialized
             *pool};
     }
 
+    template <typename Data>
+    ALWAYS_INLINE inline void emplaceKeyPhMap(
+            Data &,
+            Arena &,
+            std::vector<String> &)
+    {
+        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap for this HashMethod");
+    }
+
 protected:
     friend class columns_hashing_impl::HashMethodBase<Self, Value, Mapped, false>;
 };
@@ -640,6 +713,15 @@ struct HashMethodHashed
     ALWAYS_INLINE inline Key getKeyHolder(size_t row, Arena *, std::vector<String> & sort_key_containers) const
     {
         return hash128(row, key_columns.size(), key_columns, collators, sort_key_containers);
+    }
+
+    template <typename Data>
+    ALWAYS_INLINE inline void emplaceKeyPhMap(
+            Data &,
+            Arena &,
+            std::vector<String> &)
+    {
+        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap for this HashMethod");
     }
 };
 

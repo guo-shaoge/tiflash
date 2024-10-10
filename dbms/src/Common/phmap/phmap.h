@@ -4071,6 +4071,7 @@ public:
 template <class K, class V, class Hash, class Eq, class Alloc> // default values in phmap_fwd_decl.h
 class flat_hash_map : public phmap::priv::raw_hash_map<phmap::priv::FlatHashMapPolicy<K, V>, Hash, Eq, Alloc> {
     using Base = typename flat_hash_map::raw_hash_map;
+    static constexpr bool isPhMap = true;
 
 public:
     flat_hash_map() = default;
