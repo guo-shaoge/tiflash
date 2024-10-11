@@ -372,7 +372,7 @@ Aggregator::Aggregator(
     /// Initialize sizes of aggregation states and its offsets.
     offsets_of_aggregate_states.resize(params.aggregates_size);
     // TODO for ph map , use AggregateStatesBatchAllocator, key is also inside, so need new offset.
-    total_size_of_aggregate_states = 0;
+    total_size_of_aggregate_states = 16;
     all_aggregates_has_trivial_destructor = true;
 
     // aggreate_states will be aligned as below:
@@ -1073,6 +1073,11 @@ bool Aggregator::executeOnBlockOnlyLookup(
     return executeOnBlockImpl<false, true>(agg_process_info, result, thread_num);
 }
 
+size_t alignOf8Byte(size_t len)
+{
+    return (len + 15) & (~15);
+}
+
 template <bool collect_hit_rate, bool only_lookup>
 bool Aggregator::executeOnBlockImpl(
     AggProcessInfo & agg_process_info,
@@ -1093,6 +1098,9 @@ bool Aggregator::executeOnBlockImpl(
         result.init(method_chosen);
         result.keys_size = params.keys_size;
         result.key_sizes = key_sizes;
+        // todo init func; better align method!!
+        result.aggregate_states_batch_allocator.one_agg_state_size = alignOf8Byte(total_size_of_aggregate_states);
+        result.aggregate_states_batch_allocator.aggregates_pool = result.aggregates_pool;
         LOG_TRACE(log, "Aggregation method: `{}`", result.getMethodName());
     }
 
