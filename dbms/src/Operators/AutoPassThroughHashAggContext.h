@@ -73,7 +73,7 @@ public:
         RUNTIME_CHECK(aggregator->getParams().keys_size > 0);
 
         many_data[0] = std::make_shared<AggregatedDataVariants>();
-        agg_process_info = std::make_unique<Aggregator::AggProcessInfo>(aggregator.get());
+        agg_process_info = std::make_unique<AggProcessInfo>(aggregator.get());
 
         auto header = aggregator->getHeader(/*final=*/true);
         const auto & aggregate_descriptions = aggregator->getParams().aggregates;
@@ -150,7 +150,7 @@ private:
     // Check ~AggregatedDataVariants.
     std::unique_ptr<Aggregator> aggregator;
     ManyAggregatedDataVariants many_data;
-    std::unique_ptr<Aggregator::AggProcessInfo> agg_process_info;
+    std::unique_ptr<AggProcessInfo> agg_process_info;
 
     size_t adjust_processed_rows = 0;
     size_t adjust_hit_rows = 0;

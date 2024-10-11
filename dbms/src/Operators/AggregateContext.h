@@ -27,7 +27,7 @@ struct ThreadData
     size_t src_rows = 0;
     size_t src_bytes = 0;
 
-    Aggregator::AggProcessInfo agg_process_info;
+    AggProcessInfo agg_process_info;
     explicit ThreadData(Aggregator * aggregator)
         : agg_process_info(aggregator)
     {}

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Core/OperatorSpillContext.h"
 #include <AggregateFunctions/AggregateFunctionArray.h>
 #include <AggregateFunctions/AggregateFunctionState.h>
 #include <Common/FailPoint.h>
@@ -227,6 +228,77 @@ void AggregatedDataVariants::convertToTwoLevel()
     aggregator->useTwoLevelHashTable();
 }
 
+template <typename FieldType, typename TData, bool consecutive_keys_optimization>
+void AggregationMethodOneNumber<FieldType, TData, consecutive_keys_optimization>::emplaceKeyPhMap(
+        TData & data,
+        AggregateStatesBatchAllocator & batch_allocator,
+        const Aggregator * aggregator,
+        const State & state,
+        AggProcessInfo & agg_process_info,
+        Arena * aggregates_pool,
+        bool with_prefetch,
+        std::vector<String> & sort_key_containers)
+{
+    const auto total_rows = agg_process_info.end_row - agg_process_info.start_row;
+    AggregateDataPtr places[total_rows];
+
+    const auto alloc_func = [&batch_allocator, aggregator](const FieldType & key) {
+        auto * aggregate_data = batch_allocator.allocate();
+        *reinterpret_cast<FieldType*>(aggregate_data) = key;
+        // todo better align method
+        aggregator->createAggregateStates(aggregate_data);
+        return aggregate_data;
+    };
+
+    if (with_prefetch)
+    {
+        // TODO fix this hash_val size may not equal to AggregateDataPtr
+        auto * hash_vals = reinterpret_cast<size_t *>(&places[0]);
+        for (size_t i = 0; i < total_rows; ++i)
+        {
+            const auto & key = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
+            hash_vals[i] = data.hash_function()(key);
+        }
+        size_t prefix_idx = 16;
+
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
+        {
+            if (prefix_idx < agg_process_info.end_row)
+            {
+                data.prefetch_hash(hash_vals[prefix_idx++]);
+            }
+
+            const auto & key = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
+            auto iter = data.lazy_emplace_with_hash(key, hash_vals[i], [&](const auto & ctor) {
+                ctor(key, alloc_func(key));
+            });
+            places[i] = iter->second;
+        }
+    }
+    else
+    {
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
+        {
+            const auto & key = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
+            auto iter = data.lazy_emplace(key, [&](const auto & ctor) {
+                    ctor(key, alloc_func(key));
+            });
+            places[i] = iter->second;
+        }
+    }
+
+    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data();
+            inst->that; ++inst)
+    {
+        inst->batch_that->addBatch(
+                agg_process_info.start_row,
+                total_rows,
+                &places[0],
+                inst->state_offset,
+                inst->batch_arguments,
+                aggregates_pool);
+    }
+}
 
 Block Aggregator::getHeader(bool final) const
 {
@@ -299,6 +371,7 @@ Aggregator::Aggregator(
 
     /// Initialize sizes of aggregation states and its offsets.
     offsets_of_aggregate_states.resize(params.aggregates_size);
+    // TODO for ph map , use AggregateStatesBatchAllocator, key is also inside, so need new offset.
     total_size_of_aggregate_states = 0;
     all_aggregates_has_trivial_destructor = true;
 
@@ -627,7 +700,6 @@ AggregatedDataVariants::Type Aggregator::chooseAggregationMethod()
     return ChooseAggregationMethodFastPath(params.keys_size, types_not_null, params.collators);
 }
 
-
 void Aggregator::createAggregateStates(AggregateDataPtr & aggregate_data) const
 {
     for (size_t j = 0; j < params.aggregates_size; ++j)
@@ -651,7 +723,6 @@ void Aggregator::createAggregateStates(AggregateDataPtr & aggregate_data) const
     }
 }
 
-
 /** It's interesting - if you remove `noinline`, then gcc for some reason will inline this function, and the performance decreases (~ 10%).
   * (Probably because after the inline of this function, more internal functions no longer be inlined.)
   * Inline does not make sense, since the inner loop is entirely inside this function.
@@ -659,13 +730,32 @@ void Aggregator::createAggregateStates(AggregateDataPtr & aggregate_data) const
 template <bool collect_hit_rate, bool only_lookup, typename Method>
 void NO_INLINE Aggregator::executeImpl(
     Method & method,
+    AggregateStatesBatchAllocator & batch_allocator,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
     TiDB::TiDBCollators & collators) const
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    executeImplBatch<collect_hit_rate, only_lookup>(method, state, aggregates_pool, agg_process_info);
+    // TODO remove reference from caller.
+    if constexpr (std::decay_t<Method>::Data::isPhMap)
+    {
+        std::vector<std::string> sort_key_containers;
+        sort_key_containers.resize(params.keys_size, "");
+        const bool enable_prefetch = method.data.bucket_count() >= 8192;
+        // TODO maybe too many arguments.
+        Method::emplaceKeyPhMap(
+                method.data,
+                batch_allocator,
+                this,
+                state,
+                agg_process_info,
+                aggregates_pool,
+                enable_prefetch,
+                sort_key_containers);
+    }
+    else
+        executeImplBatch<collect_hit_rate, only_lookup>(method, state, aggregates_pool, agg_process_info);
 }
 
 template <bool only_lookup, typename Method>
@@ -922,7 +1012,13 @@ void Aggregator::prepareAggregateInstructions(
     }
 }
 
-void Aggregator::AggProcessInfo::prepareForAgg()
+bool AggProcessInfo::allBlockDataHandled() const
+{
+    assert(start_row <= end_row);
+    return start_row == end_row || aggregator->isCancelled();
+}
+
+void AggProcessInfo::prepareForAgg()
 {
     if (prepare_for_agg_done)
         return;
@@ -1028,6 +1124,7 @@ bool Aggregator::executeOnBlockImpl(
     {                                                                      \
         executeImpl<collect_hit_rate, only_lookup>(                        \
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
+            result.aggregate_states_batch_allocator,                       \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
             params.collators);                                             \
@@ -1196,7 +1293,7 @@ BlocksList Aggregator::convertOneBucketToBlocks(
     size_t bucket) const
 {
 #define FILLER_DEFINE(name, skip_convert_key)                                                         \
-    auto filler_##name = [bucket, &method, arena, this](                                              \
+    auto filler_##name = [bucket, &method, arena, &data_variants, this](                              \
                              const Sizes & key_sizes,                                                 \
                              std::vector<MutableColumns> & key_columns_vec,                           \
                              std::vector<AggregateColumnsData> & aggregate_columns_vec,               \
@@ -1205,6 +1302,7 @@ BlocksList Aggregator::convertOneBucketToBlocks(
         convertToBlocksImpl<decltype(method), decltype(method.data.impls[bucket]), skip_convert_key>( \
             method,                                                                                   \
             method.data.impls[bucket],                                                                \
+            data_variants.aggregate_states_batch_allocator,                                           \
             key_sizes,                                                                                \
             key_columns_vec,                                                                          \
             aggregate_columns_vec,                                                                    \
@@ -1379,6 +1477,7 @@ template <typename Method, typename Table, bool skip_convert_key>
 void Aggregator::convertToBlocksImpl(
     Method & method,
     Table & data,
+    AggregateStatesBatchAllocator & states_batch_allocator,
     const Sizes & key_sizes,
     std::vector<MutableColumns> & key_columns_vec,
     std::vector<AggregateColumnsData> & aggregate_columns_vec,
@@ -1389,6 +1488,7 @@ void Aggregator::convertToBlocksImpl(
     if (data.empty())
         return;
 
+    // TODO why bother make a raw_key_columns_vec?
     std::vector<std::vector<IColumn *>> raw_key_columns_vec;
     raw_key_columns_vec.reserve(key_columns_vec.size());
     for (auto & key_columns : key_columns_vec)
@@ -1407,6 +1507,7 @@ void Aggregator::convertToBlocksImpl(
         convertToBlocksImplFinal<decltype(method), decltype(data), skip_convert_key>(
             method,
             data,
+            states_batch_allocator,
             key_sizes,
             std::move(raw_key_columns_vec),
             final_aggregate_columns_vec,
@@ -1420,7 +1521,11 @@ void Aggregator::convertToBlocksImpl(
             aggregate_columns_vec);
 
     /// In order to release memory early.
-    data.clearAndShrink();
+    // TODO remove reference from caller.
+    if constexpr (std::decay_t<Table>::isPhMap)
+        data.clear();
+    else
+        data.clearAndShrink();
 }
 
 
@@ -1595,29 +1700,38 @@ void NO_INLINE Aggregator::convertToBlockImplFinal(
     Arena * arena) const
 {
     assert(key_sizes.size() == key_columns.size());
-    Sizes key_sizes_ref = key_sizes; // NOLINT
-    AggregatorMethodInitKeyColumnHelper<Method> agg_keys_helper{method};
-    if constexpr (!skip_convert_key)
-    {
-        auto shuffled_key_sizes = method.shuffleKeyColumns(key_columns, key_sizes);
-        if (shuffled_key_sizes)
-        {
-            // When key_ref_agg_func is not empty, we may reorder key to skip copying some key from HashMap.
-            // But this optimization is not compatible with shuffleKeyColumns of AggregationMethodKeysFixed.
-            RUNTIME_CHECK(params.key_ref_agg_func.empty());
-            key_sizes_ref = *shuffled_key_sizes;
-        }
-        agg_keys_helper.initAggKeys(data.size(), key_columns);
-    }
 
-    data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
+    // TODO remove reference from caller.
+    if constexpr (std::decay_t<Method>::Data::isPhMap)
+    {
+        RUNTIME_CHECK_MSG(false, "convertToBlockImplFinal not impl");
+    }
+    else
+    {
+        Sizes key_sizes_ref = key_sizes; // NOLINT
+        AggregatorMethodInitKeyColumnHelper<Method> agg_keys_helper{method};
         if constexpr (!skip_convert_key)
         {
-            agg_keys_helper.insertKeyIntoColumns(key, key_columns, key_sizes_ref, params.collators);
+            auto shuffled_key_sizes = method.shuffleKeyColumns(key_columns, key_sizes);
+            if (shuffled_key_sizes)
+            {
+                // When key_ref_agg_func is not empty, we may reorder key to skip copying some key from HashMap.
+                // But this optimization is not compatible with shuffleKeyColumns of AggregationMethodKeysFixed.
+                RUNTIME_CHECK(params.key_ref_agg_func.empty());
+                key_sizes_ref = *shuffled_key_sizes;
+            }
+            agg_keys_helper.initAggKeys(data.size(), key_columns);
         }
 
-        insertAggregatesIntoColumns(mapped, final_aggregate_columns, arena);
-    });
+        data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
+            if constexpr (!skip_convert_key)
+            {
+                agg_keys_helper.insertKeyIntoColumns(key, key_columns, key_sizes_ref, params.collators);
+            }
+
+            insertAggregatesIntoColumns(mapped, final_aggregate_columns, arena);
+        });
+    }
 }
 
 namespace
@@ -1661,6 +1775,7 @@ template <typename Method, typename Table, bool skip_convert_key>
 void NO_INLINE Aggregator::convertToBlocksImplFinal(
     Method & method,
     Table & data,
+    AggregateStatesBatchAllocator & states_batch_allocator,
     const Sizes & key_sizes,
     std::vector<std::vector<IColumn *>> && key_columns_vec,
     std::vector<MutableColumns> & final_aggregate_columns_vec,
@@ -1673,30 +1788,48 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
         assert(key_columns.size() == key_sizes.size());
     }
 #endif
-    std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<std::decay_t<Method>>>> agg_keys_helpers;
-    Sizes key_sizes_ref = key_sizes; // NOLINT
-    if constexpr (!skip_convert_key)
-    {
-        auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
-        if (shuffled_key_sizes)
-        {
-            RUNTIME_CHECK(params.key_ref_agg_func.empty());
-            key_sizes_ref = *shuffled_key_sizes;
-        }
-        agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
-    }
 
-    size_t data_index = 0;
-    data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
-        size_t key_columns_vec_index = data_index / params.max_block_size;
+    // TODO remove reference from caller.
+    if constexpr (std::decay_t<Method>::Data::isPhMap)
+    {
+        // TODO make it outside function instead as member function.
+        method.convertToBlocksFinal(
+                states_batch_allocator,
+                key_sizes,
+                std::move(key_columns_vec),
+                final_aggregate_columns_vec, arena,
+                params.max_block_size,
+                params.aggregates_size,
+                aggregate_functions,
+                offsets_of_aggregate_states);
+    }
+    else
+    {
+        std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<std::decay_t<Method>>>> agg_keys_helpers;
+        Sizes key_sizes_ref = key_sizes; // NOLINT
         if constexpr (!skip_convert_key)
         {
-            agg_keys_helpers[key_columns_vec_index]
-                ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+            auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
+            if (shuffled_key_sizes)
+            {
+                RUNTIME_CHECK(params.key_ref_agg_func.empty());
+                key_sizes_ref = *shuffled_key_sizes;
+            }
+            agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
         }
-        insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
-        ++data_index;
-    });
+
+        size_t data_index = 0;
+        data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
+            size_t key_columns_vec_index = data_index / params.max_block_size;
+            if constexpr (!skip_convert_key)
+            {
+                agg_keys_helpers[key_columns_vec_index]
+                    ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+            }
+            insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+            ++data_index;
+        });
+    }
 }
 
 template <typename Method, typename Table, bool skip_convert_key>
@@ -1708,31 +1841,40 @@ void NO_INLINE Aggregator::convertToBlockImplNotFinal(
     AggregateColumnsData & aggregate_columns) const
 {
     assert(key_sizes.size() == key_columns.size());
-    AggregatorMethodInitKeyColumnHelper<Method> agg_keys_helper{method};
-    Sizes key_sizes_ref = key_sizes; // NOLINT
-    if constexpr (!skip_convert_key)
-    {
-        auto shuffled_key_sizes = method.shuffleKeyColumns(key_columns, key_sizes);
-        if (shuffled_key_sizes)
-        {
-            RUNTIME_CHECK(params.key_ref_agg_func.empty());
-            key_sizes_ref = *shuffled_key_sizes;
-        }
-        agg_keys_helper.initAggKeys(data.size(), key_columns);
-    }
 
-    data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
+    // TODO remove reference from caller.
+    if constexpr (std::decay_t<Method>::Data::isPhMap)
+    {
+        RUNTIME_CHECK_MSG(false, "convertToBlockImplNotFinal not impl for ph map");
+    }
+    else
+    {
+        AggregatorMethodInitKeyColumnHelper<Method> agg_keys_helper{method};
+        Sizes key_sizes_ref = key_sizes; // NOLINT
         if constexpr (!skip_convert_key)
         {
-            agg_keys_helper.insertKeyIntoColumns(key, key_columns, key_sizes_ref, params.collators);
+            auto shuffled_key_sizes = method.shuffleKeyColumns(key_columns, key_sizes);
+            if (shuffled_key_sizes)
+            {
+                RUNTIME_CHECK(params.key_ref_agg_func.empty());
+                key_sizes_ref = *shuffled_key_sizes;
+            }
+            agg_keys_helper.initAggKeys(data.size(), key_columns);
         }
 
-        /// reserved, so push_back does not throw exceptions
-        for (size_t i = 0; i < params.aggregates_size; ++i)
-            aggregate_columns[i]->push_back(mapped + offsets_of_aggregate_states[i]);
+        data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
+            if constexpr (!skip_convert_key)
+            {
+                agg_keys_helper.insertKeyIntoColumns(key, key_columns, key_sizes_ref, params.collators);
+            }
 
-        mapped = nullptr;
-    });
+            /// reserved, so push_back does not throw exceptions
+            for (size_t i = 0; i < params.aggregates_size; ++i)
+                aggregate_columns[i]->push_back(mapped + offsets_of_aggregate_states[i]);
+
+            mapped = nullptr;
+        });
+    }
 }
 
 template <typename Method, typename Table, bool skip_convert_key>
@@ -1749,35 +1891,43 @@ void NO_INLINE Aggregator::convertToBlocksImplNotFinal(
         assert(key_sizes.size() == key_columns.size());
     }
 #endif
-    std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<std::decay_t<Method>>>> agg_keys_helpers;
-    Sizes key_sizes_ref = key_sizes; // NOLINT
-    if constexpr (!skip_convert_key)
+    // TODO remove reference from caller.
+    if constexpr (std::decay_t<Method>::Data::isPhMap)
     {
-        auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
-        if (shuffled_key_sizes)
-        {
-            RUNTIME_CHECK(params.key_ref_agg_func.empty());
-            key_sizes_ref = shuffled_key_sizes ? *shuffled_key_sizes : key_sizes;
-        }
-        agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
+        RUNTIME_CHECK_MSG(false, "convertToBlocksImplNotFinal for ph map not impl");
     }
-
-    size_t data_index = 0;
-    data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
-        size_t key_columns_vec_index = data_index / params.max_block_size;
+    else
+    {
+        std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<std::decay_t<Method>>>> agg_keys_helpers;
+        Sizes key_sizes_ref = key_sizes; // NOLINT
         if constexpr (!skip_convert_key)
         {
-            agg_keys_helpers[key_columns_vec_index]
-                ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+            auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
+            if (shuffled_key_sizes)
+            {
+                RUNTIME_CHECK(params.key_ref_agg_func.empty());
+                key_sizes_ref = shuffled_key_sizes ? *shuffled_key_sizes : key_sizes;
+            }
+            agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
         }
 
-        /// reserved, so push_back does not throw exceptions
-        for (size_t i = 0; i < params.aggregates_size; ++i)
-            aggregate_columns_vec[key_columns_vec_index][i]->push_back(mapped + offsets_of_aggregate_states[i]);
+        size_t data_index = 0;
+        data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
+            size_t key_columns_vec_index = data_index / params.max_block_size;
+            if constexpr (!skip_convert_key)
+            {
+                agg_keys_helpers[key_columns_vec_index]
+                    ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+            }
 
-        ++data_index;
-        mapped = nullptr;
-    });
+            /// reserved, so push_back does not throw exceptions
+            for (size_t i = 0; i < params.aggregates_size; ++i)
+                aggregate_columns_vec[key_columns_vec_index][i]->push_back(mapped + offsets_of_aggregate_states[i]);
+
+            ++data_index;
+            mapped = nullptr;
+        });
+    }
 }
 
 template <typename Filler>
@@ -2035,6 +2185,7 @@ BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & 
         convertToBlocksImpl<decltype(tmp_method), decltype(tmp_data), skip_convert_key>(               \
             tmp_method,                                                                                \
             tmp_data,                                                                                  \
+            data_variants.aggregate_states_batch_allocator,                                            \
             key_sizes,                                                                                 \
             key_columns_vec,                                                                           \
             aggregate_columns_vec,                                                                     \
@@ -2083,28 +2234,52 @@ BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & 
 template <typename Method, typename Table>
 void NO_INLINE Aggregator::mergeDataImpl(Table & table_dst, Table & table_src, Arena * arena) const
 {
-    table_src.mergeToViaEmplace(
-        table_dst,
-        [&](AggregateDataPtr & __restrict dst, AggregateDataPtr & __restrict src, bool inserted) {
-            if (!inserted)
-            {
-                for (size_t i = 0; i < params.aggregates_size; ++i)
+    if constexpr (Table::isPhMap)
+    {
+        for (auto src_iter = table_src.begin(); src_iter != table_src.end(); ++src_iter)
+        {
+            const auto & key = src_iter->first;
+            auto * src_aggregate_data = src_iter->second;
+            auto [dst_iter, ok] = table_dst.try_emplace(key, src_aggregate_data);
+            if (!ok) {
+                auto * dst_aggregate_data = dst_iter->second;
+                for (size_t i = 0; i < aggregate_functions.size(); ++i)
+                {
                     aggregate_functions[i]->merge(
-                        dst + offsets_of_aggregate_states[i],
-                        src + offsets_of_aggregate_states[i],
-                        arena);
-
-                for (size_t i = 0; i < params.aggregates_size; ++i)
-                    aggregate_functions[i]->destroy(src + offsets_of_aggregate_states[i]);
+                            dst_aggregate_data + offsets_of_aggregate_states[i],
+                            src_aggregate_data + offsets_of_aggregate_states[i],
+                            arena
+                            );
+                }
             }
-            else
-            {
-                dst = src;
-            }
+        }
+        table_src.clear();
+    }
+    else
+    {
+        table_src.mergeToViaEmplace(
+            table_dst,
+            [&](AggregateDataPtr & __restrict dst, AggregateDataPtr & __restrict src, bool inserted) {
+                if (!inserted)
+                {
+                    for (size_t i = 0; i < params.aggregates_size; ++i)
+                        aggregate_functions[i]->merge(
+                            dst + offsets_of_aggregate_states[i],
+                            src + offsets_of_aggregate_states[i],
+                            arena);
 
-            src = nullptr;
-        });
-    table_src.clearAndShrink();
+                    for (size_t i = 0; i < params.aggregates_size; ++i)
+                        aggregate_functions[i]->destroy(src + offsets_of_aggregate_states[i]);
+                }
+                else
+                {
+                    dst = src;
+                }
+
+                src = nullptr;
+            });
+        table_src.clearAndShrink();
+    }
 }
 
 void NO_INLINE Aggregator::mergeWithoutKeyDataImpl(ManyAggregatedDataVariants & non_empty_data) const
@@ -2255,64 +2430,72 @@ void NO_INLINE Aggregator::mergeStreamsImplCase(
     Method & method [[maybe_unused]],
     Table & data) const
 {
-    ColumnRawPtrs key_columns(params.keys_size);
-    AggregateColumnsConstData aggregate_columns(params.aggregates_size);
-
-    /// Remember the columns we will work with
-    for (size_t i = 0; i < params.keys_size; ++i)
-        key_columns[i] = block.safeGetByPosition(i).column.get();
-
-    for (size_t i = 0; i < params.aggregates_size; ++i)
+    if constexpr (std::decay_t<Table>::isPhMap)
     {
-        const auto & aggregate_column_name = params.aggregates[i].column_name;
-        aggregate_columns[i]
-            = &typeid_cast<const ColumnAggregateFunction &>(*block.getByName(aggregate_column_name).column).getData();
+        // TODO impl
+        RUNTIME_CHECK_MSG(false, "mergeStreamsImplCase not impl for ph map");
     }
-
-    std::vector<std::string> sort_key_containers;
-    sort_key_containers.resize(params.keys_size, "");
-
-    /// in merge stage, don't need to care about the collator because the key is already the sort_key of original string
-    typename Method::State state(key_columns, key_sizes, {});
-
-    /// For all rows.
-    size_t rows = block.rows();
-    std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[rows]);
-
-    for (size_t i = 0; i < rows; ++i)
+    else
     {
-        AggregateDataPtr aggregate_data = nullptr;
+        ColumnRawPtrs key_columns(params.keys_size);
+        AggregateColumnsConstData aggregate_columns(params.aggregates_size);
 
-        auto emplace_result = state.emplaceKey(data, i, *aggregates_pool, sort_key_containers);
-        if (emplace_result.isInserted())
+        /// Remember the columns we will work with
+        for (size_t i = 0; i < params.keys_size; ++i)
+            key_columns[i] = block.safeGetByPosition(i).column.get();
+
+        for (size_t i = 0; i < params.aggregates_size; ++i)
         {
-            emplace_result.setMapped(nullptr);
-
-            aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-            createAggregateStates(aggregate_data);
-
-            emplace_result.setMapped(aggregate_data);
+            const auto & aggregate_column_name = params.aggregates[i].column_name;
+            aggregate_columns[i]
+                = &typeid_cast<const ColumnAggregateFunction &>(*block.getByName(aggregate_column_name).column).getData();
         }
-        else
-            aggregate_data = emplace_result.getMapped();
 
-        places[i] = aggregate_data;
+        std::vector<std::string> sort_key_containers;
+        sort_key_containers.resize(params.keys_size, "");
+
+        /// in merge stage, don't need to care about the collator because the key is already the sort_key of original string
+        typename Method::State state(key_columns, key_sizes, {});
+
+        /// For all rows.
+        size_t rows = block.rows();
+        std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[rows]);
+
+        for (size_t i = 0; i < rows; ++i)
+        {
+            AggregateDataPtr aggregate_data = nullptr;
+
+            auto emplace_result = state.emplaceKey(data, i, *aggregates_pool, sort_key_containers);
+            if (emplace_result.isInserted())
+            {
+                emplace_result.setMapped(nullptr);
+
+                aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                createAggregateStates(aggregate_data);
+
+                emplace_result.setMapped(aggregate_data);
+            }
+            else
+                aggregate_data = emplace_result.getMapped();
+
+            places[i] = aggregate_data;
+        }
+
+        for (size_t j = 0; j < params.aggregates_size; ++j)
+        {
+            /// Merge state of aggregate functions.
+            aggregate_functions[j]->mergeBatch(
+                rows,
+                places.get(),
+                offsets_of_aggregate_states[j],
+                aggregate_columns[j]->data(),
+                aggregates_pool);
+        }
+
+
+        /// Early release memory.
+        block.clear();
     }
-
-    for (size_t j = 0; j < params.aggregates_size; ++j)
-    {
-        /// Merge state of aggregate functions.
-        aggregate_functions[j]->mergeBatch(
-            rows,
-            places.get(),
-            offsets_of_aggregate_states[j],
-            aggregate_columns[j]->data(),
-            aggregates_pool);
-    }
-
-
-    /// Early release memory.
-    block.clear();
 }
 
 template <typename Method, typename Table>
@@ -2613,19 +2796,36 @@ Blocks Aggregator::convertBlockToTwoLevel(const Block & block)
 template <typename Method, typename Table>
 void NO_INLINE Aggregator::destroyImpl(Table & table) const
 {
-    table.forEachMapped([&](AggregateDataPtr & data) {
-        /** If an exception (usually a lack of memory, the MemoryTracker throws) arose
-          *  after inserting the key into a hash table, but before creating all states of aggregate functions,
-          *  then data will be equal nullptr.
-          */
-        if (nullptr == data)
-            return;
+    if constexpr (Table::isPhMap)
+    {
+        for (auto iter = table.begin(); iter != table.end(); ++iter)
+        {
+            AggregateDataPtr aggregate_state = iter->second;
+            if (aggregate_state == nullptr)
+                return;
 
-        for (size_t i = 0; i < params.aggregates_size; ++i)
-            aggregate_functions[i]->destroy(data + offsets_of_aggregate_states[i]);
+            for (size_t i = 0; i < params.aggregates_size; ++i)
+            {
+                aggregate_functions[i]->destroy(aggregate_state + offsets_of_aggregate_states[i]);
+            }
+        }
+    }
+    else
+    {
+        table.forEachMapped([&](AggregateDataPtr & data) {
+            /** If an exception (usually a lack of memory, the MemoryTracker throws) arose
+              *  after inserting the key into a hash table, but before creating all states of aggregate functions,
+              *  then data will be equal nullptr.
+              */
+            if (nullptr == data)
+                return;
 
-        data = nullptr;
-    });
+            for (size_t i = 0; i < params.aggregates_size; ++i)
+                aggregate_functions[i]->destroy(data + offsets_of_aggregate_states[i]);
+
+            data = nullptr;
+        });
+    }
 }
 
 

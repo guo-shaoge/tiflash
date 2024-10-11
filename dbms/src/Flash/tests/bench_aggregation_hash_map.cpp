@@ -296,7 +296,7 @@ try
             register_operator_spill_context);
         data_variants->aggregator = aggregator.get();
 
-        Aggregator::AggProcessInfo agg_process_info(aggregator.get());
+        AggProcessInfo agg_process_info(aggregator.get());
         Stopwatch build_side_watch;
         {
             build_side_watch.start();

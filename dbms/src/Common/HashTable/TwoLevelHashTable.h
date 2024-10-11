@@ -43,8 +43,7 @@ template <
     typename Allocator,
     typename ImplTable = HashTable<Key, Cell, Hash, Grower, Allocator>,
     size_t BITS_FOR_BUCKET = 8>
-class TwoLevelHashTable : private boost::noncopyable
-    ,
+class TwoLevelHashTable : private boost::noncopyable,
                           protected Hash /// empty base optimization
 {
 protected:
@@ -57,6 +56,7 @@ protected:
 public:
     using Impl = ImplTable;
 
+    static constexpr bool isPhMap = false;
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;
 

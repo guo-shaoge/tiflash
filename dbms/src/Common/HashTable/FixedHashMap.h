@@ -136,6 +136,8 @@ public:
 
     using Base::Base;
 
+    static constexpr bool isPhMap = false;
+
     template <typename Func>
     void ALWAYS_INLINE mergeToViaEmplace(Self & that, Func && func)
     {

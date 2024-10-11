@@ -1,19 +1,16 @@
-// Copyright 2021-present StarRocks, Inc. All rights reserved.
+// Copyright 2023 PingCAP, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     https://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-// This file is based on code available under the Apache license here:
-//   https://github.com/greg7mdp/parallel-hashmap/blob/master/parallel_hashmap/phmap.h
 
 #if !defined(phmap_h_guard_)
 #define phmap_h_guard_
@@ -1144,6 +1141,8 @@ public:
     size_t size() const { return size_; }
     size_t capacity() const { return capacity_; }
     size_t max_size() const { return (std::numeric_limits<size_t>::max)(); }
+    // TODO also ctrl memory
+    size_t getBufferSizeInBytes() const { return capacity() * sizeof(slot_type); }
 
     PHMAP_ATTRIBUTE_REINITIALIZES void clear() {
         // Iterating over this container is O(bucket_count()). When bucket_count()
@@ -4071,9 +4070,9 @@ public:
 template <class K, class V, class Hash, class Eq, class Alloc> // default values in phmap_fwd_decl.h
 class flat_hash_map : public phmap::priv::raw_hash_map<phmap::priv::FlatHashMapPolicy<K, V>, Hash, Eq, Alloc> {
     using Base = typename flat_hash_map::raw_hash_map;
-    static constexpr bool isPhMap = true;
 
 public:
+    static constexpr bool isPhMap = true;
     flat_hash_map() = default;
 #ifdef __INTEL_COMPILER
     using Base::raw_hash_map;

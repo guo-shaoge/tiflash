@@ -29,6 +29,7 @@ public:
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;
+    static constexpr bool isPhMap = false;
 
     // TODO: currently hashing contains redundant computations when doing distributed or external aggregations
     size_t hash(const Key & x) const

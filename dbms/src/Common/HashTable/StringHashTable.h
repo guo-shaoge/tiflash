@@ -226,6 +226,8 @@ public:
     using LookupResult = StringHashTableLookupResult<typename cell_type::mapped_type>;
     using ConstLookupResult = StringHashTableLookupResult<const typename cell_type::mapped_type>;
 
+    static constexpr bool isPhMap = false;
+
     StringHashTable() = default;
 
     explicit StringHashTable(size_t reserve_for_num_elements)
