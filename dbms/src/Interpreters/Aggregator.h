@@ -717,6 +717,28 @@ struct AggregationMethodSerialized
     }
 };
 
+struct AggregateStatesBatchAllocator
+{
+    const size_t batch_size = 1024;
+
+    size_t one_agg_state_size = 0;
+
+    std::vector<std::pair<void *, size_t>> batch_agg_states;
+    Arena * aggregates_pool = nullptr;
+
+    // todo fixed type
+    AggregateDataPtr allocate()
+    {
+        if (batch_agg_states.empty() || batch_agg_states.back().second == batch_size)
+        {
+            auto * batch_agg_states_ptr = aggregates_pool->alloc(one_agg_state_size * batch_size);
+            RUNTIME_CHECK(batch_agg_states_ptr);
+            batch_agg_states.emplace_back(batch_agg_states_ptr, 0);
+        }
+        auto & last_ele = batch_agg_states.back();
+        return static_cast<AggregateDataPtr>(last_ele.first) + last_ele.second++ * one_agg_state_size;
+    }
+};
 
 class Aggregator;
 
@@ -755,6 +777,8 @@ struct AggregatedDataVariants : private boost::noncopyable
     /** Specialization for the case when there are no keys.
       */
     AggregatedDataWithoutKey without_key = nullptr;
+
+    AggregateStatesBatchAllocator agg_states_batch_allocator{};
 
     using AggregationMethod_key8 = AggregationMethodOneNumber<UInt8, AggregatedDataWithUInt8Key, false>;
     using AggregationMethod_key16 = AggregationMethodOneNumber<UInt16, AggregatedDataWithUInt16Key, false>;
@@ -1158,6 +1182,7 @@ private:
 
     void doLevelMerge(Int32 bucket_num, size_t concurrency_index);
 
+    Block getDataByAggregateStatesBatchAllocator();
 private:
     const LoggerPtr log;
     const Aggregator & aggregator;
@@ -1450,9 +1475,11 @@ protected:
     template <bool collect_hit_rate, bool only_lookup, typename Method>
     void executeImpl(
         Method & method,
+        AggregateStatesBatchAllocator & agg_states_batch_allocator,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        TiDB::TiDBCollators & collators) const;
+        TiDB::TiDBCollators & collators,
+        const AggregatedDataVariants::Type & type) const;
 
     template <bool collect_hit_rate, bool only_loopup, typename Method>
     void executeImplBatch(
@@ -1460,6 +1487,14 @@ protected:
         typename Method::State & state,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info) const;
+
+    template <typename Method, bool enable_prefetch>
+    void executeImplPrefetch(
+            Method & method,
+            AggregateStatesBatchAllocator & agg_states_batch_allocator,
+            typename Method::State & state,
+            Arena * aggregates_pool,
+            AggProcessInfo & agg_process_info) const;
 
     template <bool only_lookup, typename Method>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(

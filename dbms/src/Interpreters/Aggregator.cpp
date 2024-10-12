@@ -299,7 +299,8 @@ Aggregator::Aggregator(
 
     /// Initialize sizes of aggregation states and its offsets.
     offsets_of_aggregate_states.resize(params.aggregates_size);
-    total_size_of_aggregate_states = 0;
+    // todo hack to force align
+    total_size_of_aggregate_states = 16;
     all_aggregates_has_trivial_destructor = true;
 
     // aggreate_states will be aligned as below:
@@ -659,13 +660,99 @@ void Aggregator::createAggregateStates(AggregateDataPtr & aggregate_data) const
 template <bool collect_hit_rate, bool only_lookup, typename Method>
 void NO_INLINE Aggregator::executeImpl(
     Method & method,
+    AggregateStatesBatchAllocator & agg_states_batch_allocator,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
-    TiDB::TiDBCollators & collators) const
+    TiDB::TiDBCollators & collators,
+    const AggregatedDataVariants::Type & type) const
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    executeImplBatch<collect_hit_rate, only_lookup>(method, state, aggregates_pool, agg_process_info);
+    if (type == AggregatedDataVariants::Type::key64)
+    {
+        if constexpr (std::is_same_v<typename Method::Data, AggregatedDataWithUInt64Key>)
+        {
+            LOG_DEBUG(log, "executeImplPrefetch");
+            if (method.data.getBufferSizeInCells() > 8192)
+                executeImplPrefetch<std::decay_t<decltype(method)>, true>(method, agg_states_batch_allocator, state, aggregates_pool, agg_process_info);
+            else
+                executeImplPrefetch<std::decay_t<decltype(method)>, false>(method, agg_states_batch_allocator, state, aggregates_pool, agg_process_info);
+        }
+        else
+        {
+            RUNTIME_CHECK_MSG(false, "wrong Data type");
+        }
+    }
+    else
+    {
+        executeImplBatch<collect_hit_rate, only_lookup>(method, state, aggregates_pool, agg_process_info);
+    }
+}
+
+template <typename Method, bool enable_prefetch>
+void Aggregator::executeImplPrefetch(
+        Method & method,
+        AggregateStatesBatchAllocator & agg_states_batch_allocator,
+        typename Method::State & state,
+        Arena * aggregates_pool,
+        AggProcessInfo & agg_process_info) const
+{
+    auto total_rows = agg_process_info.end_row - agg_process_info.start_row;
+    typename Method::Data::LookupResult lookup_result = nullptr;
+    bool inserted = false;
+    std::vector<String> sort_key_containers;
+    AggregateDataPtr aggregate_data = nullptr;
+    AggregateDataPtr places[total_rows];
+    size_t hash_values[total_rows];
+    size_t prefetch_idx = 16;
+
+    if constexpr (enable_prefetch)
+    {
+        for (size_t i = 0; i < total_rows; ++i)
+        {
+            auto key = state.getKeyHolder(i, nullptr, sort_key_containers);
+            hash_values[i] = method.data.hash(std::move(key));
+        }
+    }
+
+    // TODO handle resize callback
+    for (size_t i = 0; i < total_rows; ++i)
+    {
+        auto key = state.getKeyHolder(i, nullptr, sort_key_containers);
+
+        if constexpr (enable_prefetch)
+        {
+            if likely (prefetch_idx < total_rows)
+                method.data.prefetch(hash_values[prefetch_idx++]);
+        }
+
+        method.data.emplace(std::move(key), lookup_result, inserted);
+        if (inserted)
+        {
+            aggregate_data = agg_states_batch_allocator.allocate();
+            // aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+            createAggregateStates(aggregate_data);
+            lookup_result->getMapped() = aggregate_data;
+        }
+        else
+        {
+            aggregate_data = lookup_result->getMapped();
+        }
+        places[i] = aggregate_data;
+    }
+
+    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data();
+            inst->that; ++inst)
+    {
+        inst->batch_that->addBatch(
+                agg_process_info.start_row,
+                total_rows,
+                &places[0],
+                inst->state_offset,
+                inst->batch_arguments,
+                aggregates_pool);
+    }
+    agg_process_info.start_row = total_rows;
 }
 
 template <bool only_lookup, typename Method>
@@ -977,6 +1064,11 @@ bool Aggregator::executeOnBlockOnlyLookup(
     return executeOnBlockImpl<false, true>(agg_process_info, result, thread_num);
 }
 
+size_t alignOf8Byte(size_t len)
+{
+    return (len + 15) & (~15);
+}
+
 template <bool collect_hit_rate, bool only_lookup>
 bool Aggregator::executeOnBlockImpl(
     AggProcessInfo & agg_process_info,
@@ -997,7 +1089,10 @@ bool Aggregator::executeOnBlockImpl(
         result.init(method_chosen);
         result.keys_size = params.keys_size;
         result.key_sizes = key_sizes;
-        LOG_TRACE(log, "Aggregation method: `{}`", result.getMethodName());
+        // todo init func; better align method!!
+        result.agg_states_batch_allocator.one_agg_state_size = alignOf8Byte(total_size_of_aggregate_states);
+        result.agg_states_batch_allocator.aggregates_pool = result.aggregates_pool;
+        LOG_DEBUG(log, "Aggregation method: `{}`", result.getMethodName());
     }
 
     agg_process_info.prepareForAgg();
@@ -1028,9 +1123,11 @@ bool Aggregator::executeOnBlockImpl(
     {                                                                      \
         executeImpl<collect_hit_rate, only_lookup>(                        \
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
+            result.agg_states_batch_allocator, \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
-            params.collators);                                             \
+            params.collators,                                              \
+            result.type);                                                  \
         break;                                                             \
     }
 
@@ -2729,7 +2826,106 @@ Block MergingBuckets::getData(size_t concurrency_index)
 
     FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_aggregate_merge_failpoint);
 
+    if (data[0]->type == AggregatedDataVariants::Type::key64)
+        return getDataByAggregateStatesBatchAllocator();
+
     return is_two_level ? getDataForTwoLevel(concurrency_index) : getDataForSingleLevel();
+}
+
+Block MergingBuckets::getDataByAggregateStatesBatchAllocator()
+{
+    RUNTIME_CHECK_MSG(!is_two_level, "not support two level for now for getDataByAggregateStatesBatchAllocator");
+
+
+    assert(!data.empty());
+
+    // todo assume ph map always is single level
+    Block out_block = popBlocksListFront(single_level_blocks);
+    if (likely(out_block))
+    {
+        return out_block;
+    }
+
+    if (current_bucket_num > 0)
+        return {};
+
+    // TODO doesn't merge for now, so only works for fine grained shuffle.
+    // aggregator.mergeSingleLevelDataPhMap(data);
+
+    // convert agg states to blocks
+    
+    // todo only for fine grained, so no merge phmap
+    const auto & header = aggregator.getHeader(true);
+    const auto & params = aggregator.params;
+
+    auto key_column = header.getByPosition(0).type->createColumn();
+    key_column->reserve(params.max_block_size);
+
+    auto create_agg_column = [&]() {
+        std::vector<MutableColumnPtr> tmp_agg_func_columns;
+        for (size_t i = 0; i < params.aggregates_size; ++i)
+        {
+            auto tmp_col = header.getByName(params.aggregates[i].column_name).type->createColumn();
+            tmp_col->reserve(params.max_block_size);
+            tmp_agg_func_columns.push_back(std::move(tmp_col));
+        }
+        return tmp_agg_func_columns;
+    };
+    std::vector<MutableColumnPtr> agg_func_columns = create_agg_column();
+
+    const auto & all_batch_agg_states = data[0]->agg_states_batch_allocator.batch_agg_states;
+    for (const auto & one_batch : all_batch_agg_states)
+    {
+        // TODO block too small. consider max_block_size
+        for (size_t i = 0; i < one_batch.second; ++i)
+        {
+            const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
+                i * data[0]->agg_states_batch_allocator.one_agg_state_size;
+            const UInt64 key = *reinterpret_cast<const UInt64 *>(agg_states);
+            // todo Method::insertKeyIntoColumns
+            key_column->insert(Field(static_cast<Int64>(key)));
+
+            for (size_t j = 0; j < params.aggregates_size; ++j)
+            {
+                aggregator.aggregate_functions[j]->insertResultInto(
+                        agg_states + aggregator.offsets_of_aggregate_states[j],
+                        *agg_func_columns[j],
+                        data[0]->aggregates_pool);
+            }
+
+            if unlikely (key_column->size() >= params.max_block_size)
+            {
+                Block res = header.cloneEmpty();
+
+                res.getByPosition(0).column = std::move(key_column);
+                key_column = header.getByPosition(0).type->createColumn();
+
+                for (size_t agg_func_idx = 0; agg_func_idx < params.aggregates_size; ++agg_func_idx)
+                {
+                    res.getByName(params.aggregates[agg_func_idx].column_name).column = 
+                        std::move(agg_func_columns[agg_func_idx]);
+                }
+                agg_func_columns = create_agg_column();
+
+                single_level_blocks.push_back(res);
+            }
+
+            // todo destroy
+        }
+    }
+    if (!key_column->empty())
+    {
+        Block res = header.cloneEmpty();
+        res.getByPosition(0).column = std::move(key_column);
+        for (size_t agg_func_idx = 0; agg_func_idx < params.aggregates_size; ++agg_func_idx)
+        {
+            res.getByName(params.aggregates[agg_func_idx].column_name).column = 
+                std::move(agg_func_columns[agg_func_idx]);
+        }
+        single_level_blocks.push_back(res);
+    }
+    current_bucket_num++;
+    return popBlocksListFront(single_level_blocks);
 }
 
 Block MergingBuckets::getDataForSingleLevel()
