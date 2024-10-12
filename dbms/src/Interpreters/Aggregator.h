@@ -1452,7 +1452,8 @@ protected:
         Method & method,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        TiDB::TiDBCollators & collators) const;
+        TiDB::TiDBCollators & collators,
+        const AggregatedDataVariants::Type & type) const;
 
     template <bool collect_hit_rate, bool only_loopup, typename Method>
     void executeImplBatch(
@@ -1460,6 +1461,13 @@ protected:
         typename Method::State & state,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info) const;
+
+    template <typename Method, bool enable_prefetch>
+    void executeImplPrefetch(
+            Method & method,
+            typename Method::State & state,
+            Arena * aggregates_pool,
+            AggProcessInfo & agg_process_info) const;
 
     template <bool only_lookup, typename Method>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(

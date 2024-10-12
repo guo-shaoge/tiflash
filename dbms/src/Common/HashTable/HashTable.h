@@ -1322,6 +1322,13 @@ public:
 #ifdef DBMS_HASH_MAP_COUNT_COLLISIONS
     size_t getCollisions() const { return collisions; }
 #endif
+
+    void prefetch(size_t hash_value) const
+    {
+        const auto & place_value = grower.place(hash_value);
+        // TODO __mm_prefetch type
+        __builtin_prefetch(&buf[place_value]);
+    }
 };
 
 template <typename HashTableType>

@@ -661,11 +661,95 @@ void NO_INLINE Aggregator::executeImpl(
     Method & method,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
-    TiDB::TiDBCollators & collators) const
+    TiDB::TiDBCollators & collators,
+    const AggregatedDataVariants::Type & type) const
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    executeImplBatch<collect_hit_rate, only_lookup>(method, state, aggregates_pool, agg_process_info);
+    if (type == AggregatedDataVariants::Type::key64)
+    {
+        if constexpr (std::is_same_v<typename Method::Data, AggregatedDataWithUInt64Key>)
+        {
+            LOG_DEBUG(log, "executeImplPrefetch");
+            if (method.data.getBufferSizeInCells() > 8192)
+                executeImplPrefetch<std::decay_t<decltype(method)>, true>(method, state, aggregates_pool, agg_process_info);
+            else
+                executeImplPrefetch<std::decay_t<decltype(method)>, false>(method, state, aggregates_pool, agg_process_info);
+        }
+        else
+        {
+            RUNTIME_CHECK_MSG(false, "wrong Data type");
+        }
+    }
+    else
+    {
+        executeImplBatch<collect_hit_rate, only_lookup>(method, state, aggregates_pool, agg_process_info);
+    }
+}
+
+template <typename Method, bool enable_prefetch>
+void Aggregator::executeImplPrefetch(
+        Method & method,
+        typename Method::State & state,
+        Arena * aggregates_pool,
+        AggProcessInfo & agg_process_info) const
+{
+    auto total_rows = agg_process_info.end_row - agg_process_info.start_row;
+    typename Method::Data::LookupResult lookup_result = nullptr;
+    bool inserted = false;
+    std::vector<String> sort_key_containers;
+    AggregateDataPtr aggregate_data = nullptr;
+    AggregateDataPtr places[total_rows];
+    size_t hash_values[total_rows];
+    size_t prefetch_idx = 16;
+
+    if constexpr (enable_prefetch)
+    {
+        for (size_t i = 0; i < total_rows; ++i)
+        {
+            auto key = state.getKeyHolder(i, nullptr, sort_key_containers);
+            hash_values[i] = method.data.hash(std::move(key));
+        }
+    }
+
+    // TODO handle resize callback
+    for (size_t i = 0; i < total_rows; ++i)
+    {
+        auto key = state.getKeyHolder(i, nullptr, sort_key_containers);
+
+        if constexpr (enable_prefetch)
+        {
+            if likely (prefetch_idx < total_rows)
+                method.data.prefetch(hash_values[prefetch_idx++]);
+        }
+
+        method.data.emplace(std::move(key), lookup_result, inserted);
+        if (inserted)
+        {
+            // aggregate_data = aggregate_states_batch_allocator.allocate();
+            aggregate_data = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+            createAggregateStates(aggregate_data);
+            lookup_result->getMapped() = aggregate_data;
+        }
+        else
+        {
+            aggregate_data = lookup_result->getMapped();
+        }
+        places[i] = aggregate_data;
+    }
+
+    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data();
+            inst->that; ++inst)
+    {
+        inst->batch_that->addBatch(
+                agg_process_info.start_row,
+                total_rows,
+                &places[0],
+                inst->state_offset,
+                inst->batch_arguments,
+                aggregates_pool);
+    }
+    agg_process_info.start_row = total_rows;
 }
 
 template <bool only_lookup, typename Method>
@@ -997,7 +1081,7 @@ bool Aggregator::executeOnBlockImpl(
         result.init(method_chosen);
         result.keys_size = params.keys_size;
         result.key_sizes = key_sizes;
-        LOG_TRACE(log, "Aggregation method: `{}`", result.getMethodName());
+        LOG_DEBUG(log, "Aggregation method: `{}`", result.getMethodName());
     }
 
     agg_process_info.prepareForAgg();
@@ -1030,7 +1114,8 @@ bool Aggregator::executeOnBlockImpl(
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
-            params.collators);                                             \
+            params.collators,                                              \
+            result.type);                                                  \
         break;                                                             \
     }
 
