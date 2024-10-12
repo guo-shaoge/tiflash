@@ -670,10 +670,11 @@ void NO_INLINE Aggregator::executeImpl(
 {
     if constexpr (Method::using_ph_map)
     {
-        if (method.data.bucket_count() < 8192)
-            emplacePhMap<false, Method>(method, agg_process_info, agg_states_batch_allocator, aggregates_pool);
-        else
-            emplacePhMap<true, Method>(method, agg_process_info, agg_states_batch_allocator, aggregates_pool);
+        emplacePhMap<false, Method>(method, agg_process_info, agg_states_batch_allocator, aggregates_pool);
+        // if (method.data.bucket_count() < 8192)
+        //     emplacePhMap<false, Method>(method, agg_process_info, agg_states_batch_allocator, aggregates_pool);
+        // else
+        //     emplacePhMap<true, Method>(method, agg_process_info, agg_states_batch_allocator, aggregates_pool);
 
     }
     else
@@ -2370,16 +2371,16 @@ MergingBucketsPtr Aggregator::mergeAndConvertToBlocks(
     }
 
     // doesn't support merge ph map for now. so cannot be used for parallel hash agg.
-    // if (data_variants[0]->using_ph_map)
-    // {
-    //     for (const auto & iter_variant : data_variants)
-    //     {
-    //         RUNTIME_CHECK(iter_variant->using_ph_map);
-    //     }
+    if (data_variants[0]->using_ph_map)
+    {
+        for (const auto & iter_variant : data_variants)
+        {
+            RUNTIME_CHECK(iter_variant->using_ph_map);
+        }
 
-    //     RUNTIME_CHECK_MSG(max_threads == 1, "ph map only impl for fine grained, so merging buckets concurrency should be 1");
-    //     return std::make_shared<MergingBuckets>(*this, non_empty_data, final, 1);
-    // }
+        RUNTIME_CHECK_MSG(max_threads == 1, "phmap only impl for fine grained, so merging buckets concurrency should be 1");
+        return std::make_shared<MergingBuckets>(*this, non_empty_data, final, 1);
+    }
 
     /// If at least one of the options is two-level, then convert all the options into two-level ones, if there are not such.
     /// Note - perhaps it would be more optimal not to convert single-level versions before the merge, but merge them separately, at the end.
@@ -2980,7 +2981,7 @@ Block MergingBuckets::getDataForPhMap()
     if (current_bucket_num > 0)
         return {};
 
-    aggregator.mergeSingleLevelDataPhMap(data);
+    // aggregator.mergeSingleLevelDataPhMap(data);
 
     // convert agg states to blocks
     
