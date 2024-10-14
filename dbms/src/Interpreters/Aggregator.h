@@ -287,35 +287,65 @@ struct AggregationMethodOneNumber
 
         const auto & all_agg_states = batch_allocator.batch_agg_states;
 
-        const auto block_count = key_columns_vec.size();
-        for (size_t block_idx = 0; block_idx < block_count; ++block_idx)
+        // const auto block_count = key_columns_vec.size();
+        size_t row = 0;
+        for (const auto & one_batch : all_agg_states)
         {
+            const auto block_idx = row / max_block_size;
+
             auto & key_columns = key_columns_vec[block_idx];
             auto & aggregate_columns = final_aggregate_columns_vec[block_idx];
             // For AggregationMethodOneNumber
             RUNTIME_CHECK(key_columns.size() == 1);
-            for (size_t batch_idx = 0; batch_idx < batch_count_per_block; ++batch_idx)
-            {
-                const auto & one_batch = all_agg_states[block_idx * batch_count_per_block + batch_idx];
-                for (size_t row_idx = 0; row_idx < one_batch.second; ++row_idx)
-                {
-                    const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
-                        row_idx * batch_allocator.one_agg_state_size;
-                    // TODO is this ok, is it compatible with real storage?
-                    const Key & key = *reinterpret_cast<const Key *>(agg_states);
-                    // todo Method::insertKeyIntoColumns
-                    key_columns[0]->insert(Field(static_cast<typename NearestFieldType<Key>::Type>(key)));
 
-                    for (size_t j = 0; j < aggregates_size; ++j)
-                    {
-                        aggregate_functions[j]->insertResultInto(
-                                agg_states + offsets_of_aggregate_states[j],
-                                *aggregate_columns[j],
-                                aggregates_pool);
-                    }
+            for (size_t i = 0; i < one_batch.second; ++i)
+            {
+                const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
+                    i * batch_allocator.one_agg_state_size;
+                // TODO is this ok, is it compatible with real storage?
+                const Key & key = *reinterpret_cast<const Key *>(agg_states);
+                // todo Method::insertKeyIntoColumns
+                key_columns[0]->insert(Field(static_cast<typename NearestFieldType<Key>::Type>(key)));
+
+                for (size_t j = 0; j < aggregates_size; ++j)
+                {
+                    aggregate_functions[j]->insertResultInto(
+                            agg_states + offsets_of_aggregate_states[j],
+                            *aggregate_columns[j],
+                            aggregates_pool);
                 }
+                row++;
             }
         }
+
+        // for (size_t block_idx = 0; block_idx < block_count; ++block_idx)
+        // {
+        //     auto & key_columns = key_columns_vec[block_idx];
+        //     auto & aggregate_columns = final_aggregate_columns_vec[block_idx];
+        //     // For AggregationMethodOneNumber
+        //     RUNTIME_CHECK(key_columns.size() == 1);
+        //     for (size_t batch_idx = 0; batch_idx < batch_count_per_block; ++batch_idx)
+        //     {
+        //         const auto & one_batch = all_agg_states[block_idx * batch_count_per_block + batch_idx];
+        //         for (size_t row_idx = 0; row_idx < one_batch.second; ++row_idx)
+        //         {
+        //             const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
+        //                 row_idx * batch_allocator.one_agg_state_size;
+        //             // TODO is this ok, is it compatible with real storage?
+        //             const Key & key = *reinterpret_cast<const Key *>(agg_states);
+        //             // todo Method::insertKeyIntoColumns
+        //             key_columns[0]->insert(Field(static_cast<typename NearestFieldType<Key>::Type>(key)));
+
+        //             for (size_t j = 0; j < aggregates_size; ++j)
+        //             {
+        //                 aggregate_functions[j]->insertResultInto(
+        //                         agg_states + offsets_of_aggregate_states[j],
+        //                         *aggregate_columns[j],
+        //                         aggregates_pool);
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     // TODO impl this
