@@ -298,6 +298,7 @@ void AggregationMethodOneNumber<FieldType, TData, consecutive_keys_optimization>
                 inst->batch_arguments,
                 aggregates_pool);
     }
+    agg_process_info.start_row += total_rows;
 }
 
 Block Aggregator::getHeader(bool final) const
