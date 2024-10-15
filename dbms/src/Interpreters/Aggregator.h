@@ -186,13 +186,20 @@ struct AggregateStatesBatchAllocator
             size_t max_block_size,
             Arena * pool,
             size_t agg_state_size_)
-        : batch_size(std::min(1024, max_block_size))
-        , aggregates_pool(pool)
-        , one_agg_state_size(agg_state_size_) {}
+        : aggregates_pool(pool)
+        , one_agg_state_size(agg_state_size_)
+    {
+        // make sure max_block_size % batch_size == 0
+        batch_size = std::min(1024, max_block_size);
+        if (max_block_size % batch_size != 0)
+        {
+            batch_size = max_block_size;
+        }
+    }
 
-    const size_t batch_size;
     Arena * aggregates_pool;
     size_t one_agg_state_size;
+    size_t batch_size;
 
     std::vector<std::pair<void *, size_t>> batch_agg_states;
 
@@ -263,17 +270,6 @@ struct AggregationMethodOneNumber
         column->insertRawData<sizeof(FieldType)>(key_holder);
     }
 
-    static void insertKeyIntoColumns(
-            const char * key,
-            std::vector<IColumn *> & key_columns,
-            const Sizes &,
-            const TiDB::TiDBCollators &)
-    {
-        RUNTIME_CHECK(key_columns.size() == 1);
-        auto * column = static_cast<ColumnVectorHelper *>(key_columns[0]);
-        column->insertRawData<sizeof(FieldType)>(key);
-    }
-
     // TODO inline
     AggregateDataPtr allocateAggregateDataPhMap(const FieldType & key,
             AggregateStatesBatchAllocator & states_batch_allocator) const
@@ -284,6 +280,7 @@ struct AggregationMethodOneNumber
     }
     static auto getKeyFromAggStates(const char * agg_states)
     {
+        // TODO also FieldType?
         return *reinterpret_cast<const Key *>(agg_states);
     }
 };

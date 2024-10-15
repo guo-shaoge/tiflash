@@ -703,7 +703,7 @@ void Aggregator::executeImplBatchPhMap(
 
     if (enable_prefetch)
     {
-        for (size_t i = 0; i < total_rows; ++i)
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
         {
             const auto & key = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
             hash_vals[i] = data.hash_function()(key);
@@ -752,7 +752,7 @@ void Aggregator::executeImplBatchPhMap(
             inst->batch_that->addBatch(
                     agg_process_info.start_row,
                     *processed_rows - agg_process_info.start_row + 1,
-                    &places[0],
+                    &places[agg_process_info.start_row],
                     inst->state_offset,
                     inst->batch_arguments,
                     aggregates_pool);
@@ -1663,38 +1663,46 @@ void Aggregator::convertToBlocksImplFinalPhMap(
         Arena * aggregates_pool) const
 {
     RUNTIME_CHECK(key_columns_vec.size() == final_aggregate_columns_vec.size());
+    RUNTIME_CHECK(params.max_block_size % states_batch_allocator.batch_size == 0);
 
     const auto & all_agg_states = states_batch_allocator.batch_agg_states;
+    const auto block_count = key_columns_vec.size();
+    const auto batch_count = params.max_block_size / states_batch_allocator.batch_size;
+    RUNTIME_CHECK(batch_count > 0);
 
-    size_t row = 0;
-    for (const auto & one_batch : all_agg_states)
+    for (size_t block_idx = 0; block_idx < block_count; ++block_idx)
     {
-        const auto block_idx = row / params.max_block_size;
-
         auto & key_columns = key_columns_vec[block_idx];
         auto & aggregate_columns = final_aggregate_columns_vec[block_idx];
+        const auto & agg_key_helper = agg_keys_helper[block_idx];
+        auto tmp_batch_idx = block_idx * batch_count;
 
-        for (size_t i = 0; i < one_batch.second; ++i)
+        for (size_t batch_idx = 0; batch_idx < batch_count; ++batch_idx, ++tmp_batch_idx)
         {
-            const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
-                i * states_batch_allocator.one_agg_state_size;
-
-            // Method::insertKeyIntoColumns(agg_states, key_columns, key_sizes, params.collators);
-            const auto & key = Method::getKeyFromAggStates(agg_states);
-            agg_keys_helper[block_idx]->insertKeyIntoColumns(key, key_columns, key_sizes, params.collators);
-
-            for (size_t j = 0; j < params.aggregates_size; ++j)
+            if unlikely (tmp_batch_idx >= all_agg_states.size())
             {
-                aggregate_functions[j]->insertResultInto(
-                        agg_states + offsets_of_aggregate_states[j],
-                        *aggregate_columns[j],
-                        aggregates_pool);
+                RUNTIME_CHECK(block_idx == block_count - 1);
+                return;
             }
 
-            row++;
+            const auto & one_batch = all_agg_states[tmp_batch_idx];
 
-            if unlikely (row >= params.max_block_size)
-                break;
+            for (size_t row_idx = 0; row_idx < one_batch.second; ++row_idx)
+            {
+                const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
+                    row_idx * states_batch_allocator.one_agg_state_size;
+
+                const auto & key = Method::getKeyFromAggStates(agg_states);
+                agg_key_helper->insertKeyIntoColumns(key, key_columns, key_sizes, params.collators);
+
+                for (size_t j = 0; j < params.aggregates_size; ++j)
+                {
+                    aggregate_functions[j]->insertResultInto(
+                            agg_states + offsets_of_aggregate_states[j],
+                            *aggregate_columns[j],
+                            aggregates_pool);
+                }
+            }
         }
     }
 }
