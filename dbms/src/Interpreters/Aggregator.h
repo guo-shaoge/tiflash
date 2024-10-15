@@ -182,14 +182,20 @@ struct AggProcessInfo
 
 struct AggregateStatesBatchAllocator
 {
-    const size_t batch_size = 1024;
+    explicit AggregateStatesBatchAllocator(
+            size_t max_block_size,
+            Arena * pool,
+            size_t agg_state_size_)
+        : batch_size(std::min(1024, max_block_size))
+        , aggregates_pool(pool)
+        , one_agg_state_size(agg_state_size_) {}
 
-    size_t one_agg_state_size = 0;
+    const size_t batch_size;
+    Arena * aggregates_pool;
+    size_t one_agg_state_size;
 
     std::vector<std::pair<void *, size_t>> batch_agg_states;
-    Arena * aggregates_pool = nullptr;
 
-    // todo fixed type
     AggregateDataPtr allocate()
     {
         if (batch_agg_states.empty() || batch_agg_states.back().second == batch_size)
@@ -257,102 +263,33 @@ struct AggregationMethodOneNumber
         column->insertRawData<sizeof(FieldType)>(key_holder);
     }
 
-    static void emplaceKeyPhMap(
-            TData & data,
-            AggregateStatesBatchAllocator & batch_allocator,
-            const Aggregator * aggregator,
-            const State & state,
-            AggProcessInfo & agg_process_info,
-            Arena * aggregates_pool,
-            bool with_prefetch,
-            std::vector<String> & sort_key_containers);
-
-    void convertToBlocksFinal(
-            AggregateStatesBatchAllocator & batch_allocator,
+    static void insertKeyIntoColumns(
+            const char * key,
+            std::vector<IColumn *> & key_columns,
             const Sizes &,
-            std::vector<std::vector<IColumn *>> && key_columns_vec,
-            std::vector<MutableColumns> & final_aggregate_columns_vec,
-            Arena * aggregates_pool,
-            size_t max_block_size,
-            size_t aggregates_size,
-            const AggregateFunctionsPlainPtrs & aggregate_functions,
-            const Sizes & offsets_of_aggregate_states) const
+            const TiDB::TiDBCollators &)
     {
-        // TODO handle batch_size is zero!!!
-        const auto batch_count_per_block = max_block_size / batch_allocator.batch_size;
-        RUNTIME_CHECK(batch_count_per_block > 0);
-        // TODO make sure can divide
-        RUNTIME_CHECK(max_block_size % batch_allocator.batch_size == 0);
-        RUNTIME_CHECK(key_columns_vec.size() == final_aggregate_columns_vec.size());
-
-        const auto & all_agg_states = batch_allocator.batch_agg_states;
-
-        // const auto block_count = key_columns_vec.size();
-        size_t row = 0;
-        for (const auto & one_batch : all_agg_states)
-        {
-            const auto block_idx = row / max_block_size;
-
-            auto & key_columns = key_columns_vec[block_idx];
-            auto & aggregate_columns = final_aggregate_columns_vec[block_idx];
-            // For AggregationMethodOneNumber
-            RUNTIME_CHECK(key_columns.size() == 1);
-
-            for (size_t i = 0; i < one_batch.second; ++i)
-            {
-                const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
-                    i * batch_allocator.one_agg_state_size;
-                // TODO is this ok, is it compatible with real storage?
-                const Key & key = *reinterpret_cast<const Key *>(agg_states);
-                // todo Method::insertKeyIntoColumns
-                key_columns[0]->insert(Field(static_cast<typename NearestFieldType<Key>::Type>(key)));
-
-                for (size_t j = 0; j < aggregates_size; ++j)
-                {
-                    aggregate_functions[j]->insertResultInto(
-                            agg_states + offsets_of_aggregate_states[j],
-                            *aggregate_columns[j],
-                            aggregates_pool);
-                }
-                row++;
-            }
-        }
-
-        // for (size_t block_idx = 0; block_idx < block_count; ++block_idx)
-        // {
-        //     auto & key_columns = key_columns_vec[block_idx];
-        //     auto & aggregate_columns = final_aggregate_columns_vec[block_idx];
-        //     // For AggregationMethodOneNumber
-        //     RUNTIME_CHECK(key_columns.size() == 1);
-        //     for (size_t batch_idx = 0; batch_idx < batch_count_per_block; ++batch_idx)
-        //     {
-        //         const auto & one_batch = all_agg_states[block_idx * batch_count_per_block + batch_idx];
-        //         for (size_t row_idx = 0; row_idx < one_batch.second; ++row_idx)
-        //         {
-        //             const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
-        //                 row_idx * batch_allocator.one_agg_state_size;
-        //             // TODO is this ok, is it compatible with real storage?
-        //             const Key & key = *reinterpret_cast<const Key *>(agg_states);
-        //             // todo Method::insertKeyIntoColumns
-        //             key_columns[0]->insert(Field(static_cast<typename NearestFieldType<Key>::Type>(key)));
-
-        //             for (size_t j = 0; j < aggregates_size; ++j)
-        //             {
-        //                 aggregate_functions[j]->insertResultInto(
-        //                         agg_states + offsets_of_aggregate_states[j],
-        //                         *aggregate_columns[j],
-        //                         aggregates_pool);
-        //             }
-        //         }
-        //     }
-        // }
+        RUNTIME_CHECK(key_columns.size() == 1);
+        auto * column = static_cast<ColumnVectorHelper *>(key_columns[0]);
+        column->insertRawData<sizeof(FieldType)>(key);
     }
 
-    // TODO impl this
-    // convertToBlocksNotFinal()
+    // TODO inline
+    AggregateDataPtr allocateAggregateDataPhMap(const FieldType & key,
+            AggregateStatesBatchAllocator & states_batch_allocator) const
+    {
+        auto * aggregate_data = states_batch_allocator.allocate();
+        *reinterpret_cast<FieldType *>(aggregate_data) = key;
+        return aggregate_data;
+    }
+    static auto getKeyFromAggStates(const char * agg_states)
+    {
+        return *reinterpret_cast<const Key *>(agg_states);
+    }
 };
 
 /// For the case where there is one string key.
+// TODO not used?
 template <typename TData>
 struct AggregationMethodString
 {
@@ -399,17 +336,15 @@ struct AggregationMethodString
         static_cast<ColumnString *>(key_columns[0])->insertData(key.data, key.size);
     }
 
-    static void emplaceKeyPhMap(
-            TData &,
-            AggregateStatesBatchAllocator &,
-            const Aggregator *,
-            const State &,
-            AggProcessInfo &,
-            Arena *,
-            bool,
-            std::vector<String> &)
+    AggregateDataPtr allocateAggregateDataPhMap(
+            const StringRef &,
+            AggregateStatesBatchAllocator &) const
     {
-        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap not impl");
+        RUNTIME_CHECK_MSG(false, "aggregation method not suitable for ph map");
+    }
+    static auto getKeyFromAggStates(const char * agg_states)
+    {
+        return *reinterpret_cast<const StringRef *>(agg_states);
     }
 };
 
@@ -462,17 +397,19 @@ struct AggregationMethodStringNoCache
         static_cast<ColumnString *>(key_columns[0])->insertData(key.data, key.size);
     }
 
-    static void emplaceKeyPhMap(
-            TData &,
-            AggregateStatesBatchAllocator &,
-            const Aggregator *,
-            const State &,
-            AggProcessInfo &,
-            Arena *,
-            bool,
-            std::vector<String> &)
+    AggregateDataPtr allocateAggregateDataPhMap(
+            const StringRef & key,
+            AggregateStatesBatchAllocator & states_batch_allocator) const
     {
-        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap not impl");
+        auto * aggregate_data = states_batch_allocator.allocate();
+        // TODO persiste key
+        // TODO make a different pool to store StringRef key.
+        *reinterpret_cast<StringRef *>(aggregate_data) = key;
+        return aggregate_data;
+    }
+    static auto getKeyFromAggStates(const char * agg_states)
+    {
+        return *reinterpret_cast<const StringRef *>(agg_states);
     }
 };
 
@@ -523,17 +460,20 @@ struct AggregationMethodOneKeyStringNoCache
     }
     ALWAYS_INLINE static inline void initAggKeys(size_t, IColumn *) {}
 
-    static void emplaceKeyPhMap(
-            TData &,
-            AggregateStatesBatchAllocator &,
-            const Aggregator *,
-            const State &,
-            AggProcessInfo &,
-            Arena *,
-            bool,
-            std::vector<String> &)
+    // TODO same as AggregationMethodStringNoCache
+    AggregateDataPtr allocateAggregateDataPhMap(
+            const StringRef & key,
+            AggregateStatesBatchAllocator & states_batch_allocator) const
     {
-        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap not impl");
+        auto * aggregate_data = states_batch_allocator.allocate();
+        // TODO persiste key
+        // TODO make a different pool to store StringRef key.
+        *reinterpret_cast<StringRef *>(aggregate_data) = key;
+        return aggregate_data;
+    }
+    static auto getKeyFromAggStates(const char * agg_states)
+    {
+        return *reinterpret_cast<const StringRef *>(agg_states);
     }
 };
 
@@ -686,17 +626,18 @@ struct AggregationMethodFastPathTwoKeysNoCache
         }
     }
 
-    static void emplaceKeyPhMap(
-            TData &,
-            AggregateStatesBatchAllocator &,
-            const Aggregator *,
-            const State &,
-            AggProcessInfo &,
-            Arena *,
-            bool,
-            std::vector<String> &)
+    // TODO static?
+    AggregateDataPtr allocateAggregateDataPhMap(
+            const StringRef & key,
+            AggregateStatesBatchAllocator & states_batch_allocator) const
     {
-        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap not impl");
+        auto * aggregate_data = states_batch_allocator.allocate();
+        *reinterpret_cast<StringRef *>(aggregate_data) = key;
+        return aggregate_data;
+    }
+    static auto getKeyFromAggStates(const char * agg_states)
+    {
+        return *reinterpret_cast<const StringRef *>(agg_states);
     }
 };
 
@@ -748,17 +689,15 @@ struct AggregationMethodFixedString
         static_cast<ColumnFixedString *>(key_columns[0])->insertData(key.data, key.size);
     }
 
-    static void emplaceKeyPhMap(
-            TData &,
-            AggregateStatesBatchAllocator &,
-            const Aggregator *,
-            const State &,
-            AggProcessInfo &,
-            Arena *,
-            bool,
-            std::vector<String> &)
+    AggregateDataPtr allocateAggregateDataPhMap(
+            const StringRef &,
+            AggregateStatesBatchAllocator &) const
     {
-        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap not impl");
+        RUNTIME_CHECK_MSG(false, "aggregation method not suitable for ph map");
+    }
+    static auto getKeyFromAggStates(const char * agg_states)
+    {
+        return *reinterpret_cast<const StringRef *>(agg_states);
     }
 };
 
@@ -809,17 +748,18 @@ struct AggregationMethodFixedStringNoCache
         static_cast<ColumnFixedString *>(key_columns[0])->insertData(key.data, key.size);
     }
 
-    static void emplaceKeyPhMap(
-            TData &,
-            AggregateStatesBatchAllocator &,
-            const Aggregator *,
-            const State &,
-            AggProcessInfo &,
-            Arena *,
-            bool,
-            std::vector<String> &)
+    // TODO static?
+    AggregateDataPtr allocateAggregateDataPhMap(
+            const StringRef & key,
+            AggregateStatesBatchAllocator & states_batch_allocator) const
     {
-        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap not impl");
+        auto * aggregate_data = states_batch_allocator.allocate();
+        *reinterpret_cast<StringRef *>(aggregate_data) = key;
+        return aggregate_data;
+    }
+    static auto getKeyFromAggStates(const char * agg_states)
+    {
+        return *reinterpret_cast<const StringRef *>(agg_states);
     }
 };
 
@@ -926,17 +866,17 @@ struct AggregationMethodKeysFixed
         }
     }
 
-    static void emplaceKeyPhMap(
-            TData &,
-            AggregateStatesBatchAllocator &,
-            const Aggregator *,
-            const State &,
-            AggProcessInfo &,
-            Arena *,
-            bool,
-            std::vector<String> &)
+    AggregateDataPtr allocateAggregateDataPhMap(
+            const Key & key,
+            AggregateStatesBatchAllocator & states_batch_allocator) const
     {
-        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap not impl");
+        auto * aggregate_data = states_batch_allocator.allocate();
+        *reinterpret_cast<Key *>(aggregate_data) = key;
+        return aggregate_data;
+    }
+    static auto getKeyFromAggStates(const char * agg_states)
+    {
+        return *reinterpret_cast<const Key *>(agg_states);
     }
 };
 
@@ -993,17 +933,17 @@ struct AggregationMethodSerialized
             pos = key_columns[i]->deserializeAndInsertFromArena(pos, collators.empty() ? nullptr : collators[i]);
     }
 
-    static void emplaceKeyPhMap(
-            TData &,
-            AggregateStatesBatchAllocator &,
-            const Aggregator *,
-            const State &,
-            AggProcessInfo &,
-            Arena *,
-            bool,
-            std::vector<String> &)
+    AggregateDataPtr allocateAggregateDataPhMap(
+            const StringRef & key,
+            AggregateStatesBatchAllocator & states_batch_allocator) const
     {
-        RUNTIME_CHECK_MSG(false, "emplaceKeyPhMap not impl");
+        auto * aggregate_data = states_batch_allocator.allocate();
+        *reinterpret_cast<StringRef *>(aggregate_data) = key;
+        return aggregate_data;
+    }
+    static auto getKeyFromAggStates(const char * agg_states)
+    {
+        return *reinterpret_cast<const StringRef *>(agg_states);
     }
 };
 
@@ -1045,7 +985,7 @@ struct AggregatedDataVariants : private boost::noncopyable
       */
     AggregatedDataWithoutKey without_key = nullptr;
 
-    AggregateStatesBatchAllocator aggregate_states_batch_allocator;
+    std::shared_ptr<AggregateStatesBatchAllocator> aggregate_states_batch_allocator = nullptr;
 
     using AggregationMethod_key8 = AggregationMethodOneNumber<UInt8, AggregatedDataWithUInt8Key_phmap, false>;
     using AggregationMethod_key16 = AggregationMethodOneNumber<UInt16, AggregatedDataWithUInt16Key_phmap, false>;
@@ -1114,13 +1054,13 @@ struct AggregatedDataVariants : private boost::noncopyable
         ColumnsHashing::KeyDescStringBin,
         ColumnsHashing::KeyDescNumber64,
         AggregatedDataWithStringKey>;
-    using AggregationMethod_two_keys_strbin_strbin = AggregationMethodFastPathTwoKeysNoCache<
-        ColumnsHashing::KeyDescStringBin,
-        ColumnsHashing::KeyDescStringBin,
-        AggregatedDataWithStringKey>;
     using AggregationMethod_two_keys_strbinpadding_num64 = AggregationMethodFastPathTwoKeysNoCache<
         ColumnsHashing::KeyDescStringBinPadding,
         ColumnsHashing::KeyDescNumber64,
+        AggregatedDataWithStringKey>;
+    using AggregationMethod_two_keys_strbin_strbin = AggregationMethodFastPathTwoKeysNoCache<
+        ColumnsHashing::KeyDescStringBin,
+        ColumnsHashing::KeyDescStringBin,
         AggregatedDataWithStringKey>;
     using AggregationMethod_two_keys_strbinpadding_strbinpadding = AggregationMethodFastPathTwoKeysNoCache<
         ColumnsHashing::KeyDescStringBinPadding,
@@ -1474,6 +1414,101 @@ private:
 };
 using MergingBucketsPtr = std::shared_ptr<MergingBuckets>;
 
+template <typename Method>
+struct AggregatorMethodInitKeyColumnHelper
+{
+    Method & method;
+    explicit AggregatorMethodInitKeyColumnHelper(Method & method_)
+        : method(method_)
+    {}
+    ALWAYS_INLINE inline void initAggKeys(size_t, std::vector<IColumn *> &) {}
+    template <typename Key>
+    ALWAYS_INLINE inline void insertKeyIntoColumns(
+        const Key & key,
+        std::vector<IColumn *> & key_columns,
+        const Sizes & sizes,
+        const TiDB::TiDBCollators & collators)
+    {
+        method.insertKeyIntoColumns(key, key_columns, sizes, collators);
+    }
+};
+
+template <typename Key1Desc, typename Key2Desc, typename TData>
+struct AggregatorMethodInitKeyColumnHelper<AggregationMethodFastPathTwoKeysNoCache<Key1Desc, Key2Desc, TData>>
+{
+    using Method = AggregationMethodFastPathTwoKeysNoCache<Key1Desc, Key2Desc, TData>;
+    size_t index{};
+    std::function<void(const StringRef &, std::vector<IColumn *> &, size_t)> insert_key_into_columns_function_ptr{};
+
+    Method & method;
+    explicit AggregatorMethodInitKeyColumnHelper(Method & method_)
+        : method(method_)
+    {}
+
+    ALWAYS_INLINE inline void initAggKeys(size_t rows, std::vector<IColumn *> & key_columns)
+    {
+        index = 0;
+        if (key_columns.size() == 1)
+        {
+            Method::template initAggKeys<Key1Desc>(rows, key_columns[0]);
+            insert_key_into_columns_function_ptr
+                = AggregationMethodFastPathTwoKeysNoCache<Key1Desc, Key2Desc, TData>::insertKeyIntoColumnsOneKey;
+        }
+        else if (key_columns.size() == 2)
+        {
+            Method::template initAggKeys<Key1Desc>(rows, key_columns[0]);
+            Method::template initAggKeys<Key2Desc>(rows, key_columns[1]);
+            insert_key_into_columns_function_ptr
+                = AggregationMethodFastPathTwoKeysNoCache<Key1Desc, Key2Desc, TData>::insertKeyIntoColumnsTwoKey;
+        }
+        else
+        {
+            throw Exception("unexpected key_columns size for AggMethodFastPathTwoKey: {}", key_columns.size());
+        }
+    }
+    ALWAYS_INLINE inline void insertKeyIntoColumns(
+        const StringRef & key,
+        std::vector<IColumn *> & key_columns,
+        const Sizes &,
+        const TiDB::TiDBCollators &)
+    {
+        assert(insert_key_into_columns_function_ptr);
+        insert_key_into_columns_function_ptr(key, key_columns, index);
+        ++index;
+    }
+};
+
+template <bool bin_padding, typename TData>
+struct AggregatorMethodInitKeyColumnHelper<AggregationMethodOneKeyStringNoCache<bin_padding, TData>>
+{
+    using Method = AggregationMethodOneKeyStringNoCache<bin_padding, TData>;
+    size_t index{};
+
+    Method & method;
+    explicit AggregatorMethodInitKeyColumnHelper(Method & method_)
+        : method(method_)
+    {}
+
+    void initAggKeys(size_t rows, std::vector<IColumn *> & key_columns)
+    {
+        index = 0;
+        RUNTIME_CHECK_MSG(
+            key_columns.size() == 1,
+            "unexpected key_columns size for AggMethodOneKeyString: {}",
+            key_columns.size());
+        Method::initAggKeys(rows, key_columns[0]);
+    }
+    ALWAYS_INLINE inline void insertKeyIntoColumns(
+        const StringRef & key,
+        std::vector<IColumn *> & key_columns,
+        const Sizes &,
+        const TiDB::TiDBCollators &)
+    {
+        method.insertKeyIntoColumns(key, key_columns, index);
+        ++index;
+    }
+};
+
 /** Aggregates the source of the blocks.
   */
 class Aggregator
@@ -1700,6 +1735,17 @@ protected:
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info) const;
 
+    template <typename Method>
+    void executeImplBatchPhMap(
+            Method & method,
+            typename Method::Data & data,
+            typename Method::State & state,
+            AggregateStatesBatchAllocator & states_batch_allocator,
+            AggProcessInfo & agg_process_info,
+            Arena * aggregates_pool,
+            bool enable_prefetch,
+            std::vector<String> & sort_key_containers) const;
+
     template <bool only_lookup, typename Method>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(
         Method & method,
@@ -1723,6 +1769,15 @@ protected:
 
     template <typename Method>
     void mergeSingleLevelDataImpl(ManyAggregatedDataVariants & non_empty_data) const;
+
+    template <typename Method>
+    void convertToBlocksImplFinalPhMap(
+            const std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<Method>>> & agg_keys_helper,
+            AggregateStatesBatchAllocator & states_batch_allocator,
+            const Sizes & key_sizes,
+            std::vector<std::vector<IColumn *>> && key_columns_vec,
+            std::vector<MutableColumns> & final_aggregate_columns_vec,
+            Arena * aggregates_pool) const;
 
     template <typename Method, typename Table, bool skip_convert_key>
     void convertToBlockImpl(

@@ -228,79 +228,6 @@ void AggregatedDataVariants::convertToTwoLevel()
     aggregator->useTwoLevelHashTable();
 }
 
-template <typename FieldType, typename TData, bool consecutive_keys_optimization>
-void AggregationMethodOneNumber<FieldType, TData, consecutive_keys_optimization>::emplaceKeyPhMap(
-        TData & data,
-        AggregateStatesBatchAllocator & batch_allocator,
-        const Aggregator * aggregator,
-        const State & state,
-        AggProcessInfo & agg_process_info,
-        Arena * aggregates_pool,
-        bool with_prefetch,
-        std::vector<String> & sort_key_containers)
-{
-    const auto total_rows = agg_process_info.end_row - agg_process_info.start_row;
-    AggregateDataPtr places[total_rows];
-
-    const auto alloc_func = [&batch_allocator, aggregator](const FieldType & key) {
-        auto * aggregate_data = batch_allocator.allocate();
-        *reinterpret_cast<FieldType*>(aggregate_data) = key;
-        // todo better align method
-        aggregator->createAggregateStates(aggregate_data);
-        return aggregate_data;
-    };
-
-    if (with_prefetch)
-    {
-        // TODO fix this hash_val size may not equal to AggregateDataPtr
-        auto * hash_vals = reinterpret_cast<size_t *>(&places[0]);
-        for (size_t i = 0; i < total_rows; ++i)
-        {
-            const auto & key = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
-            hash_vals[i] = data.hash_function()(key);
-        }
-        size_t prefix_idx = 16;
-
-        for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
-        {
-            if (prefix_idx < agg_process_info.end_row)
-            {
-                data.prefetch_hash(hash_vals[prefix_idx++]);
-            }
-
-            const auto & key = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
-            auto iter = data.lazy_emplace_with_hash(key, hash_vals[i], [&](const auto & ctor) {
-                ctor(key, alloc_func(key));
-            });
-            places[i] = iter->second;
-        }
-    }
-    else
-    {
-        for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
-        {
-            const auto & key = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
-            auto iter = data.lazy_emplace(key, [&](const auto & ctor) {
-                    ctor(key, alloc_func(key));
-            });
-            places[i] = iter->second;
-        }
-    }
-
-    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data();
-            inst->that; ++inst)
-    {
-        inst->batch_that->addBatch(
-                agg_process_info.start_row,
-                total_rows,
-                &places[0],
-                inst->state_offset,
-                inst->batch_arguments,
-                aggregates_pool);
-    }
-    agg_process_info.start_row += total_rows;
-}
-
 Block Aggregator::getHeader(bool final) const
 {
     return params.getHeader(final);
@@ -744,12 +671,11 @@ void NO_INLINE Aggregator::executeImpl(
         std::vector<std::string> sort_key_containers;
         sort_key_containers.resize(params.keys_size, "");
         const bool enable_prefetch = method.data.bucket_count() >= 8192;
-        // TODO maybe too many arguments.
-        Method::emplaceKeyPhMap(
+        executeImplBatchPhMap(
+                method,
                 method.data,
-                batch_allocator,
-                this,
                 state,
+                batch_allocator,
                 agg_process_info,
                 aggregates_pool,
                 enable_prefetch,
@@ -757,6 +683,82 @@ void NO_INLINE Aggregator::executeImpl(
     }
     else
         executeImplBatch<collect_hit_rate, only_lookup>(method, state, aggregates_pool, agg_process_info);
+}
+
+template <typename Method>
+void Aggregator::executeImplBatchPhMap(
+        Method & method,
+        typename Method::Data & data,
+        typename Method::State & state,
+        AggregateStatesBatchAllocator & states_batch_allocator,
+        AggProcessInfo & agg_process_info,
+        Arena * aggregates_pool,
+        bool enable_prefetch,
+        std::vector<String> & sort_key_containers) const
+{
+    const auto total_rows = agg_process_info.end_row - agg_process_info.start_row;
+    AggregateDataPtr places[total_rows];
+    size_t hash_vals[total_rows];
+    std::optional<size_t> processed_rows;
+
+    if (enable_prefetch)
+    {
+        for (size_t i = 0; i < total_rows; ++i)
+        {
+            const auto & key = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
+            hash_vals[i] = data.hash_function()(key);
+        }
+
+        size_t prefix_idx = 16;
+
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
+        {
+            if (prefix_idx < agg_process_info.end_row)
+                data.prefetch_hash(hash_vals[prefix_idx++]);
+
+            const auto & key_holder = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
+            const auto & key = keyHolderGetKey(key_holder);
+
+            // TODO resize exception
+            auto iter = data.lazy_emplace_with_hash(key, hash_vals[i], [&](const auto & ctor) {
+                ctor(key, method.allocateAggregateDataPhMap(key, states_batch_allocator));
+                keyHolderPersistKey(key_holder);
+            });
+            places[i] = iter->second;
+            processed_rows = i;
+        }
+    }
+    else
+    {
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.end_row; ++i)
+        {
+            const auto & key_holder = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
+            const auto & key = keyHolderGetKey(key_holder);
+
+            auto iter = data.lazy_emplace(key, [&](const auto & ctor) {
+                    ctor(key, method.allocateAggregateDataPhMap(key, states_batch_allocator));
+                    keyHolderPersistKey(key_holder);
+            });
+            places[i] = iter->second;
+            processed_rows = i;
+        }
+    }
+
+    if (processed_rows)
+    {
+        for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data();
+                inst->that; ++inst)
+        {
+            inst->batch_that->addBatch(
+                    agg_process_info.start_row,
+                    *processed_rows - agg_process_info.start_row + 1,
+                    &places[0],
+                    inst->state_offset,
+                    inst->batch_arguments,
+                    aggregates_pool);
+        }
+        agg_process_info.start_row = *processed_rows + 1;
+    }
 }
 
 template <bool only_lookup, typename Method>
@@ -1074,7 +1076,8 @@ bool Aggregator::executeOnBlockOnlyLookup(
     return executeOnBlockImpl<false, true>(agg_process_info, result, thread_num);
 }
 
-size_t alignOf8Byte(size_t len)
+// todo align of 16 or 8?
+size_t alignOf16Byte(size_t len)
 {
     return (len + 15) & (~15);
 }
@@ -1099,9 +1102,11 @@ bool Aggregator::executeOnBlockImpl(
         result.init(method_chosen);
         result.keys_size = params.keys_size;
         result.key_sizes = key_sizes;
-        // todo init func; better align method!!
-        result.aggregate_states_batch_allocator.one_agg_state_size = alignOf8Byte(total_size_of_aggregate_states);
-        result.aggregate_states_batch_allocator.aggregates_pool = result.aggregates_pool;
+        // todo better align method!!
+        result.aggregate_states_batch_allocator = std::make_shared<AggregateStatesBatchAllocator>(
+                params.max_block_size,
+                result.aggregates_pool,
+                alignOf16Byte(total_size_of_aggregate_states));
         LOG_TRACE(log, "Aggregation method: `{}`", result.getMethodName());
     }
 
@@ -1133,7 +1138,7 @@ bool Aggregator::executeOnBlockImpl(
     {                                                                      \
         executeImpl<collect_hit_rate, only_lookup>(                        \
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
-            result.aggregate_states_batch_allocator,                       \
+            *result.aggregate_states_batch_allocator,                      \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
             params.collators);                                             \
@@ -1311,7 +1316,7 @@ BlocksList Aggregator::convertOneBucketToBlocks(
         convertToBlocksImpl<decltype(method), decltype(method.data.impls[bucket]), skip_convert_key>( \
             method,                                                                                   \
             method.data.impls[bucket],                                                                \
-            data_variants.aggregate_states_batch_allocator,                                           \
+            *data_variants.aggregate_states_batch_allocator,                                          \
             key_sizes,                                                                                \
             key_columns_vec,                                                                          \
             aggregate_columns_vec,                                                                    \
@@ -1604,101 +1609,6 @@ inline void Aggregator::insertAggregatesIntoColumns(
         std::rethrow_exception(exception);
 }
 
-template <typename Method>
-struct AggregatorMethodInitKeyColumnHelper
-{
-    Method & method;
-    explicit AggregatorMethodInitKeyColumnHelper(Method & method_)
-        : method(method_)
-    {}
-    ALWAYS_INLINE inline void initAggKeys(size_t, std::vector<IColumn *> &) {}
-    template <typename Key>
-    ALWAYS_INLINE inline void insertKeyIntoColumns(
-        const Key & key,
-        std::vector<IColumn *> & key_columns,
-        const Sizes & sizes,
-        const TiDB::TiDBCollators & collators)
-    {
-        method.insertKeyIntoColumns(key, key_columns, sizes, collators);
-    }
-};
-
-template <typename Key1Desc, typename Key2Desc, typename TData>
-struct AggregatorMethodInitKeyColumnHelper<AggregationMethodFastPathTwoKeysNoCache<Key1Desc, Key2Desc, TData>>
-{
-    using Method = AggregationMethodFastPathTwoKeysNoCache<Key1Desc, Key2Desc, TData>;
-    size_t index{};
-    std::function<void(const StringRef &, std::vector<IColumn *> &, size_t)> insert_key_into_columns_function_ptr{};
-
-    Method & method;
-    explicit AggregatorMethodInitKeyColumnHelper(Method & method_)
-        : method(method_)
-    {}
-
-    ALWAYS_INLINE inline void initAggKeys(size_t rows, std::vector<IColumn *> & key_columns)
-    {
-        index = 0;
-        if (key_columns.size() == 1)
-        {
-            Method::template initAggKeys<Key1Desc>(rows, key_columns[0]);
-            insert_key_into_columns_function_ptr
-                = AggregationMethodFastPathTwoKeysNoCache<Key1Desc, Key2Desc, TData>::insertKeyIntoColumnsOneKey;
-        }
-        else if (key_columns.size() == 2)
-        {
-            Method::template initAggKeys<Key1Desc>(rows, key_columns[0]);
-            Method::template initAggKeys<Key2Desc>(rows, key_columns[1]);
-            insert_key_into_columns_function_ptr
-                = AggregationMethodFastPathTwoKeysNoCache<Key1Desc, Key2Desc, TData>::insertKeyIntoColumnsTwoKey;
-        }
-        else
-        {
-            throw Exception("unexpected key_columns size for AggMethodFastPathTwoKey: {}", key_columns.size());
-        }
-    }
-    ALWAYS_INLINE inline void insertKeyIntoColumns(
-        const StringRef & key,
-        std::vector<IColumn *> & key_columns,
-        const Sizes &,
-        const TiDB::TiDBCollators &)
-    {
-        assert(insert_key_into_columns_function_ptr);
-        insert_key_into_columns_function_ptr(key, key_columns, index);
-        ++index;
-    }
-};
-
-template <bool bin_padding, typename TData>
-struct AggregatorMethodInitKeyColumnHelper<AggregationMethodOneKeyStringNoCache<bin_padding, TData>>
-{
-    using Method = AggregationMethodOneKeyStringNoCache<bin_padding, TData>;
-    size_t index{};
-
-    Method & method;
-    explicit AggregatorMethodInitKeyColumnHelper(Method & method_)
-        : method(method_)
-    {}
-
-    void initAggKeys(size_t rows, std::vector<IColumn *> & key_columns)
-    {
-        index = 0;
-        RUNTIME_CHECK_MSG(
-            key_columns.size() == 1,
-            "unexpected key_columns size for AggMethodOneKeyString: {}",
-            key_columns.size());
-        Method::initAggKeys(rows, key_columns[0]);
-    }
-    ALWAYS_INLINE inline void insertKeyIntoColumns(
-        const StringRef & key,
-        std::vector<IColumn *> & key_columns,
-        const Sizes &,
-        const TiDB::TiDBCollators &)
-    {
-        method.insertKeyIntoColumns(key, key_columns, index);
-        ++index;
-    }
-};
-
 template <typename Method, typename Table, bool skip_convert_key>
 void NO_INLINE Aggregator::convertToBlockImplFinal(
     Method & method,
@@ -1742,6 +1652,64 @@ void NO_INLINE Aggregator::convertToBlockImplFinal(
         });
     }
 }
+
+template <typename Method>
+void Aggregator::convertToBlocksImplFinalPhMap(
+        const std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<Method>>> & agg_keys_helper,
+        AggregateStatesBatchAllocator & states_batch_allocator,
+        const Sizes & key_sizes,
+        std::vector<std::vector<IColumn *>> && key_columns_vec,
+        std::vector<MutableColumns> & final_aggregate_columns_vec,
+        Arena * aggregates_pool) const
+{
+    RUNTIME_CHECK(key_columns_vec.size() == final_aggregate_columns_vec.size());
+
+    const auto & all_agg_states = states_batch_allocator.batch_agg_states;
+
+    size_t row = 0;
+    for (const auto & one_batch : all_agg_states)
+    {
+        const auto block_idx = row / params.max_block_size;
+
+        auto & key_columns = key_columns_vec[block_idx];
+        auto & aggregate_columns = final_aggregate_columns_vec[block_idx];
+
+        for (size_t i = 0; i < one_batch.second; ++i)
+        {
+            const auto * agg_states = static_cast<AggregateDataPtr>(one_batch.first) +
+                i * states_batch_allocator.one_agg_state_size;
+
+            // Method::insertKeyIntoColumns(agg_states, key_columns, key_sizes, params.collators);
+            const auto & key = Method::getKeyFromAggStates(agg_states);
+            agg_keys_helper[block_idx]->insertKeyIntoColumns(key, key_columns, key_sizes, params.collators);
+
+            for (size_t j = 0; j < params.aggregates_size; ++j)
+            {
+                aggregate_functions[j]->insertResultInto(
+                        agg_states + offsets_of_aggregate_states[j],
+                        *aggregate_columns[j],
+                        aggregates_pool);
+            }
+
+            row++;
+
+            if unlikely (row >= params.max_block_size)
+                break;
+        }
+    }
+}
+
+// void Aggregator::convertToBlocksPhMapNotFinal()
+// {
+// }
+// 
+// void Aggregator::convertToBlockPhMapFinal()
+// {
+// }
+// 
+// void Aggregator::convertToBlockPhMapNotFinal()
+// {
+// }
 
 namespace
 {
@@ -1798,35 +1766,33 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     }
 #endif
 
+    std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<std::decay_t<Method>>>> agg_keys_helpers;
+    Sizes key_sizes_ref = key_sizes; // NOLINT
+    if constexpr (!skip_convert_key)
+    {
+        auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
+        if (shuffled_key_sizes)
+        {
+            RUNTIME_CHECK(params.key_ref_agg_func.empty());
+            key_sizes_ref = *shuffled_key_sizes;
+        }
+        agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
+    }
+
+
     // TODO remove reference from caller.
     if constexpr (std::decay_t<Method>::Data::isPhMap)
     {
-        // TODO make it outside function instead as member function.
-        method.convertToBlocksFinal(
+        convertToBlocksImplFinalPhMap<std::decay_t<Method>>(
+                agg_keys_helpers,
                 states_batch_allocator,
-                key_sizes,
+                key_sizes_ref,
                 std::move(key_columns_vec),
-                final_aggregate_columns_vec, arena,
-                params.max_block_size,
-                params.aggregates_size,
-                aggregate_functions,
-                offsets_of_aggregate_states);
+                final_aggregate_columns_vec,
+                arena);
     }
     else
     {
-        std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<std::decay_t<Method>>>> agg_keys_helpers;
-        Sizes key_sizes_ref = key_sizes; // NOLINT
-        if constexpr (!skip_convert_key)
-        {
-            auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
-            if (shuffled_key_sizes)
-            {
-                RUNTIME_CHECK(params.key_ref_agg_func.empty());
-                key_sizes_ref = *shuffled_key_sizes;
-            }
-            agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
-        }
-
         size_t data_index = 0;
         data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
             size_t key_columns_vec_index = data_index / params.max_block_size;
@@ -2194,7 +2160,7 @@ BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & 
         convertToBlocksImpl<decltype(tmp_method), decltype(tmp_data), skip_convert_key>(               \
             tmp_method,                                                                                \
             tmp_data,                                                                                  \
-            data_variants.aggregate_states_batch_allocator,                                            \
+            *data_variants.aggregate_states_batch_allocator,                                           \
             key_sizes,                                                                                 \
             key_columns_vec,                                                                           \
             aggregate_columns_vec,                                                                     \
