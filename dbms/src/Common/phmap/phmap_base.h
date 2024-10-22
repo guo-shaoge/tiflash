@@ -4314,6 +4314,12 @@ union map_slot_type {
     using value_type = std::pair<const K, V>;
     using mutable_value_type = std::pair<K, V>;
 
+    template <typename Hash>
+    size_t getHash(const Hash & hash) const
+    {
+        hash.hash(value.first);
+    }
+
     value_type value;
     mutable_value_type mutable_value;
     K key;

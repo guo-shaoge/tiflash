@@ -416,3 +416,37 @@ struct IntHash32<T, salt, std::enable_if_t<!is_fit_register<T>, void>>
         }
     }
 };
+
+enum PhHashSeed { PhHashSeed1, PhHashSeed2 };
+
+template <int n, PhHashSeed seed>
+class PhHashMixSeed {
+public:
+    inline size_t operator()(size_t) const;
+};
+
+template <>
+class PhHashMixSeed<4, PhHashSeed1> {
+public:
+    inline size_t operator()(size_t a) const {
+        static constexpr uint64_t kmul = 0xcc9e2d51UL;
+        uint64_t l = a * kmul;
+        return static_cast<size_t>(l ^ (l >> 32u));
+    }
+};
+
+template <>
+class PhHashMixSeed<8, PhHashSeed1> {
+public:
+    inline size_t operator()(size_t a) const {
+        static constexpr uint64_t k = 0xde5fb9d2630458e9ULL;
+        uint64_t h;
+        uint64_t l = umul128(a, k, &h);
+        return static_cast<size_t>(h + l);
+    }
+};
+template <typename T, PhHashSeed seed>
+struct PhHash
+{
+    std::size_t operator()(T value) const { return PhHashMixSeed<sizeof(size_t), seed>()(std::hash<T>()(value)); }
+};

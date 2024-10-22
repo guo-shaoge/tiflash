@@ -114,6 +114,7 @@ public:
     template <typename Source>
     explicit TwoLevelHashTable(const Source & src)
     {
+        // TODO gjt phmap
         typename Source::const_iterator it = src.begin();
 
         /// It is assumed that the zero key (stored separately) is first in iteration order.
@@ -168,6 +169,7 @@ public:
         Cell & operator*() const { return *current_it; }
         Cell * operator->() const { return current_it.getPtr(); }
 
+        // TODO gjt phmap
         Cell * getPtr() const { return current_it.getPtr(); }
         size_t getHash() const { return current_it.getHash(); }
     };
@@ -242,12 +244,14 @@ public:
     /// Insert a value. In the case of any more complex values, it is better to use the `emplace` function.
     std::pair<LookupResult, bool> ALWAYS_INLINE insert(const value_type & x)
     {
+        // TODO gjt phmap map_slot_type add getKey()
         size_t hash_value = hash(Cell::getKey(x));
 
         std::pair<LookupResult, bool> res;
         emplace(Cell::getKey(x), res.first, res.second, hash_value);
 
         if (res.second)
+            // TODO gjt phmap map_slot_type add getMapped()
             insertSetMapped(res.first->getMapped(), x);
 
         return res;
@@ -300,7 +304,7 @@ public:
 
     ConstLookupResult ALWAYS_INLINE find(Key x) const { return find(x, hash(x)); }
 
-
+    // TODO gjt map
     void write(DB::WriteBuffer & wb) const
     {
         for (size_t i = 0; i < NUM_BUCKETS; ++i)
