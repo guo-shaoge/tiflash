@@ -4320,6 +4320,11 @@ union map_slot_type {
         hash.hash(value.first);
     }
 
+    const K & getKey() const { return value.first; }
+    V & getMapped() { return value.second; }
+    const V & getMapped() const { return value.second; }
+    const value_type & getValue() const { return value; }
+
     value_type value;
     mutable_value_type mutable_value;
     K key;

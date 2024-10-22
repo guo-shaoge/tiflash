@@ -1694,10 +1694,7 @@ public:
         return HashElement{hash_ref()}(key);
     }
 
-private:
-    template <class Container, typename Enabler>
-    friend struct phmap::priv::hashtable_debug_internal::HashtableDebugAccess;
-
+protected:
     template <class K = key_type>
     bool find_impl(const key_arg<K>& key, size_t hashval, size_t& offset) {
         auto seq = probe(hashval);
@@ -1713,6 +1710,10 @@ private:
             seq.next();
         }
     }
+
+private:
+    template <class Container, typename Enabler>
+    friend struct phmap::priv::hashtable_debug_internal::HashtableDebugAccess;
 
     struct FindElement {
         template <class K, class... Args>
@@ -2074,6 +2075,9 @@ protected:
 
     iterator iterator_at(size_t i) { return {ctrl_ + i, slots_ + i}; }
     const_iterator iterator_at(size_t i) const { return {ctrl_ + i, slots_ + i}; }
+
+    slot_type * slot_at(size_t i) { return slots_ + i; }
+    const slot_type * slot_at(size_t i) const { return slots_ + i; }
 
 public:
     const HashtablezInfoHandle& infoz() const { return infoz_; }
