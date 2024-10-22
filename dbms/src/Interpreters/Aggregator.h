@@ -78,6 +78,20 @@ class AggHashTableToBlocksBlockInputStream;
 template <typename Key, typename Mapped>
 using PhHashMap = PhHashTable<Key, Mapped, PhHash<Key, PhHashSeed1>>;
 
+// TODO gjt Allocator
+template <typename TMapped, typename Allocator>
+struct StringHashMapPhSubMaps
+{
+    using T0 = StringHashTableEmpty<StringHashMapCell<StringRef, TMapped>>;
+    // TODO seed
+    using T1 = PhHashTable<StringKey8, TMapped, PhHash<StringKey8, PhHashSeed1>>;
+    using T2 = PhHashTable<StringKey16, TMapped, PhHash<StringKey16, PhHashSeed1>>;
+    using T3 = PhHashTable<StringKey24, TMapped, PhHash<StringKey24, PhHashSeed1>>;
+    using Ts = PhHashTable<StringRef, TMapped, PhHash<StringRef, PhHashSeed1>>;
+};
+using StringPhHashMap = StringHashMap<AggregateDataPtr, HashTableAllocator, StringHashMapPhSubMaps>;
+using TwoLevelStringPhHashMap = TwoLevelStringHashMap<AggregateDataPtr, HashTableAllocator, StringHashMap, StringHashMapPhSubMaps>;
+
 using AggregatedDataWithoutKey = AggregateDataPtr;
 
 using AggregatedDataWithUInt8Key = FixedImplicitZeroHashMapWithCalculatedSize<UInt8, AggregateDataPtr>;

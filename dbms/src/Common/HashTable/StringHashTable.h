@@ -454,8 +454,9 @@ public:
 
     void clearAndShrink()
     {
-        m1.clearHasZero();
-        m1.clearAndShrink();
+        if constexpr (!T1::isPhMap)
+            m1.clearHasZero();
+
         m2.clearAndShrink();
         m3.clearAndShrink();
         ms.clearAndShrink();

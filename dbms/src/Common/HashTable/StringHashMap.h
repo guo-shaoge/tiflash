@@ -117,8 +117,10 @@ struct StringHashMapSubMaps
         Allocator>;
 };
 
-template <typename TMapped, typename Allocator = HashTableAllocator>
-class StringHashMap : public StringHashTable<StringHashMapSubMaps<TMapped, Allocator>>
+template <typename TMapped,
+         typename Allocator = HashTableAllocator,
+         template <typename, typename> typename TSubMaps = StringHashMapSubMaps>
+class StringHashMap : public StringHashTable<TSubMaps<TMapped, Allocator>>
 {
 public:
     using Key = StringRef;
