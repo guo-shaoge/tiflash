@@ -43,8 +43,7 @@ template <
     typename Allocator,
     typename ImplTable = HashTable<Key, Cell, Hash, Grower, Allocator>,
     size_t BITS_FOR_BUCKET = 8>
-class TwoLevelHashTable : private boost::noncopyable
-    ,
+class TwoLevelHashTable : private boost::noncopyable,
                           protected Hash /// empty base optimization
 {
 protected:
@@ -114,22 +113,30 @@ public:
     template <typename Source>
     explicit TwoLevelHashTable(const Source & src)
     {
-        // TODO gjt phmap
-        typename Source::const_iterator it = src.begin();
-
-        /// It is assumed that the zero key (stored separately) is first in iteration order.
-        if (it != src.end() && it.getPtr()->isZero(src))
+        if constexpr (Source::isPhMap)
         {
-            insert(it->getValue());
-            ++it;
+            // TODO
         }
-
-        for (; it != src.end(); ++it)
+        else
         {
-            const Cell * cell = it.getPtr();
-            size_t hash_value = cell->getHash(src);
-            size_t buck = getBucketFromHash(hash_value);
-            impls[buck].insertUniqueNonZero(cell, hash_value);
+            typename Source::const_iterator it = src.begin();
+
+            /// It is assumed that the zero key (stored separately) is first in iteration order.
+            if (it != src.end() && it.getPtr()->isZero(src))
+            {
+                insert(it->getValue());
+                ++it;
+            }
+
+            for (; it != src.end(); ++it)
+            {
+                // getPtr() return const HashMapCel<K, V>* for HashTable,
+                // it returns std::pair<K, V> for PhHashTable.
+                const auto * cell = it.getPtr();
+                size_t hash_value = cell->getHash(src);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].insertUniqueNonZero(cell, hash_value);
+            }
         }
     }
 

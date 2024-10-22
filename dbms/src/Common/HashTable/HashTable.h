@@ -402,6 +402,7 @@ public:
     using Grower = GrowerType;
     using Allocator = AllocatorType;
 
+    static constexpr bool isPhMap = false;
 protected:
     friend class const_iterator;
     friend class iterator;

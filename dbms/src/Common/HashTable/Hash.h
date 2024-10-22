@@ -20,6 +20,7 @@
 #include <common/StringRef.h>
 #include <common/types.h>
 #include <common/unaligned.h>
+#include <Common/phmap/phmap_bits.h>
 
 #include <boost/functional/hash/hash.hpp>
 #include <type_traits>

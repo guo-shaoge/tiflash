@@ -136,6 +136,8 @@ protected:
     friend class Reader;
 
     using Self = FixedHashTable;
+    
+    static constexpr bool isPhMap = false;
 
     Cell * buf; /// A piece of memory for all elements.
 

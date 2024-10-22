@@ -85,6 +85,8 @@ public:
     using value_type = typename Cell::value_type;
     using cell_type = Cell;
 
+    static constexpr bool isPhMap = false;
+
     class Reader final : private Cell::State
     {
     public:
