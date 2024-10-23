@@ -31,13 +31,9 @@ public:
     using Base::find_or_prepare_insert;
     using Base::find_impl;
     using Base::hash;
+    using Base::hash_function;
     using Base::lazy_emplace;
     using Base::lazy_emplace_with_hash;
-
-    ALWAYS_INLINE inline size_t getHash(const KeyType & key) const
-    {
-        return hash(key);
-    }
 
     template <typename KeyHolder>
     ALWAYS_INLINE inline void emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted)

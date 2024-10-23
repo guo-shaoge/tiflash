@@ -131,13 +131,6 @@ public:
     static constexpr size_t prefetch_step = 16;
 
     template <typename Data>
-    ALWAYS_INLINE inline size_t getHash(const Data & data, size_t row, Arena & pool, std::vector<String> & sort_key_containers) const
-    {
-        auto key_holder = static_cast<const Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
-        data.getHash(keyHolderGetKey(key_holder));
-    }
-
-    template <typename Data>
     ALWAYS_INLINE inline EmplaceResult emplaceKey(
         Data & data,
         size_t row,
@@ -152,7 +145,7 @@ public:
     ALWAYS_INLINE inline EmplaceResult emplaceKey(
         Data & data,
         size_t row,
-        std::vector<size_t> hashvals,
+        const std::vector<size_t> & hashvals,
         Arena & pool,
         std::vector<String> & sort_key_containers)
     {
@@ -181,9 +174,9 @@ public:
         const Data & data,
         size_t row,
         Arena & pool,
-        std::vector<String> & sort_key_containers)
+        std::vector<String> & sort_key_containers) const
     {
-        auto key_holder = static_cast<Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
+        auto key_holder = static_cast<const Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
         // TODO enable prefetch
         return data.hash(keyHolderGetKey(key_holder));
     }

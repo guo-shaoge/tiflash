@@ -449,5 +449,5 @@ public:
 template <typename T, PhHashSeed seed>
 struct PhHash
 {
-    std::size_t operator()(T value) const { return PhHashMixSeed<sizeof(size_t), seed>()(std::hash<T>()(value)); }
+    std::size_t operator()(const T & value) const { return PhHashMixSeed<sizeof(size_t), seed>()(std::hash<T>()(value)); }
 };

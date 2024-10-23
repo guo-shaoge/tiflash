@@ -204,7 +204,7 @@ void AggregatedDataVariants::convertToTwoLevel()
     case AggregationMethodType(NAME):                                                     \
     {                                                                                     \
         if (aggregator)                                                                   \
-            LOG_TRACE(                                                                    \
+            LOG_DEBUG(                                                                    \
                 aggregator->log,                                                          \
                 "Converting aggregation data type `{}` to `{}`.",                         \
                 getMethodName(AggregationMethodType(NAME)),                               \
@@ -1043,7 +1043,7 @@ bool Aggregator::executeOnBlockImpl(
         result.init(method_chosen);
         result.keys_size = params.keys_size;
         result.key_sizes = key_sizes;
-        LOG_TRACE(log, "Aggregation method: `{}`", result.getMethodName());
+        LOG_DEBUG(log, "Aggregation method: `{}`", result.getMethodName());
     }
 
     agg_process_info.prepareForAgg();
