@@ -207,6 +207,11 @@ protected:
             {
                 new (&it->getMapped()) Mapped();
             }
+            LOG_DEBUG(Logger::get(), "gjt debug inserted");
+        }
+        else
+        {
+            LOG_DEBUG(Logger::get(), "gjt debug not inserted");
         }
 
         if constexpr (consecutive_keys_optimization)

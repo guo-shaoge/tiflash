@@ -1687,6 +1687,7 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     }
 
     size_t data_index = 0;
+    LOG_DEBUG(log, "gjt debug size: {}", data.size());
     data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
         size_t key_columns_vec_index = data_index / params.max_block_size;
         if constexpr (!skip_convert_key)
