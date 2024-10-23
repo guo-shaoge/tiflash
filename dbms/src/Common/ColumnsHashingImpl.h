@@ -227,7 +227,7 @@ protected:
         bool inserted = false;
 
         if constexpr (enable_prefetch)
-            data.emplace(key_holder, hashval, it, inserted);
+            data.emplace(key_holder, it, inserted, hashval);
         else
             data.emplace(key_holder, it, inserted);
 

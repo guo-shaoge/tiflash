@@ -46,19 +46,25 @@ public:
         auto iter = lazy_emplace(key, [&](const auto & ctor) { // TODO init inserted as false
             inserted = true;
             ctor(key, nullptr);
+            keyHolderPersistKey(key_holder);
         });
         it = iter.getPtr();
+        if (!inserted)
+            keyHolderDiscardKey(key_holder);
     }
 
     template <typename KeyHolder>
-    ALWAYS_INLINE inline void emplace(KeyHolder && key_holder, size_t hashval, LookupResult & it, bool & inserted)
+    ALWAYS_INLINE inline void emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
     {
         const auto & key = keyHolderGetKey(key_holder);
         auto iter = lazy_emplace_with_hash(key, hashval, [&](const auto & ctor) {
             inserted = true;
             ctor(key, nullptr);
+            keyHolderPersistKey(key_holder);
         });
         it = iter.getPtr();
+        if (!inserted)
+            keyHolderDiscardKey(key_holder);
     }
 
     ALWAYS_INLINE inline LookupResult find(const KeyType & key, size_t hashval)

@@ -1111,8 +1111,6 @@ struct AggregatedDataVariants : private boost::noncopyable
     }
 
 #define APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL(M) \
-    M(key32)                                           \
-    M(key64)                                           \
     M(key_int256)                                      \
     M(key_string)                                      \
     M(key_fixed_string)                                \
@@ -1133,7 +1131,10 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(one_key_strbinpadding)
 
 
+    // TODO two level
 #define APPLY_FOR_VARIANTS_NOT_CONVERTIBLE_TO_TWO_LEVEL(M) \
+    M(key32)                                           \
+    M(key64)                                           \
     M(key8)                                                \
     M(key16)                                               \
     M(keys16)                                              \
