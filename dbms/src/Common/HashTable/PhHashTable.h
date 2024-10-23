@@ -30,9 +30,15 @@ public:
     using Base::slot_at;
     using Base::find_or_prepare_insert;
     using Base::find_impl;
+    using Base::hash;
+
+    ALWAYS_INLINE inline size_t getHash(const KeyType & key) const
+    {
+        return hash(key);
+    }
 
     template <typename KeyHolder>
-    void ALWAYS_INLINE emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted)
+    ALWAYS_INLINE inline void emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted)
     {
         const auto & key = keyHolderGetKey(key_holder);
         auto res = find_or_prepare_insert(key);
@@ -41,7 +47,7 @@ public:
     }
 
     template <typename KeyHolder>
-    void ALWAYS_INLINE emplace(KeyHolder && key_holder, size_t hashval, LookupResult & it, bool & inserted)
+    ALWAYS_INLINE inline void emplace(KeyHolder && key_holder, size_t hashval, LookupResult & it, bool & inserted)
     {
         const auto & key = keyHolderGetKey(key_holder);
         auto res = this->find_or_prepare_insert(key, hashval);
@@ -49,7 +55,7 @@ public:
         inserted = res.second;
     }
 
-    LookupResult ALWAYS_INLINE find(const KeyType & key, size_t hashval)
+    ALWAYS_INLINE inline LookupResult find(const KeyType & key, size_t hashval)
     {
         size_t offset;
         if (find_impl(key, hashval, offset))
@@ -58,18 +64,18 @@ public:
             return nullptr;
     }
 
-    LookupResult ALWAYS_INLINE find(const KeyType & key)
+    ALWAYS_INLINE inline LookupResult find(const KeyType & key)
     {
         const auto hashval = this->hash(key);
         find(key, hashval);
     }
 
-    ConstLookupResult ALWAYS_INLINE find(const KeyType & key, size_t hashval) const
+    ALWAYS_INLINE inline ConstLookupResult find(const KeyType & key, size_t hashval) const
     {
         return const_cast<std::decay_t<decltype(*this)> *>(this)->find(key, hashval);
     }
 
-    ConstLookupResult ALWAYS_INLINE find(const KeyType & key) const
+    ALWAYS_INLINE inline ConstLookupResult find(const KeyType & key) const
     {
         return const_cast<std::decay_t<decltype(*this)> *>(this)->find(key);
     }
@@ -79,8 +85,6 @@ public:
     {
         for (auto iter = begin(); iter != end(); ++iter)
         {
-            // TODO key is const,
-            // check map_slot_type
             func(iter->first, iter->second);
         }
     }
@@ -94,7 +98,7 @@ public:
         }
     }
 
-    typename Base::mapped_type & ALWAYS_INLINE operator[](const Key & key)
+    ALWAYS_INLINE inline typename Base::mapped_type & operator[](const Key & key)
     {
         LookupResult it = nullptr;
         bool inserted = false;
@@ -106,17 +110,19 @@ public:
         return it->getMapped();
     }
 
-    size_t ALWAYS_INLINE getBufferSizeInBytes() const
+    ALWAYS_INLINE inline size_t getBufferSizeInBytes() const
     {
+        // TODO correctness for ctro?
         return capacity() * (sizeof(typename Base::slot_type) + sizeof(typename phmap::priv::ctrl_t));
     }
 
-    size_t ALWAYS_INLINE getBufferSizeInCells() const
+    ALWAYS_INLINE inline size_t getBufferSizeInCells() const
     {
+        // TODO correctness for ctro?
         return capacity();
     }
 
-    void ALWAYS_INLINE clearAndShrink()
+    ALWAYS_INLINE inline void clearAndShrink()
     {
         clear();
     }
@@ -156,7 +162,7 @@ public:
     }
 
     template <typename Func>
-    void ALWAYS_INLINE mergeToViaEmplace(Self & that, Func && func)
+    ALWAYS_INLINE inline void mergeToViaEmplace(Self & that, Func && func)
     {
         for (auto it = this->begin(), end = this->end(); it != end; ++it)
         {
@@ -168,7 +174,7 @@ public:
     }
 
     template <typename Func>
-    void ALWAYS_INLINE mergeToViaFind(Self & that, Func && func)
+    ALWAYS_INLINE inline void mergeToViaFind(Self & that, Func && func)
     {
         for (auto it = this->begin(), end = this->end(); it != end; ++it)
         {

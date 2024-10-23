@@ -1478,18 +1478,19 @@ protected:
         AggProcessInfo & agg_process_info,
         TiDB::TiDBCollators & collators) const;
 
-    template <bool collect_hit_rate, bool only_loopup, typename Method>
+    template <bool collect_hit_rate, bool only_loopup, bool enable_prefetch, typename Method>
     void executeImplBatch(
         Method & method,
         typename Method::State & state,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info) const;
 
-    template <bool only_lookup, typename Method>
+    template <bool only_lookup, bool enable_prefetch, typename Method>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(
         Method & method,
         typename Method::State & state,
         size_t index,
+        const std::vector<size_t> & hashvals,
         Arena & aggregates_pool,
         std::vector<std::string> & sort_key_containers) const;
 

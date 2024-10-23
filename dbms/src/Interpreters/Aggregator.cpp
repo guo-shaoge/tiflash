@@ -665,23 +665,40 @@ void NO_INLINE Aggregator::executeImpl(
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    executeImplBatch<collect_hit_rate, only_lookup>(method, state, aggregates_pool, agg_process_info);
+    if constexpr (Method::Data::isPhMap)
+    {
+        if (method.data.getBufferSizeInCells() < 8192)
+            executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+        else
+            executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+    }
+    else
+    {
+        executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+    }
 }
 
-template <bool only_lookup, typename Method>
+template <bool only_lookup, bool enable_prefetch, typename Method>
 std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> Aggregator::emplaceOrFindKey(
     Method & method,
     typename Method::State & state,
     size_t index,
+    const std::vector<size_t> & hashvals,
     Arena & aggregates_pool,
     std::vector<std::string> & sort_key_containers) const
 {
     try
     {
         if constexpr (only_lookup)
+            // TODO prefetch:
             return state.findKey(method.data, index, aggregates_pool, sort_key_containers);
         else
-            return state.emplaceKey(method.data, index, aggregates_pool, sort_key_containers);
+        {
+            if constexpr (enable_prefetch)
+                return state.emplaceKey(method.data, index, hashvals, aggregates_pool, sort_key_containers);
+            else
+                return state.emplaceKey(method.data, index, aggregates_pool, sort_key_containers);
+        }
     }
     catch (ResizeException &)
     {
@@ -689,7 +706,26 @@ std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::Res
     }
 }
 
-template <bool collect_hit_rate, bool only_lookup, typename Method>
+template <bool enable_prefetch, typename Data, typename State>
+ALWAYS_INLINE inline std::vector<size_t> getHashVals(
+        const Data & data,
+        const State & state,
+        const Aggregator::AggProcessInfo & agg_process_info,
+        size_t rows,
+        Arena & pool,
+        std::vector<String> & sort_key_containers)
+{
+    std::vector<size_t> hashvals;
+    if constexpr (enable_prefetch)
+    {
+        hashvals.resize(agg_process_info.start_row + rows);
+        for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + rows; ++i)
+            hashvals[i] = state.template getHash(data, i, pool, sort_key_containers);
+    }
+    return hashvals;
+}
+
+template <bool collect_hit_rate, bool only_lookup, bool enable_prefetch, typename Method>
 ALWAYS_INLINE void Aggregator::executeImplBatch(
     Method & method,
     typename Method::State & state,
@@ -712,12 +748,21 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     {
         /// For all rows.
         AggregateDataPtr place = aggregates_pool->alloc(0);
+        std::vector<size_t> hashvals = getHashVals<enable_prefetch>(
+                method.data,
+                state,
+                agg_process_info,
+                agg_size,
+                *aggregates_pool,
+                sort_key_containers);
+
         for (size_t i = 0; i < agg_size; ++i)
         {
-            auto emplace_result_hold = emplaceOrFindKey<only_lookup>(
+            auto emplace_result_hold = emplaceOrFindKey<only_lookup, enable_prefetch>(
                 method,
                 state,
                 agg_process_info.start_row,
+                hashvals,
                 *aggregates_pool,
                 sort_key_containers);
             if likely (emplace_result_hold.has_value())
@@ -781,16 +826,17 @@ ALWAYS_INLINE void Aggregator::executeImplBatch(
     }
 
     /// Generic case.
-
     std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[agg_size]);
     std::optional<size_t> processed_rows;
+    std::vector<size_t> hashvals = getHashVals<enable_prefetch>(
+            method.data, state, agg_process_info, agg_size, *aggregates_pool, sort_key_containers);
 
     for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + agg_size; ++i)
     {
         AggregateDataPtr aggregate_data = nullptr;
 
         auto emplace_result_holder
-            = emplaceOrFindKey<only_lookup>(method, state, i, *aggregates_pool, sort_key_containers);
+            = emplaceOrFindKey<only_lookup, enable_prefetch>(method, state, i, hashvals, *aggregates_pool, sort_key_containers);
         if unlikely (!emplace_result_holder.has_value())
         {
             LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");

@@ -55,6 +55,8 @@ protected:
 
 public:
     using Impl = ImplTable;
+    // TODO maybe another isTwoLevel
+    static constexpr bool isPhMap = false;
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;

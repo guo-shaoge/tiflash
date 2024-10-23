@@ -136,8 +136,6 @@ protected:
     friend class Reader;
 
     using Self = FixedHashTable;
-    
-    static constexpr bool isPhMap = false;
 
     Cell * buf; /// A piece of memory for all elements.
 
@@ -223,7 +221,8 @@ public:
 
     using LookupResult = Cell *;
     using ConstLookupResult = const Cell *;
-
+    
+    static constexpr bool isPhMap = false;
 
     size_t hash(const Key & x) const { return x; }
 
