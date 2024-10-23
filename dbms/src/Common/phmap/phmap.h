@@ -897,7 +897,7 @@ public:
         friend bool operator==(const iterator& a, const iterator& b) { return a.ctrl_ == b.ctrl_; }
         friend bool operator!=(const iterator& a, const iterator& b) { return !(a == b); }
 
-        auto getPtr() const { return &operator*(); }
+        auto getPtr() const { return slot_; }
         size_t getHash() const { return getPtr()->getHash(*this); }
 
     private:

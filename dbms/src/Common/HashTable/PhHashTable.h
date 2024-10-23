@@ -30,6 +30,8 @@ public:
     using Base::slot_at;
     using Base::find_or_prepare_insert;
     using Base::find_impl;
+    using Base::lazy_emplace;
+    using Base::lazy_emplace_with_hash;
 
     PhHashTable() = default;
 
@@ -37,18 +39,29 @@ public:
     void ALWAYS_INLINE emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted)
     {
         const auto & key = keyHolderGetKey(key_holder);
-        auto res = find_or_prepare_insert(key);
-        it = slot_at(res.first);
-        inserted = res.second;
+        // auto res = find_or_prepare_insert(key);
+        // it = slot_at(res.first);
+        // inserted = res.second;
+        
+        auto iter = lazy_emplace(key, [&](const auto & ctor) { // TODO init inserted as false
+            inserted = true;
+            ctor(key, nullptr);
+        });
+        it = iter.getPtr();
     }
 
     template <typename KeyHolder>
     void ALWAYS_INLINE emplace(KeyHolder && key_holder, size_t hashval, LookupResult & it, bool & inserted)
     {
         const auto & key = keyHolderGetKey(key_holder);
-        auto res = this->find_or_prepare_insert(key, hashval);
-        it = slot_at(res.first);
-        inserted = res.second;
+        // auto res = this->find_or_prepare_insert(key, hashval);
+        // it = slot_at(res.first);
+        // inserted = res.second;
+        auto iter = lazy_emplace_with_hash(key, hashval, [&](const auto & ctor) {
+            inserted = true;
+            ctor(key, nullptr);
+        });
+        it = iter.getPtr();
     }
 
     LookupResult ALWAYS_INLINE find(const KeyType & key, size_t hashval)
