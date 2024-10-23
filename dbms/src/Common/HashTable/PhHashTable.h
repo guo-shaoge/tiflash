@@ -31,6 +31,8 @@ public:
     using Base::find_or_prepare_insert;
     using Base::find_impl;
 
+    PhHashTable() = default;
+
     template <typename KeyHolder>
     void ALWAYS_INLINE emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted)
     {
