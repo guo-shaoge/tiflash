@@ -117,7 +117,14 @@ public:
     {
         if constexpr (Source::isPhMap)
         {
-            // TODO
+            src.forEachValue([&](const auto & key, auto & mapped) {
+                LookupResult it;
+                bool inserted;
+                this->emplace(key, it, inserted);
+
+                if (inserted)
+                    it->second = mapped;
+            });
         }
         else
         {
