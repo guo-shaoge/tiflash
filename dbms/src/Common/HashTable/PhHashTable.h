@@ -31,6 +31,8 @@ public:
     using Base::find_or_prepare_insert;
     using Base::find_impl;
     using Base::hash;
+    using Base::lazy_emplace;
+    using Base::lazy_emplace_with_hash;
 
     ALWAYS_INLINE inline size_t getHash(const KeyType & key) const
     {
@@ -41,18 +43,22 @@ public:
     ALWAYS_INLINE inline void emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted)
     {
         const auto & key = keyHolderGetKey(key_holder);
-        auto res = find_or_prepare_insert(key);
-        it = slot_at(res.first);
-        inserted = res.second;
+        auto iter = lazy_emplace(key, [&](const auto & ctor) { // TODO init inserted as false
+            inserted = true;
+            ctor(key, nullptr);
+        });
+        it = iter.getPtr();
     }
 
     template <typename KeyHolder>
     ALWAYS_INLINE inline void emplace(KeyHolder && key_holder, size_t hashval, LookupResult & it, bool & inserted)
     {
         const auto & key = keyHolderGetKey(key_holder);
-        auto res = this->find_or_prepare_insert(key, hashval);
-        it = slot_at(res.first);
-        inserted = res.second;
+        auto iter = lazy_emplace_with_hash(key, hashval, [&](const auto & ctor) {
+            inserted = true;
+            ctor(key, nullptr);
+        });
+        it = iter.getPtr();
     }
 
     ALWAYS_INLINE inline LookupResult find(const KeyType & key, size_t hashval)
