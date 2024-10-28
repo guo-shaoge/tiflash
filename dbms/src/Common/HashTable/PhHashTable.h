@@ -79,6 +79,7 @@ public:
     using Base::hash;
     using Base::lazy_emplace_with_hash;
     using Base::prefetch;
+    using Base::prefetch_hash;
     using Base::size;
     using Base::capacity;
     using Base::slot_at;

@@ -56,7 +56,8 @@ protected:
 public:
     using Impl = ImplTable;
     static constexpr bool isPhMap = ImplTable::isPhMap;
-    static constexpr bool isNestedMap = true;
+    // TODO
+    static constexpr bool isNestedMap = false;
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;
@@ -272,6 +273,11 @@ public:
         return res;
     }
 
+    void ALWAYS_INLINE inline prefetch_hash(size_t hashval) const // NOLINT
+    {
+        size_t bucket = getBucketFromHash(hashval);
+        impls[bucket].prefetch_hash(hashval);
+    }
 
     /** Insert the key,
       * return an iterator to a position that can be used for `placement new` of value,
