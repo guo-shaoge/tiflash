@@ -18,11 +18,13 @@
 #include <Common/Stopwatch.h>
 #include <Common/ThresholdUtils.h>
 #include <Common/typeid_cast.h>
+#include <Common/Stopwatch.h>
 #include <DataStreams/AggHashTableToBlocksBlockInputStream.h>
 #include <DataStreams/materializeBlock.h>
 #include <DataTypes/DataTypeAggregateFunction.h>
 #include <DataTypes/DataTypeNullable.h>
 #include <Interpreters/Aggregator.h>
+#include <ext/scope_guard.h>
 
 #include <array>
 #include <cassert>
@@ -198,6 +200,11 @@ void AggregatedDataVariants::setResizeCallbackIfNeeded(size_t thread_num) const
 
 void AggregatedDataVariants::convertToTwoLevel()
 {
+    Stopwatch watch;
+    SCOPE_EXIT({
+        watch.stop();
+        LOG_DEBUG(aggregator->log, "Converting two level dura: {} ms", watch.elapsedMilliseconds());
+    });
     switch (type)
     {
 #define M(NAME)                                                                           \
@@ -2312,6 +2319,29 @@ MergingBucketsPtr Aggregator::mergeAndConvertToBlocks(
                 variant->convertToTwoLevel();
 
     AggregatedDataVariantsPtr & first = non_empty_data[0];
+
+    if (has_at_least_one_two_level)
+    {
+#define M(NAME)                                                                           \
+    case AggregationMethodType(NAME):                                                     \
+    {                                                                                     \
+        for (size_t i = 0; i < non_empty_data.size(); ++i) { \
+            for (size_t bucket_idx = 0; bucket_idx < 256; ++bucket_idx) \
+            { \
+                auto size = getDataVariant<AggregationMethodName(NAME)>(*non_empty_data[i]).data.impls[bucket_idx].size(); \
+                LOG_DEBUG(log, "gjt debug non empty data: {}, bucket: {}, size: {}", i, bucket_idx, size); \
+            } \
+        }; \
+        break;                                                                            \
+    }
+    switch (first->type)
+    {
+        APPLY_FOR_VARIANTS_TWO_LEVEL(M)
+    default:
+        throw Exception("Unknown aggregated data variant.", ErrorCodes::UNKNOWN_AGGREGATED_DATA_VARIANT);
+    }
+#undef M
+    }
 
     for (size_t i = 1, size = non_empty_data.size(); i < size; ++i)
     {
