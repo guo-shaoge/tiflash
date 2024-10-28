@@ -37,13 +37,13 @@ struct MapSlotWithSavedHashType
         return x.second;
     }
 
-    size_t hashval;
     union
     {
         std::pair<const K, V> value;
         std::pair<K, V> mutable_value;
         K key;
     };
+    size_t hashval;
 };
 
 template <typename K, typename V>
