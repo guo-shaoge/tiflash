@@ -126,7 +126,8 @@ using AggregatedDataWithUInt64KeyPhMap = PhHashMap<UInt64, AggregateDataPtr>;
 
 using AggregatedDataWithShortStringKeyPhMap = PhStringHashMap<AggregateDataPtr>;
 // TODO DefPhHash for StringRef
-using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
+// using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
+using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
 
 // TODO hasher ok with Int256? for now use HashCRC32???
 using AggregatedDataWithInt256KeyPhMap = PhHashTable<Int256, AggregateDataPtr, HashCRC32<Int256>>;
@@ -142,7 +143,8 @@ using AggregatedDataWithUInt64KeyTwoLevelPhMap = TwoLevelPhHashMap<UInt64, Aggre
 using AggregatedDataWithInt256KeyTwoLevelPhMap = TwoLevelPhHashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
 
 using AggregatedDataWithShortStringKeyTwoLevelPhMap = TwoLevelPhStringHashMap<AggregateDataPtr>;
-using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
+// using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
+using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
 
 using AggregatedDataWithKeys128TwoLevelPhMap = TwoLevelPhHashMap<UInt128, AggregateDataPtr>;
 using AggregatedDataWithKeys256TwoLevelPhMap = TwoLevelPhHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
