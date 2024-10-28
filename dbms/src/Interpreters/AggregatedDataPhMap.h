@@ -19,12 +19,24 @@
 
 template <typename Key>
 using DefPhHash = PhHash<Key, PhHashSeed1>;
-// TODO
+// TODO move to HashMap.h
 template <typename Key, typename Mapped, typename Hash = DefPhHash<Key>>
 using PhHashMap = PhHashTable<Key, Mapped, Hash>;
 
 template <typename Key, typename Mapped, typename Hash = DefPhHash<Key>>
 using PhHashMapWithSavedHash = PhHashTableWithSavedHash<Key, Mapped, Hash>;
+
+// TODO move to StringRef.h
+template <PhHashSeed seed>
+struct StringRefPhHash
+{
+    size_t operator()(const StringRef & string_ref) const
+    {
+        // TODO: why not just pos and size.
+        return PhHashMixSeed<sizeof(size_t), seed>()(std::hash<std::string_view>()(
+                    std::string_view{string_ref.data, string_ref.size}));
+    }
+};
 
 // template parameter of Hash/Grower/Allocator will be ignored for phmap.
 template <
@@ -114,7 +126,7 @@ using AggregatedDataWithUInt64KeyPhMap = PhHashMap<UInt64, AggregateDataPtr>;
 
 using AggregatedDataWithShortStringKeyPhMap = PhStringHashMap<AggregateDataPtr>;
 // TODO DefPhHash for StringRef
-using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
+using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
 
 // TODO hasher ok with Int256? for now use HashCRC32???
 using AggregatedDataWithInt256KeyPhMap = PhHashTable<Int256, AggregateDataPtr, HashCRC32<Int256>>;
@@ -130,7 +142,7 @@ using AggregatedDataWithUInt64KeyTwoLevelPhMap = TwoLevelPhHashMap<UInt64, Aggre
 using AggregatedDataWithInt256KeyTwoLevelPhMap = TwoLevelPhHashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
 
 using AggregatedDataWithShortStringKeyTwoLevelPhMap = TwoLevelPhStringHashMap<AggregateDataPtr>;
-using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
+using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
 
 using AggregatedDataWithKeys128TwoLevelPhMap = TwoLevelPhHashMap<UInt128, AggregateDataPtr>;
 using AggregatedDataWithKeys256TwoLevelPhMap = TwoLevelPhHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
