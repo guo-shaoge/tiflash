@@ -86,12 +86,32 @@ constexpr const inline char empty_string_ref_addr{};
 
 using StringRefs = std::vector<StringRef>;
 
+  template <typename T>
+  typename std::enable_if<sizeof(T) == 1, bool>::type memequal_padded(const T* p1, size_t size1, const T* p2,
+                                                                      size_t size2) {
+      if (size1 != size2) {
+          return false;
+      }
+      for (size_t offset = 0; offset < size1; offset += 16) {
+          uint16_t mask =
+                  _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_loadu_si128(reinterpret_cast<const __m128i*>(p1 + offset)),
+                                                   _mm_loadu_si128(reinterpret_cast<const __m128i*>(p2 + offset))));
+          mask = ~mask;
+          if (mask) {
+              offset += __builtin_ctz(mask);
+              return offset >= size1;
+          }
+      }
+      return true;
+  }
+
 // According to https://github.com/pingcap/tiflash/pull/5658
 // - if size of memory area is bigger than 1M, instructions about avx512 may begin to get better results
 // - otherwise, use `mem_utils::avx2_mem_equal`(under x86-64 with avx2)
 inline bool operator==(StringRef lhs, StringRef rhs)
 {
-    return mem_utils::IsStrViewEqual({lhs}, {rhs});
+    // return mem_utils::IsStrViewEqual({lhs}, {rhs});
+    return memequal_padded(lhs.data, lhs.size, rhs.data, rhs.size);
 }
 
 inline bool operator!=(StringRef lhs, StringRef rhs)
