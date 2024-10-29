@@ -17,6 +17,27 @@
 #include <Common/HashTable/PhHashTable.h>
 #include <Interpreters/Aggregator.h>
 
+// https://github.com/HowardHinnant/hash_append/issues/7
+template <typename T>
+inline void hash_combine(uint64_t& seed, const T& val) {
+    seed ^= std::hash<T>{}(val) + 0x9e3779b97f4a7c15LLU + (seed << 12) + (seed >> 4);
+}
+
+inline uint64_t hash_128(uint64_t seed, Int128 val) {
+    auto low = static_cast<size_t>(val);
+    auto high = static_cast<size_t>(val >> 64);
+    hash_combine(seed, low);
+    hash_combine(seed, high);
+    return seed;
+}
+
+template <PhHashSeed seed>
+struct Hash128WithSeed {
+    std::size_t operator()(UInt128 value) const {
+        return PhHashMixSeed<sizeof(size_t), seed>()(hash_128(seed, static_cast<Int128>(value)));
+    }
+};
+
 template <typename Key>
 using DefPhHash = PhHash<Key, PhHashSeed1>;
 // TODO move to HashMap.h
@@ -132,7 +153,7 @@ using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, Aggre
 // TODO hasher ok with Int256? for now use HashCRC32???
 using AggregatedDataWithInt256KeyPhMap = PhHashTable<Int256, AggregateDataPtr, HashCRC32<Int256>>;
 
-using AggregatedDataWithKeys128PhMap = PhHashMap<UInt128, AggregateDataPtr>;
+using AggregatedDataWithKeys128PhMap = PhHashMap<UInt128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
 using AggregatedDataWithKeys256PhMap = PhHashTable<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
 // using AggregatedDataWithKeys128 = HashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 // using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
@@ -146,7 +167,7 @@ using AggregatedDataWithShortStringKeyTwoLevelPhMap = TwoLevelPhStringHashMap<Ag
 // using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
 using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
 
-using AggregatedDataWithKeys128TwoLevelPhMap = TwoLevelPhHashMap<UInt128, AggregateDataPtr>;
+using AggregatedDataWithKeys128TwoLevelPhMap = TwoLevelPhHashMap<UInt128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
 using AggregatedDataWithKeys256TwoLevelPhMap = TwoLevelPhHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
 
 // TODO hash is not good
