@@ -33,8 +33,8 @@ inline uint64_t hash_128(uint64_t seed, Int128 val) {
 
 template <PhHashSeed seed>
 struct Hash128WithSeed {
-    std::size_t operator()(UInt128 value) const {
-        return PhHashMixSeed<sizeof(size_t), seed>()(hash_128(seed, static_cast<Int128>(value)));
+    std::size_t operator()(const Int128 & value) const {
+        return PhHashMixSeed<sizeof(size_t), seed>()(hash_128(seed, value));
     }
 };
 
@@ -153,7 +153,7 @@ using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, Aggre
 // TODO hasher ok with Int256? for now use HashCRC32???
 using AggregatedDataWithInt256KeyPhMap = PhHashTable<Int256, AggregateDataPtr, HashCRC32<Int256>>;
 
-using AggregatedDataWithKeys128PhMap = PhHashMap<UInt128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
+using AggregatedDataWithKeys128PhMap = PhHashMap<Int128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
 using AggregatedDataWithKeys256PhMap = PhHashTable<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
 // using AggregatedDataWithKeys128 = HashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 // using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
@@ -167,7 +167,7 @@ using AggregatedDataWithShortStringKeyTwoLevelPhMap = TwoLevelPhStringHashMap<Ag
 // using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
 using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
 
-using AggregatedDataWithKeys128TwoLevelPhMap = TwoLevelPhHashMap<UInt128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
+using AggregatedDataWithKeys128TwoLevelPhMap = TwoLevelPhHashMap<Int128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
 using AggregatedDataWithKeys256TwoLevelPhMap = TwoLevelPhHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
 
 // TODO hash is not good
