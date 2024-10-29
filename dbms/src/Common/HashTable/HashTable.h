@@ -1055,6 +1055,20 @@ public:
         return const_cast<std::decay_t<decltype(*this)> *>(this)->find(x, hash_value);
     }
 
+    void prefetch_hash(size_t hashval) const
+    {
+        (void)hashval;
+#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
+        // size_t place_value = findCell(key, hashval, grower.place(hashval));
+        size_t place_value = grower.place(hashval);
+        _mm_prefetch((const char*)(&buf[place_value], _MM_HINT_NTA);
+#elif defined(__GNUC__)
+        // size_t place_value = findCell(key, hashval, grower.place(hashval));
+        size_t place_value = grower.place(hashval);
+        __builtin_prefetch(static_cast<const void*>(&buf[place_value]));
+#endif // __GNUC__
+    }
+
     std::enable_if_t<Grower::performs_linear_probing_with_single_step, bool> ALWAYS_INLINE erase(const Key & x)
     {
         return erase(x, hash(x));

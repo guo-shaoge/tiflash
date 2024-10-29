@@ -296,6 +296,7 @@ public:
     }
 
 
+    void prefetch_hash(size_t) {}
     iterator ALWAYS_INLINE find(Key x) { return iteratorTo(findCell(x)); }
     const_iterator ALWAYS_INLINE find(Key x) const { return iteratorTo(findCell(x)); }
 

@@ -380,6 +380,8 @@ public:
         return res;
     }
 
+    void prefetch_hash(size_t) const {}
+
     LookupResult ALWAYS_INLINE find(const Key & x) { return !buf[x].isZero(*this) ? &buf[x] : nullptr; }
 
     ConstLookupResult ALWAYS_INLINE find(const Key & x) const
