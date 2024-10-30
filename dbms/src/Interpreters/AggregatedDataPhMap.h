@@ -17,6 +17,119 @@
 #include <Common/HashTable/PhHashTable.h>
 #include <Interpreters/Aggregator.h>
 
+template <typename T>
+inline T unaligned_load(const void* p) {
+    T res{};
+    memcpy(&res, p, sizeof(res));
+    return res;
+}
+
+inline uint32_t crc_hash_32(const void* data, int32_t bytes, uint32_t hash) {
+#if defined(__x86_64__) && !defined(__SSE4_2__)
+    return static_cast<uint32_t>(crc32(hash, (const unsigned char*)data, bytes));
+#else
+    uint32_t words = bytes / sizeof(uint32_t);
+    bytes = bytes % 4 /*sizeof(uint32_t)*/;
+
+    auto* p = reinterpret_cast<const uint8_t*>(data);
+
+    while (words--) {
+#if defined(__x86_64__)
+        hash = _mm_crc32_u32(hash, unaligned_load<uint32_t>(p));
+#elif defined(__aarch64__)
+        hash = __crc32cw(hash, unaligned_load<uint32_t>(p));
+#else
+#error "Not supported architecture"
+#endif
+        p += sizeof(uint32_t);
+    }
+
+    while (bytes--) {
+#if defined(__x86_64__)
+        hash = _mm_crc32_u8(hash, *p);
+#elif defined(__aarch64__)
+        hash = __crc32cb(hash, *p);
+#else
+#error "Not supported architecture"
+#endif
+        ++p;
+    }
+
+    // The lower half of the CRC hash has has poor uniformity, so swap the halves
+    // for anyone who only uses the first several bits of the hash.
+    hash = (hash << 16u) | (hash >> 16u);
+    return hash;
+#endif
+}
+
+inline uint64_t crc_hash_64(const void* data, int32_t length, uint64_t hash) {
+#if defined(__x86_64__) && !defined(__SSE4_2__)
+    return crc32(hash, (const unsigned char*)data, length);
+#else
+    if (unlikely (length < 8)) {
+        return crc_hash_32(data, length, static_cast<uint32_t>(hash));
+    }
+
+    uint64_t words = length / sizeof(uint64_t);
+    auto* p = reinterpret_cast<const uint8_t*>(data);
+    auto* end = reinterpret_cast<const uint8_t*>(data) + length;
+    while (words--) {
+#if defined(__x86_64__) && defined(__SSE4_2__)
+        hash = _mm_crc32_u64(hash, unaligned_load<uint64_t>(p));
+#elif defined(__aarch64__)
+        hash = __crc32cd(hash, unaligned_load<uint64_t>(p));
+#else
+#error "Not supported architecture"
+#endif
+        p += sizeof(uint64_t);
+    }
+    // Reduce the branch condition
+    p = end - 8;
+#if defined(__x86_64__)
+    hash = _mm_crc32_u64(hash, unaligned_load<uint64_t>(p));
+#elif defined(__aarch64__)
+    hash = __crc32cd(hash, unaligned_load<uint64_t>(p));
+#else
+#error "Not supported architecture"
+#endif
+    p += sizeof(uint64_t);
+    return hash;
+#endif
+}
+
+// TODO: 0x811C9DC5 is not prime number
+static const uint32_t CRC_HASH_SEED1 = 0x811C9DC5;
+static const uint32_t CRC_HASH_SEED2 = 0x811C9DD7;
+
+class SliceHash {
+public:
+    std::size_t operator()(const StringRef& slice) const {
+        return crc_hash_64(slice.data, static_cast<int32_t>(slice.size), CRC_HASH_SEED1);
+    }
+};
+
+template <PhHashSeed>
+class SliceHashWithSeed {
+public:
+    std::size_t operator()(const StringRef& slice) const;
+};
+
+template <>
+class SliceHashWithSeed<PhHashSeed1> {
+public:
+    std::size_t operator()(const StringRef& slice) const {
+        return crc_hash_64(slice.data, static_cast<int32_t>(slice.size), CRC_HASH_SEED1);
+    }
+};
+
+template <>
+class SliceHashWithSeed<PhHashSeed2> {
+public:
+    std::size_t operator()(const StringRef& slice) const {
+        return crc_hash_64(slice.data, static_cast<int32_t>(slice.size), CRC_HASH_SEED2);
+    }
+};
+
 // https://github.com/HowardHinnant/hash_append/issues/7
 template <typename T>
 inline void hash_combine(uint64_t& seed, const T& val) {
@@ -148,7 +261,8 @@ using AggregatedDataWithUInt64KeyPhMap = PhHashMap<UInt64, AggregateDataPtr>;
 using AggregatedDataWithShortStringKeyPhMap = PhStringHashMap<AggregateDataPtr>;
 // TODO DefPhHash for StringRef
 // using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
-using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
+// using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
+using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 
 // TODO hasher ok with Int256? for now use HashCRC32???
 using AggregatedDataWithInt256KeyPhMap = PhHashTable<Int256, AggregateDataPtr, HashCRC32<Int256>>;
@@ -165,7 +279,8 @@ using AggregatedDataWithInt256KeyTwoLevelPhMap = TwoLevelPhHashMap<Int256, Aggre
 
 using AggregatedDataWithShortStringKeyTwoLevelPhMap = TwoLevelPhStringHashMap<AggregateDataPtr>;
 // using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, StringRefPhHash<PhHashSeed1>>;
-using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
+// using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
+using AggregatedDataWithStringKeyTwoLevelPhMap = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 
 using AggregatedDataWithKeys128TwoLevelPhMap = TwoLevelPhHashMap<Int128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
 using AggregatedDataWithKeys256TwoLevelPhMap = TwoLevelPhHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;

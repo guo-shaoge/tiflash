@@ -715,6 +715,37 @@ void NO_INLINE Aggregator::executeImpl(
     }
 }
 
+// template <typename Method>
+// void Aggregator::executeImplMethodStringByCol(Method & method, typename Method::State & state, Arena * pool, AggProcessInfo & agg_process_info)
+// {
+//     // TODO
+//     size_t one_row_max_len = 100;
+//     size_t rows = agg_process_info.end_row - agg_process_info.start_row;
+//     size_t batch_alloc_size = one_row_max_len * state;
+//     auto * buffer = pool->allocate(align16Bytes(rows * one_row_max_len));
+// 
+//     for (auto & key_column : state.key_columns)
+//     {
+//         key_column->batchSerialize(buffer, slize_sizes, agg_process_info.start_row, agg_process_info.end_row);
+//     }
+// 
+//     // todo prefetch code
+// 
+//     size_t offset = 0;
+//     for (size_t i = 0; i < rows; ++i)
+//     {
+//         StringRef key{buffer + offset, slice_sizes[i] - offset};
+//         auto iter = state.data.lazy_empalce_with_hash(key, hashval, [&](auto & ctor) {
+//                 // TODO batch allocator
+//             auto * agg_state = pool->alloc(total_size_of_aggregates, );
+//             ctor(key, agg_state);
+//         });
+//         places[i] = iter->second;
+//     }
+// 
+//     // todo handle places
+// }
+
 template <bool only_lookup, bool enable_prefetch, typename Method>
 std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> Aggregator::emplaceOrFindKey(
     Method & method,
