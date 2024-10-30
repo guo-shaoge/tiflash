@@ -26,6 +26,7 @@ struct ThreadData
 {
     size_t src_rows = 0;
     size_t src_bytes = 0;
+    size_t build_ns = 0;
 
     Aggregator::AggProcessInfo agg_process_info;
     explicit ThreadData(Aggregator * aggregator)
@@ -40,6 +41,15 @@ public:
     explicit AggregateContext(const String & req_id)
         : log(Logger::get(req_id))
     {}
+
+    ~AggregateContext()
+    {
+        for (size_t i = 0; i < threads_data.size(); ++i)
+        {
+            LOG_DEBUG(Logger::get(), "gjt debug agg context timer: i: {}, build: {}, convert: {}",
+                    i, threads_data[i]->build_ns, convert_ns);
+        }
+    }
 
     void initBuild(
         const Aggregator::Params & params,
@@ -126,6 +136,8 @@ private:
     const LoggerPtr log;
 
     std::optional<Stopwatch> build_watch;
+
+    UInt64 convert_ns = 0;
 };
 
 using AggregateContextPtr = std::shared_ptr<AggregateContext>;

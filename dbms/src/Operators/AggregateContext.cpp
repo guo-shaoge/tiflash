@@ -51,7 +51,9 @@ void AggregateContext::initBuild(
 void AggregateContext::buildOnLocalData(size_t task_index)
 {
     auto & agg_process_info = threads_data[task_index]->agg_process_info;
-    aggregator->executeOnBlock(agg_process_info, *many_data[task_index], task_index);
+    Stopwatch watch;
+    aggregator->executeOnBlock(agg_process_info, *many_data[task_index], task_index, &watch);
+    threads_data[task_index]->build_ns += watch.elapsed();
     if likely (agg_process_info.allBlockDataHandled())
     {
         threads_data[task_index]->src_bytes += agg_process_info.block.bytes();
@@ -168,7 +170,8 @@ void AggregateContext::initConvergentPrefix()
     {
         auto & agg_process_info = threads_data[0]->agg_process_info;
         agg_process_info.resetBlock(this->getSourceHeader());
-        aggregator->executeOnBlock(agg_process_info, *many_data[0], 0);
+        Stopwatch watch;
+        aggregator->executeOnBlock(agg_process_info, *many_data[0], 0, &watch);
         /// Since this won't consume a lot of memory,
         /// even if it triggers marking need spill due to a low threshold setting,
         /// it's still reasonable not to spill disk.
@@ -212,7 +215,10 @@ Block AggregateContext::readForConvergent(size_t index)
     assert(status.load() == AggStatus::convergent);
     if unlikely (!merging_buckets)
         return {};
-    return merging_buckets->getData(index);
+    Stopwatch watch;
+    auto block = merging_buckets->getData(index, &watch);
+    convert_ns += watch.elapsed();
+    return block;
 }
 
 bool AggregateContext::hasAtLeastOneTwoLevel()

@@ -20,6 +20,7 @@
 #include <Columns/ColumnString.h>
 #include <Columns/ColumnVector.h>
 #include <Common/Arena.h>
+#include <Common/Stopwatch.h>
 #include <Common/ColumnsHashing.h>
 #include <Common/Decimal.h>
 #include <Common/HashTable/FixedHashMap.h>
@@ -1380,7 +1381,7 @@ public:
 
     Block getHeader() const;
 
-    Block getData(size_t concurrency_index);
+    Block getData(size_t concurrency_index, Stopwatch * watch = nullptr);
 
     size_t getConcurrency() const { return concurrency; }
 
@@ -1577,7 +1578,7 @@ public:
     };
 
     /// Process one block. Return false if the processing should be aborted.
-    bool executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num);
+    bool executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num, Stopwatch * watch = nullptr);
     bool executeOnBlockCollectHitRate(
         AggProcessInfo & agg_process_info,
         AggregatedDataVariants & result,
@@ -1588,7 +1589,7 @@ public:
         size_t thread_num);
 
     template <bool collect_hit_rate, bool only_lookup>
-    bool executeOnBlockImpl(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num);
+    bool executeOnBlockImpl(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num, Stopwatch & watch);
 
     /** Merge several aggregation data structures and output the MergingBucketsPtr used to merge.
       * Return nullptr if there are no non empty data_variant.
@@ -1689,7 +1690,8 @@ protected:
         Method & method,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        TiDB::TiDBCollators & collators) const;
+        TiDB::TiDBCollators & collators,
+        Stopwatch & watch) const;
 
     template <bool collect_hit_rate, bool only_loopup, bool enable_prefetch, typename Method>
     void executeImplBatch(

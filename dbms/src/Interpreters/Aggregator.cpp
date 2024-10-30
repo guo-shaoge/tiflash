@@ -694,41 +694,46 @@ void Aggregator::createAggregateStates(AggregateDataPtr & aggregate_data) const
   */
 template <bool collect_hit_rate, bool only_lookup, typename Method>
 void NO_INLINE Aggregator::executeImpl(
-    AggregatedDataVariants::Type type,
+    AggregatedDataVariants::Type ,
     Method & method,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
-    TiDB::TiDBCollators & collators) const
+    TiDB::TiDBCollators & collators,
+    Stopwatch & watch) const
 {
+    watch.restart();
+    SCOPE_EXIT({
+        watch.stop();
+    });
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
     // TODO two level map prefetch
     if constexpr (!Method::Data::isNestedMap)
     {
-        if constexpr (Method::Data::isPhMap && Method::test_serialized)
-        {
-            if (type == AggregatedDataVariants::Type::serialized)
-            {
-                if (method.data.getBufferSizeInCells() < 8192)
-                    executeImplMethodStringByCol<false>(method, state, agg_process_info.key_columns, aggregates_pool, agg_process_info);
-                else
-                    executeImplMethodStringByCol<true>(method, state, agg_process_info.key_columns, aggregates_pool, agg_process_info);
-            }
-            else
-            {
-                if (method.data.getBufferSizeInCells() < 8192)
-                    executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-                else
-                    executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
-            }
-        }
-        else
-        {
+        // if constexpr (Method::Data::isPhMap && Method::test_serialized)
+        // {
+        //     if (type == AggregatedDataVariants::Type::serialized)
+        //     {
+        //         if (method.data.getBufferSizeInCells() < 8192)
+        //             executeImplMethodStringByCol<false>(method, state, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+        //         else
+        //             executeImplMethodStringByCol<true>(method, state, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+        //     }
+        //     else
+        //     {
+        //         if (method.data.getBufferSizeInCells() < 8192)
+        //             executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+        //         else
+        //             executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+        //     }
+        // }
+        // else
+        // {
             if (method.data.getBufferSizeInCells() < 8192)
                 executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
             else
                 executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
-        }
+        // }
     }
     else
     {
@@ -1145,9 +1150,15 @@ void Aggregator::AggProcessInfo::prepareForAgg()
     prepare_for_agg_done = true;
 }
 
-bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num)
+bool Aggregator::executeOnBlock(AggProcessInfo & agg_process_info, AggregatedDataVariants & result, size_t thread_num, Stopwatch * watch)
 {
-    return executeOnBlockImpl<false, false>(agg_process_info, result, thread_num);
+    if (watch != nullptr)
+        return executeOnBlockImpl<false, false>(agg_process_info, result, thread_num, *watch);
+    else
+    {
+        Stopwatch tmp_watch;
+        return executeOnBlockImpl<false, false>(agg_process_info, result, thread_num, tmp_watch);
+    }
 }
 
 bool Aggregator::executeOnBlockCollectHitRate(
@@ -1155,7 +1166,8 @@ bool Aggregator::executeOnBlockCollectHitRate(
     AggregatedDataVariants & result,
     size_t thread_num)
 {
-    return executeOnBlockImpl<true, false>(agg_process_info, result, thread_num);
+    Stopwatch watch;
+    return executeOnBlockImpl<true, false>(agg_process_info, result, thread_num, watch);
 }
 
 bool Aggregator::executeOnBlockOnlyLookup(
@@ -1163,14 +1175,16 @@ bool Aggregator::executeOnBlockOnlyLookup(
     AggregatedDataVariants & result,
     size_t thread_num)
 {
-    return executeOnBlockImpl<false, true>(agg_process_info, result, thread_num);
+    Stopwatch watch;
+    return executeOnBlockImpl<false, true>(agg_process_info, result, thread_num, watch);
 }
 
 template <bool collect_hit_rate, bool only_lookup>
 bool Aggregator::executeOnBlockImpl(
     AggProcessInfo & agg_process_info,
     AggregatedDataVariants & result,
-    size_t thread_num)
+    size_t thread_num,
+    Stopwatch & watch)
 {
     assert(!result.need_spill);
 
@@ -1220,7 +1234,7 @@ bool Aggregator::executeOnBlockImpl(
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
-            params.collators);                                             \
+            params.collators, watch);                                             \
         break;                                                             \
     }
 
@@ -2933,8 +2947,17 @@ Block MergingBuckets::getHeader() const
     return aggregator.getHeader(final);
 }
 
-Block MergingBuckets::getData(size_t concurrency_index)
+Block MergingBuckets::getData(size_t concurrency_index, Stopwatch * watch)
 {
+    Stopwatch tmp_watch;
+    if unlikely (watch == nullptr)
+    {
+        watch = &tmp_watch;
+    }
+    watch->restart();
+    SCOPE_EXIT({
+        watch->stop();
+    });
     assert(concurrency_index < concurrency);
 
     if (unlikely(data.empty()))
