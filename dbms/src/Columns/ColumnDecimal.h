@@ -145,6 +145,32 @@ public:
         const TiDB::TiDBCollatorPtr &,
         String &) const override;
     const char * deserializeAndInsertFromArena(const char * pos, const TiDB::TiDBCollatorPtr &) override;
+
+    void batchSerialize(
+            char * buffer,
+            size_t max_one_row_size,
+            std::vector<size_t> & slice_sizes) const override
+    {
+        if constexpr (is_Decimal256)
+        {
+            RUNTIME_CHECK_MSG(false, "serializeValueIntoArena not support for Decimal256");
+        }
+        else
+        {
+            for (size_t i = 0; i < size(); ++i)
+            {
+                char * pos = buffer + max_one_row_size * i + slice_sizes[i];
+                memcpy(pos, &data[i], sizeof(T));
+                slice_sizes[i] += sizeof(T);
+            }
+        }
+    }
+
+    size_t getMaxOneRowSerializeSize() const override
+    {
+        return sizeof(T);
+    }
+
     void updateHashWithValue(size_t n, SipHash & hash, const TiDB::TiDBCollatorPtr &, String &) const override;
     void updateHashWithValues(IColumn::HashValues & hash_values, const TiDB::TiDBCollatorPtr &, String &)
         const override;

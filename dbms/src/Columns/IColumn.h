@@ -197,6 +197,19 @@ public:
       */
     virtual void popBack(size_t n) = 0;
 
+    virtual void batchSerialize(
+            char *,
+            size_t,
+            std::vector<size_t> &) const
+    {
+        RUNTIME_CHECK_MSG(false, "{} doesn't support batchSerialize", getName());
+    }
+
+    virtual size_t getMaxOneRowSerializeSize() const
+    {
+        RUNTIME_CHECK_MSG(false, "{} doesn't support getMaxOneRowSerializeSize", getName());
+    }
+
     /** Serializes n-th element. Serialized element should be placed continuously inside Arena's memory.
       * Serialized value can be deserialized to reconstruct original object. Is used in aggregation.
       * The method is similar to getDataAt(), but can work when element's value cannot be mapped to existing continuous memory chunk,

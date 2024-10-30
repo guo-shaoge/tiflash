@@ -694,6 +694,7 @@ void Aggregator::createAggregateStates(AggregateDataPtr & aggregate_data) const
   */
 template <bool collect_hit_rate, bool only_lookup, typename Method>
 void NO_INLINE Aggregator::executeImpl(
+    AggregatedDataVariants::Type type,
     Method & method,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
@@ -704,10 +705,30 @@ void NO_INLINE Aggregator::executeImpl(
     // TODO two level map prefetch
     if constexpr (!Method::Data::isNestedMap)
     {
-        if (method.data.getBufferSizeInCells() < 8192)
-            executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+        if constexpr (Method::Data::isPhMap && Method::test_serialized)
+        {
+            if (type == AggregatedDataVariants::Type::serialized)
+            {
+                if (method.data.getBufferSizeInCells() < 8192)
+                    executeImplMethodStringByCol<false>(method, state, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+                else
+                    executeImplMethodStringByCol<true>(method, state, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+            }
+            else
+            {
+                if (method.data.getBufferSizeInCells() < 8192)
+                    executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+                else
+                    executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+            }
+        }
         else
-            executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+        {
+            if (method.data.getBufferSizeInCells() < 8192)
+                executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+            else
+                executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+        }
     }
     else
     {
@@ -715,36 +736,80 @@ void NO_INLINE Aggregator::executeImpl(
     }
 }
 
-// template <typename Method>
-// void Aggregator::executeImplMethodStringByCol(Method & method, typename Method::State & state, Arena * pool, AggProcessInfo & agg_process_info)
-// {
-//     // TODO
-//     size_t one_row_max_len = 100;
-//     size_t rows = agg_process_info.end_row - agg_process_info.start_row;
-//     size_t batch_alloc_size = one_row_max_len * state;
-//     auto * buffer = pool->allocate(align16Bytes(rows * one_row_max_len));
-// 
-//     for (auto & key_column : state.key_columns)
-//     {
-//         key_column->batchSerialize(buffer, slize_sizes, agg_process_info.start_row, agg_process_info.end_row);
-//     }
-// 
-//     // todo prefetch code
-// 
-//     size_t offset = 0;
-//     for (size_t i = 0; i < rows; ++i)
-//     {
-//         StringRef key{buffer + offset, slice_sizes[i] - offset};
-//         auto iter = state.data.lazy_empalce_with_hash(key, hashval, [&](auto & ctor) {
-//                 // TODO batch allocator
-//             auto * agg_state = pool->alloc(total_size_of_aggregates, );
-//             ctor(key, agg_state);
-//         });
-//         places[i] = iter->second;
-//     }
-// 
-//     // todo handle places
-// }
+template <bool enable_prefetch, typename Method>
+void Aggregator::executeImplMethodStringByCol(Method & method,
+        typename Method::State &,
+        const ColumnRawPtrs & key_columns,
+        Arena * pool,
+        AggProcessInfo & agg_process_info) const
+{
+    size_t max_one_row_size = 8;
+    for (const auto & key_column : key_columns)
+    {
+        max_one_row_size += key_column->getMaxOneRowSerializeSize();
+    }
+
+    size_t rows = agg_process_info.end_row - agg_process_info.start_row;
+    auto * buffer = pool->alignedAlloc(rows * max_one_row_size, 16);
+    std::vector<size_t> slice_sizes(rows, 0);
+
+    for (const auto & key_column : key_columns)
+    {
+        key_column->batchSerialize(buffer, max_one_row_size, slice_sizes);
+    }
+
+    std::vector<AggregateDataPtr> places(rows, nullptr);
+    if constexpr (enable_prefetch)
+    {
+        std::vector<size_t> hashvals(rows, 0);
+        size_t offset = 0;
+        for (size_t i = 0; i < rows; ++i)
+        {
+            const auto key = StringRef{buffer + offset, slice_sizes[i] - offset};
+            offset = slice_sizes[i];
+            hashvals[i] = method.data.hash(key);
+        }
+
+        offset = 0;
+        for (size_t i = 0; i < rows; ++i)
+        {
+            StringRef key{buffer + offset, slice_sizes[i] - offset};
+            offset = slice_sizes[i];
+            auto iter = method.data.lazy_emplace_with_hash(key, hashvals[i], [&](const auto & ctor) {
+                auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                ctor(key, agg_state);
+            });
+            places[i] = iter->second;
+        }
+    }
+    else
+    {
+        size_t offset = 0;
+        for (size_t i = 0; i < rows; ++i)
+        {
+            StringRef key{buffer + offset, slice_sizes[i] - offset};
+            offset = slice_sizes[i];
+            auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
+                auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                ctor(key, agg_state);
+            });
+            places[i] = iter->second;
+        }
+    }
+
+    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
+            ++inst)
+    {
+        inst->batch_that->addBatch(
+                agg_process_info.start_row,
+                rows,
+                &places[0],
+                inst->state_offset,
+                inst->batch_arguments,
+                pool);
+    }
+    agg_process_info.start_row = rows;
+}
 
 template <bool only_lookup, bool enable_prefetch, typename Method>
 std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> Aggregator::emplaceOrFindKey(
@@ -1151,6 +1216,7 @@ bool Aggregator::executeOnBlockImpl(
     case AggregationMethodType(NAME):                                      \
     {                                                                      \
         executeImpl<collect_hit_rate, only_lookup>(                        \
+            result.type, \
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \

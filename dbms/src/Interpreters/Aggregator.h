@@ -49,10 +49,31 @@ namespace ErrorCodes
 extern const int UNKNOWN_AGGREGATED_DATA_VARIANT;
 }
 
-class IBlockOutputStream;
-template <typename Method>
-class AggHashTableToBlocksBlockInputStream;
-
+// class IBlockOutputStream;
+// template <typename Method>
+// class AggHashTableToBlocksBlockInputStream;
+// 
+// struct AggregateStatesBatchAllocator
+// {
+//     const size_t batch_size = 1024;
+//     size_t one_agg_state_size = 0;
+// 
+//     std::vector<std::pair<void *, size_t>> batch_agg_states;
+//     Arena * aggregates_pool = nullptr;
+// 
+//     // todo fixed type
+//     AggregateDataPtr allocate()
+//     {
+//         if (batch_agg_states.empty() || batch_agg_states.back().second == batch_size)
+//         {
+//             auto * batch_agg_states_ptr = aggregates_pool->alloc(one_agg_state_size * batch_size);
+//             RUNTIME_CHECK(batch_agg_states_ptr);
+//             batch_agg_states.emplace_back(batch_agg_states_ptr, 0);
+//         }
+//         auto & last_ele = batch_agg_states.back();
+//         return static_cast<AggregateDataPtr>(last_ele.first) + last_ele.second++ * one_agg_state_size;
+//     }
+// };
 
 /** Different data structures that can be used for aggregation
   * For efficiency, the aggregation data itself is put into the pool.
@@ -126,6 +147,7 @@ struct AggregationMethodOneNumber
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
+    static constexpr bool test_serialized = false;
 
     Data data;
 
@@ -180,6 +202,7 @@ struct AggregationMethodString
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
+    static constexpr bool test_serialized = false;
 
     Data data;
 
@@ -228,6 +251,7 @@ struct AggregationMethodStringNoCache
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
+    static constexpr bool test_serialized = false;
 
     Data data;
 
@@ -277,6 +301,7 @@ struct AggregationMethodOneKeyStringNoCache
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
+    static constexpr bool test_serialized = false;
 
     Data data;
 
@@ -357,6 +382,7 @@ struct AggregationMethodFastPathTwoKeysNoCache
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
+    static constexpr bool test_serialized = false;
 
     Data data;
 
@@ -477,6 +503,7 @@ struct AggregationMethodFixedString
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
+    static constexpr bool test_serialized = false;
 
     Data data;
 
@@ -525,6 +552,7 @@ struct AggregationMethodFixedStringNoCache
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
+    static constexpr bool test_serialized = false;
 
     Data data;
 
@@ -574,6 +602,7 @@ struct AggregationMethodKeysFixed
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
     static constexpr bool has_nullable_keys = has_nullable_keys_;
+    static constexpr bool test_serialized = false;
 
     Data data;
 
@@ -681,6 +710,7 @@ struct AggregationMethodSerialized
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
+    static constexpr bool test_serialized = true;
 
     Data data;
 
@@ -1655,6 +1685,7 @@ protected:
     /// Process one data block, aggregate the data into a hash table.
     template <bool collect_hit_rate, bool only_lookup, typename Method>
     void executeImpl(
+        AggregatedDataVariants::Type type,
         Method & method,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
@@ -1666,6 +1697,13 @@ protected:
         typename Method::State & state,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info) const;
+    
+    template <bool enable_prefetch, typename Method>
+    void executeImplMethodStringByCol(Method & method,
+            typename Method::State & state,
+            const ColumnRawPtrs & key_columns,
+            Arena * pool,
+            AggProcessInfo & agg_process_info) const;
 
     template <bool only_lookup, bool enable_prefetch, typename Method>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(

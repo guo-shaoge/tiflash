@@ -77,6 +77,7 @@ public:
     using Base::empty;
     using Base::find_impl;
     using Base::hash;
+    using Base::lazy_emplace;
     using Base::lazy_emplace_with_hash;
     using Base::prefetch;
     using Base::prefetch_hash;

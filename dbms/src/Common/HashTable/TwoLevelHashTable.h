@@ -57,7 +57,7 @@ public:
     using Impl = ImplTable;
     static constexpr bool isPhMap = ImplTable::isPhMap;
     // TODO
-    static constexpr bool isNestedMap = false;
+    static constexpr bool isNestedMap = true;
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;
