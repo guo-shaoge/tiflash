@@ -158,7 +158,9 @@ template <typename Key, typename Mapped, typename Hash = DefPhHash<Key>>
 using PhHashMap = PhHashTable<Key, Mapped, Hash>;
 
 template <typename Key, typename Mapped, typename Hash = DefPhHash<Key>>
-using PhHashMapWithSavedHash = PhHashTableWithSavedHash<Key, Mapped, Hash>;
+// TODO no saved hash for phmap
+// using PhHashMapWithSavedHash = PhHashTableWithSavedHash<Key, Mapped, Hash>;
+using PhHashMapWithSavedHash = PhHashTable<Key, Mapped, Hash>;
 
 // TODO move to StringRef.h
 template <PhHashSeed seed>

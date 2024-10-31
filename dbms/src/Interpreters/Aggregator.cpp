@@ -442,54 +442,54 @@ AggregatedDataVariants::Type ChooseAggregationMethodFastPath(
 {
     std::array<AggFastPathType, 2> fast_path_types{};
 
-    if (keys_size == fast_path_types.max_size())
-    {
-        for (size_t i = 0; i < keys_size; ++i)
-        {
-            const auto & type = types_not_null[i];
-            if (type->isString())
-            {
-                if (collators.empty() || !collators[i])
-                {
-                    // use original way
-                    return AggregatedDataVariants::Type::serialized;
-                }
-                else
-                {
-                    switch (collators[i]->getCollatorType())
-                    {
-                    case TiDB::ITiDBCollator::CollatorType::UTF8MB4_BIN:
-                    case TiDB::ITiDBCollator::CollatorType::UTF8_BIN:
-                    case TiDB::ITiDBCollator::CollatorType::LATIN1_BIN:
-                    case TiDB::ITiDBCollator::CollatorType::ASCII_BIN:
-                    {
-                        fast_path_types[i] = AggFastPathType::StringBinPadding;
-                        break;
-                    }
-                    case TiDB::ITiDBCollator::CollatorType::BINARY:
-                    {
-                        fast_path_types[i] = AggFastPathType::StringBin;
-                        break;
-                    }
-                    default:
-                    {
-                        // for CI COLLATION, use original way
-                        return AggregatedDataVariants::Type::serialized;
-                    }
-                    }
-                }
-            }
-            else if (IsTypeNumber64(type))
-            {
-                fast_path_types[i] = AggFastPathType::Number64;
-            }
-            else
-            {
-                return AggregatedDataVariants::Type::serialized;
-            }
-        }
-        return ChooseAggregationMethodTwoKeys(fast_path_types.data());
-    }
+    // if (keys_size == fast_path_types.max_size())
+    // {
+    //     for (size_t i = 0; i < keys_size; ++i)
+    //     {
+    //         const auto & type = types_not_null[i];
+    //         if (type->isString())
+    //         {
+    //             if (collators.empty() || !collators[i])
+    //             {
+    //                 // use original way
+    //                 return AggregatedDataVariants::Type::serialized;
+    //             }
+    //             else
+    //             {
+    //                 switch (collators[i]->getCollatorType())
+    //                 {
+    //                 case TiDB::ITiDBCollator::CollatorType::UTF8MB4_BIN:
+    //                 case TiDB::ITiDBCollator::CollatorType::UTF8_BIN:
+    //                 case TiDB::ITiDBCollator::CollatorType::LATIN1_BIN:
+    //                 case TiDB::ITiDBCollator::CollatorType::ASCII_BIN:
+    //                 {
+    //                     fast_path_types[i] = AggFastPathType::StringBinPadding;
+    //                     break;
+    //                 }
+    //                 case TiDB::ITiDBCollator::CollatorType::BINARY:
+    //                 {
+    //                     fast_path_types[i] = AggFastPathType::StringBin;
+    //                     break;
+    //                 }
+    //                 default:
+    //                 {
+    //                     // for CI COLLATION, use original way
+    //                     return AggregatedDataVariants::Type::serialized;
+    //                 }
+    //                 }
+    //             }
+    //         }
+    //         else if (IsTypeNumber64(type))
+    //         {
+    //             fast_path_types[i] = AggFastPathType::Number64;
+    //         }
+    //         else
+    //         {
+    //             return AggregatedDataVariants::Type::serialized;
+    //         }
+    //     }
+    //     return ChooseAggregationMethodTwoKeys(fast_path_types.data());
+    // }
     return AggregatedDataVariants::Type::serialized;
 }
 
@@ -694,7 +694,7 @@ void Aggregator::createAggregateStates(AggregateDataPtr & aggregate_data) const
   */
 template <bool collect_hit_rate, bool only_lookup, typename Method>
 void NO_INLINE Aggregator::executeImpl(
-    AggregatedDataVariants::Type ,
+    AggregatedDataVariants::Type,
     Method & method,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
@@ -711,29 +711,28 @@ void NO_INLINE Aggregator::executeImpl(
     if constexpr (!Method::Data::isNestedMap)
     {
         // if constexpr (Method::Data::isPhMap && Method::test_serialized)
-        // {
-        //     if (type == AggregatedDataVariants::Type::serialized)
-        //     {
-        //         if (method.data.getBufferSizeInCells() < 8192)
-        //             executeImplMethodStringByCol<false>(method, state, agg_process_info.key_columns, aggregates_pool, agg_process_info);
-        //         else
-        //             executeImplMethodStringByCol<true>(method, state, agg_process_info.key_columns, aggregates_pool, agg_process_info);
-        //     }
-        //     else
-        //     {
-        //         if (method.data.getBufferSizeInCells() < 8192)
-        //             executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-        //         else
-        //             executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
-        //     }
-        // }
-        // else
-        // {
+        if constexpr (Method::test_serialized)
+        {
+            if constexpr (Method::Data::isPhMap)
+            {
+                // if (method.data.getBufferSizeInCells() < 8192)
+                //     executeImplMethodStringByCol<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+                // else
+                
+                executeImplMethodStringByCol<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+            }
+            else
+            {
+                executeImplMethodStringByColCKMap(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+            }
+        }
+        else
+        {
             if (method.data.getBufferSizeInCells() < 8192)
                 executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
             else
                 executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
-        // }
+        }
     }
     else
     {
@@ -742,13 +741,16 @@ void NO_INLINE Aggregator::executeImpl(
 }
 
 template <bool enable_prefetch, typename Method>
-void Aggregator::executeImplMethodStringByCol(Method & method,
+void Aggregator::executeImplMethodStringByCol(
+        Method & method,
         typename Method::State &,
+        TiDB::TiDBCollators & collators,
         const ColumnRawPtrs & key_columns,
         Arena * pool,
         AggProcessInfo & agg_process_info) const
 {
-    size_t max_one_row_size = 8;
+    LOG_DEBUG(log, "gjt debug executeImplMethodStringByCol");
+    size_t max_one_row_size = 0;
     for (const auto & key_column : key_columns)
     {
         max_one_row_size += key_column->getMaxOneRowSerializeSize();
@@ -757,31 +759,33 @@ void Aggregator::executeImplMethodStringByCol(Method & method,
     size_t rows = agg_process_info.end_row - agg_process_info.start_row;
     auto * buffer = pool->alignedAlloc(rows * max_one_row_size, 16);
     std::vector<size_t> slice_sizes(rows, 0);
+    String sort_key_containers;
 
-    for (const auto & key_column : key_columns)
+    for (size_t i = 0; i < key_columns.size(); ++i)
     {
-        key_column->batchSerialize(buffer, max_one_row_size, slice_sizes);
+        key_columns[i]->batchSerialize(buffer, max_one_row_size, slice_sizes, collators[i], sort_key_containers);
     }
 
     std::vector<AggregateDataPtr> places(rows, nullptr);
     if constexpr (enable_prefetch)
     {
         std::vector<size_t> hashvals(rows, 0);
-        size_t offset = 0;
+        size_t row_offset = 0;
         for (size_t i = 0; i < rows; ++i)
         {
-            const auto key = StringRef{buffer + offset, slice_sizes[i] - offset};
-            offset = slice_sizes[i];
+            StringRef key{buffer + row_offset, slice_sizes[i]};
+            row_offset += max_one_row_size;
             hashvals[i] = method.data.hash(key);
         }
 
-        offset = 0;
+        row_offset = 0;
         for (size_t i = 0; i < rows; ++i)
         {
-            StringRef key{buffer + offset, slice_sizes[i] - offset};
-            offset = slice_sizes[i];
+            StringRef key{buffer + row_offset, slice_sizes[i]};
+            row_offset += max_one_row_size;
             auto iter = method.data.lazy_emplace_with_hash(key, hashvals[i], [&](const auto & ctor) {
                 auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                createAggregateStates(agg_state);
                 ctor(key, agg_state);
             });
             places[i] = iter->second;
@@ -789,17 +793,83 @@ void Aggregator::executeImplMethodStringByCol(Method & method,
     }
     else
     {
-        size_t offset = 0;
+        size_t row_offset = 0;
         for (size_t i = 0; i < rows; ++i)
         {
-            StringRef key{buffer + offset, slice_sizes[i] - offset};
-            offset = slice_sizes[i];
+            StringRef key{buffer + row_offset, slice_sizes[i]};
+            row_offset += max_one_row_size;
             auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
+                // TODO maybe batch alloc
                 auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                createAggregateStates(agg_state);
                 ctor(key, agg_state);
             });
             places[i] = iter->second;
         }
+    }
+
+    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
+            ++inst)
+    {
+        inst->batch_that->addBatch(
+                agg_process_info.start_row,
+                rows,
+                &places[0],
+                inst->state_offset,
+                inst->batch_arguments,
+                pool);
+    }
+    agg_process_info.start_row = rows;
+}
+
+template <typename Method>
+void Aggregator::executeImplMethodStringByColCKMap(
+        Method & method,
+        typename Method::State &,
+        TiDB::TiDBCollators & collators,
+        const ColumnRawPtrs & key_columns,
+        Arena * pool,
+        AggProcessInfo & agg_process_info) const
+{
+    LOG_DEBUG(log, "gjt debug executeImplMethodStringByColCKMap");
+    size_t max_one_row_size = 0;
+    for (const auto & key_column : key_columns)
+    {
+        max_one_row_size += key_column->getMaxOneRowSerializeSize();
+    }
+
+    size_t rows = agg_process_info.end_row - agg_process_info.start_row;
+    auto * buffer = pool->alignedAlloc(rows * max_one_row_size, 16);
+    std::vector<size_t> slice_sizes(rows, 0);
+    String sort_key_containers;
+
+    for (size_t i = 0; i < key_columns.size(); ++i)
+    {
+        key_columns[i]->batchSerialize(buffer, max_one_row_size, slice_sizes, collators[i], sort_key_containers);
+    }
+
+    std::vector<AggregateDataPtr> places(rows, nullptr);
+    size_t row_offset = 0;
+    for (size_t i = 0; i < rows; ++i)
+    {
+        StringRef key{buffer + row_offset, slice_sizes[i]};
+        row_offset += max_one_row_size;
+
+        typename Method::Data::LookupResult it;
+        bool inserted = false;
+        method.data.emplace(key, it, inserted);
+        if (inserted)
+        {
+            auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+            createAggregateStates(agg_state);
+            it->getMapped() = agg_state;
+        }
+        // auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
+        //     // TODO maybe batch alloc
+        //     auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+        //     ctor(key, agg_state);
+        // });
+        places[i] = it->getMapped();
     }
 
     for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;

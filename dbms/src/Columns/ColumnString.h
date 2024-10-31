@@ -214,13 +214,15 @@ public:
         {
             res = std::max(res, sizeAt(i));
         }
-        return res;
+        return res + sizeof(size_t);
     }
 
     void batchSerialize(
             char * buffer,
             size_t max_one_row_size,
-            std::vector<size_t> & cur_buffer_offsets) const override
+            std::vector<size_t> & cur_buffer_offsets,
+            TiDB::TiDBCollatorPtr & collator,
+            String & sort_key_container) const override
     {
         for (size_t i = 0; i < size(); ++i)
         {
@@ -228,16 +230,16 @@ public:
             size_t offset = offsetAt(i);
             const void * src = &chars[offset];
 
-            // if likely (collator != nullptr)
-            // {
-            //     auto sort_key = collator->sortKeyFastPath(reinterpret_cast<const char *>(src), string_size - 1, sort_key_container);
-            //     string_size = sort_key.size;
-            //     src = sort_key.data;
-            // }
+            if likely (collator != nullptr)
+            {
+                auto sort_key = collator->sortKeyFastPath(reinterpret_cast<const char *>(src), string_size - 1, sort_key_container);
+                string_size = sort_key.size;
+                src = sort_key.data;
+            }
 
             char * pos = buffer + max_one_row_size * i + cur_buffer_offsets[i];
-            inline_memcpy(pos, &string_size, sizeof(string_size));
-            inline_memcpy(buffer + sizeof(string_size), src, string_size);
+            memcpy_inlined(pos, &string_size, sizeof(string_size));
+            memcpy_inlined(pos + sizeof(string_size), src, string_size);
             cur_buffer_offsets[i] += sizeof(string_size) + string_size;
         }
     }

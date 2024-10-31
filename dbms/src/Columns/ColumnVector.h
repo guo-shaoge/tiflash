@@ -304,6 +304,26 @@ public:
 
     void popBack(size_t n) override { data.resize_assume_reserved(data.size() - n); }
 
+    void batchSerialize(
+        char * buffer,
+        size_t max_one_row_size,
+        std::vector<size_t> & cur_buffer_offsets,
+        TiDB::TiDBCollatorPtr &,
+        String &) const override
+    {
+        for (size_t i = 0; i < size(); ++i)
+        {
+            char * pos = buffer + i * max_one_row_size + cur_buffer_offsets[i];
+            memcpy(pos, &data[i], sizeof(T));
+            cur_buffer_offsets[i] += sizeof(T);
+        }
+    }
+
+    size_t getMaxOneRowSerializeSize() const override
+    {
+        return sizeof(T);
+    }
+
     StringRef serializeValueIntoArena(
         size_t n,
         Arena & arena,

@@ -146,10 +146,32 @@ public:
         String &) const override;
     const char * deserializeAndInsertFromArena(const char * pos, const TiDB::TiDBCollatorPtr &) override;
 
+    // void batchSerialize(
+    //         char * buffer,
+    //         size_t max_one_row_size,
+    //         std::vector<size_t> & slice_sizes) const override
+    // {
+    //     if constexpr (is_Decimal256)
+    //     {
+    //         RUNTIME_CHECK_MSG(false, "serializeValueIntoArena not support for Decimal256");
+    //     }
+    //     else
+    //     {
+    //         for (size_t i = 0; i < size(); ++i)
+    //         {
+    //             char * pos = buffer + max_one_row_size * i + slice_sizes[i];
+    //             memcpy(pos, &data[i], sizeof(T));
+    //             slice_sizes[i] += sizeof(T);
+    //         }
+    //     }
+    // }
+
     void batchSerialize(
-            char * buffer,
-            size_t max_one_row_size,
-            std::vector<size_t> & slice_sizes) const override
+        char * buffer,
+        size_t max_one_row_size,
+        std::vector<size_t> & cur_buffer_offsets,
+        TiDB::TiDBCollatorPtr &,
+        String &) const override
     {
         if constexpr (is_Decimal256)
         {
@@ -159,9 +181,9 @@ public:
         {
             for (size_t i = 0; i < size(); ++i)
             {
-                char * pos = buffer + max_one_row_size * i + slice_sizes[i];
+                char * pos = buffer + i * max_one_row_size + cur_buffer_offsets[i];
                 memcpy(pos, &data[i], sizeof(T));
-                slice_sizes[i] += sizeof(T);
+                cur_buffer_offsets[i] += sizeof(T);
             }
         }
     }

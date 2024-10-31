@@ -200,7 +200,9 @@ public:
     virtual void batchSerialize(
             char *,
             size_t,
-            std::vector<size_t> &) const
+            std::vector<size_t> &,
+            TiDB::TiDBCollatorPtr &,
+            String &) const
     {
         RUNTIME_CHECK_MSG(false, "{} doesn't support batchSerialize", getName());
     }

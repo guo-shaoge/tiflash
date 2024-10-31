@@ -715,7 +715,11 @@ struct AggregationMethodSerialized
 
     Data data;
 
-    AggregationMethodSerialized() = default;
+    AggregationMethodSerialized()
+    {
+        if constexpr (!Data::isNestedMap)
+            data.reserve(8192);
+    }
 
     template <typename Other>
     explicit AggregationMethodSerialized(const Other & other)
@@ -1703,9 +1707,19 @@ protected:
     template <bool enable_prefetch, typename Method>
     void executeImplMethodStringByCol(Method & method,
             typename Method::State & state,
+            TiDB::TiDBCollators & collators,
             const ColumnRawPtrs & key_columns,
             Arena * pool,
             AggProcessInfo & agg_process_info) const;
+
+template <typename Method>
+void executeImplMethodStringByColCKMap(
+        Method & method,
+        typename Method::State &,
+        TiDB::TiDBCollators & collators,
+        const ColumnRawPtrs & key_columns,
+        Arena * pool,
+        AggProcessInfo & agg_process_info) const;
 
     template <bool only_lookup, bool enable_prefetch, typename Method>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(
