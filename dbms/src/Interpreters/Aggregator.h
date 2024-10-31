@@ -104,8 +104,7 @@ using AggregatedDataWithUInt32Key = HashMap<UInt32, AggregateDataPtr, HashCRC32<
 // using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
 using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, PhHash<UInt64, PhHashSeed1>>;
 
-// using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
-using AggregatedDataWithShortStringKey = StringHashMapRefine<AggregateDataPtr>;
+using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
 // using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr>;
 using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 
@@ -121,8 +120,7 @@ using AggregatedDataWithUInt64KeyTwoLevel = TwoLevelHashMap<UInt64, AggregateDat
 
 using AggregatedDataWithInt256KeyTwoLevel = TwoLevelHashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
 
-// using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMap<AggregateDataPtr>;
-using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMapRefine<AggregateDataPtr>;
+using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMap<AggregateDataPtr>;
 // using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr>;
 using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 

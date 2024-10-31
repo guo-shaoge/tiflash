@@ -711,7 +711,6 @@ void NO_INLINE Aggregator::executeImpl(
     if constexpr (!Method::Data::isNestedMap)
     {
         // if constexpr (Method::Data::isPhMap && Method::test_serialized)
-        // TODO key_string may slow benefet
         if constexpr (Method::test_serialized)
         {
             if constexpr (Method::Data::isPhMap)
