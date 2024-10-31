@@ -48,24 +48,149 @@ inline StringRef ALWAYS_INLINE toStringRef(const StringKey24 & n)
     return {reinterpret_cast<const char *>(&n), 24ul - (__builtin_clzll(n.c) >> 3)};
 }
 
+// struct StringHashTableHash
+// {
+// #if defined(__SSE4_2__)
+//     size_t ALWAYS_INLINE operator()(StringKey8 key) const
+//     {
+//         size_t res = -1ULL;
+//         res = _mm_crc32_u64(res, key);
+//         return res;
+//     }
+//     size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
+//     {
+//         size_t res = -1ULL;
+//         res = _mm_crc32_u64(res, key.low);
+//         res = _mm_crc32_u64(res, key.high);
+//         return res;
+//     }
+//     size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
+//     {
+//         size_t res = -1ULL;
+//         res = _mm_crc32_u64(res, key.a);
+//         res = _mm_crc32_u64(res, key.b);
+//         res = _mm_crc32_u64(res, key.c);
+//         return res;
+//     }
+// #else
+//     size_t ALWAYS_INLINE operator()(StringKey8 key) const
+//     {
+//         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 8);
+//     }
+//     size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
+//     {
+//         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 16);
+//     }
+//     size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
+//     {
+//         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 24);
+//     }
+// #endif
+//     size_t ALWAYS_INLINE operator()(StringRef key) const { return StringRefHash()(key); }
+// };
+
+template <typename T>
+inline T unaligned_load(const void* p) {
+    T res{};
+    memcpy(&res, p, sizeof(res));
+    return res;
+}
+
+inline uint32_t crc_hash_32(const void* data, int32_t bytes, uint32_t hash) {
+#if defined(__x86_64__) && !defined(__SSE4_2__)
+    return static_cast<uint32_t>(crc32(hash, (const unsigned char*)data, bytes));
+#else
+    uint32_t words = bytes / sizeof(uint32_t);
+    bytes = bytes % 4 /*sizeof(uint32_t)*/;
+
+    auto* p = reinterpret_cast<const uint8_t*>(data);
+
+    while (words--) {
+#if defined(__x86_64__)
+        hash = _mm_crc32_u32(hash, unaligned_load<uint32_t>(p));
+#elif defined(__aarch64__)
+        hash = __crc32cw(hash, unaligned_load<uint32_t>(p));
+#else
+#error "Not supported architecture"
+#endif
+        p += sizeof(uint32_t);
+    }
+
+    while (bytes--) {
+#if defined(__x86_64__)
+        hash = _mm_crc32_u8(hash, *p);
+#elif defined(__aarch64__)
+        hash = __crc32cb(hash, *p);
+#else
+#error "Not supported architecture"
+#endif
+        ++p;
+    }
+
+    // The lower half of the CRC hash has has poor uniformity, so swap the halves
+    // for anyone who only uses the first several bits of the hash.
+    hash = (hash << 16u) | (hash >> 16u);
+    return hash;
+#endif
+}
+
+inline uint64_t crc_hash_64(const void* data, int32_t length, uint64_t hash) {
+#if defined(__x86_64__) && !defined(__SSE4_2__)
+    return crc32(hash, (const unsigned char*)data, length);
+#else
+    if (unlikely (length < 8)) {
+        return crc_hash_32(data, length, static_cast<uint32_t>(hash));
+    }
+
+    uint64_t words = length / sizeof(uint64_t);
+    auto* p = reinterpret_cast<const uint8_t*>(data);
+    auto* end = reinterpret_cast<const uint8_t*>(data) + length;
+    while (words--) {
+#if defined(__x86_64__) && defined(__SSE4_2__)
+        hash = _mm_crc32_u64(hash, unaligned_load<uint64_t>(p));
+#elif defined(__aarch64__)
+        hash = __crc32cd(hash, unaligned_load<uint64_t>(p));
+#else
+#error "Not supported architecture"
+#endif
+        p += sizeof(uint64_t);
+    }
+    // Reduce the branch condition
+    p = end - 8;
+#if defined(__x86_64__)
+    hash = _mm_crc32_u64(hash, unaligned_load<uint64_t>(p));
+#elif defined(__aarch64__)
+    hash = __crc32cd(hash, unaligned_load<uint64_t>(p));
+#else
+#error "Not supported architecture"
+#endif
+    p += sizeof(uint64_t);
+    return hash;
+#endif
+}
 struct StringHashTableHash
 {
 #if defined(__SSE4_2__)
     size_t ALWAYS_INLINE operator()(StringKey8 key) const
     {
-        size_t res = -1ULL;
-        res = _mm_crc32_u64(res, key);
-        return res;
+        // size_t res = -1ULL;
+        // res = _mm_crc32_u64(res, key);
+        // return res;
+
+        return PhHashMixSeed<sizeof(size_t), PhHashSeed1>()(std::hash<StringKey8>()(key));
     }
     size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
     {
-        size_t res = -1ULL;
-        res = _mm_crc32_u64(res, key.low);
-        res = _mm_crc32_u64(res, key.high);
-        return res;
+        // size_t res = -1ULL;
+        // res = _mm_crc32_u64(res, key.low);
+        // res = _mm_crc32_u64(res, key.high);
+        // return res;
+        Int128 key128 = static_cast<Int128>(key.high) << 64 | static_cast<Int128>(key.low);
+        return PhHashMixSeed<sizeof(size_t), PhHashSeed1>()(std::hash<Int128>()(key128));
     }
     size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
     {
+        // TODO ?
         size_t res = -1ULL;
         res = _mm_crc32_u64(res, key.a);
         res = _mm_crc32_u64(res, key.b);
@@ -86,7 +211,11 @@ struct StringHashTableHash
         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 24);
     }
 #endif
-    size_t ALWAYS_INLINE operator()(StringRef key) const { return StringRefHash()(key); }
+    // size_t ALWAYS_INLINE operator()(StringRef key) const { return StringRefHash()(key); }
+    size_t ALWAYS_INLINE operator()(StringRef key) const
+    {
+        return crc_hash_64(key.data, static_cast<int32_t>(key.size), 0x811C9DC5);
+    }
 };
 
 template <typename Cell>
@@ -229,7 +358,7 @@ public:
     using ConstLookupResult = StringHashTableLookupResult<const typename Self::mapped_type>;
 
     static constexpr bool isPhMap = SubMaps::isPhMap;
-    static constexpr bool isNestedMap = true;
+    static constexpr bool isNestedMap = false;
 
     StringHashTable() = default;
 

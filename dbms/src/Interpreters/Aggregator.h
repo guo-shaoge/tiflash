@@ -203,7 +203,7 @@ struct AggregationMethodString
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
-    static constexpr bool test_serialized = false;
+    static constexpr bool test_serialized = true;
 
     Data data;
 
@@ -252,7 +252,7 @@ struct AggregationMethodStringNoCache
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
-    static constexpr bool test_serialized = false;
+    static constexpr bool test_serialized = true;
 
     Data data;
 
@@ -302,7 +302,7 @@ struct AggregationMethodOneKeyStringNoCache
     using Data = TData;
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
-    static constexpr bool test_serialized = false;
+    static constexpr bool test_serialized = true;
 
     Data data;
 

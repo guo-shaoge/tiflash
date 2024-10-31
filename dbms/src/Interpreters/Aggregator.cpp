@@ -719,7 +719,8 @@ void NO_INLINE Aggregator::executeImpl(
                 //     executeImplMethodStringByCol<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
                 // else
                 
-                executeImplMethodStringByCol<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+                // executeImplMethodStringByCol<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+                RUNTIME_CHECK_MSG(false,"gjt test fail");
             }
             else
             {
@@ -728,10 +729,7 @@ void NO_INLINE Aggregator::executeImpl(
         }
         else
         {
-            if (method.data.getBufferSizeInCells() < 8192)
-                executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-            else
-                executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+            RUNTIME_CHECK_MSG(false,"gjt test fail");
         }
     }
     else
