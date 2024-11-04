@@ -57,7 +57,7 @@ public:
     using Impl = ImplTable;
     static constexpr bool isPhMap = ImplTable::isPhMap;
     // TODO
-    static constexpr bool isNestedMap = true;
+    static constexpr bool isStringHashMap = false;
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;
@@ -301,6 +301,11 @@ public:
         emplace(key_holder, it, inserted, hash_value);
     }
 
+    void ALWAYS_INLINE prefetch_hash(size_t hashval) // NOLINT
+    {
+        const auto bucket = getBucketFromHash(hashval);
+        impls[bucket].prefetch_hash(hashval);
+    }
 
     /// Same, but with a precalculated values of hash function.
     template <typename KeyHolder>

@@ -27,7 +27,7 @@ public:
     using Key = StringRef;
     using Impl = ImplTable;
     static constexpr bool isPhMap = ImplTable::isPhMap;
-    static constexpr bool isNestedMap = true;
+    static constexpr bool isStringHashMap = true;
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;
@@ -225,6 +225,19 @@ public:
     void ALWAYS_INLINE emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted)
     {
         dispatch(*this, key_holder, typename Impl::EmplaceCallable{it, inserted});
+    }
+
+    template <typename KeyHolder>
+    void ALWAYS_INLINE prefetch_hash(KeyHolder && key_holder, size_t hashval)
+    {
+        const StringRef & x = keyHolderGetKey(key_holder);
+        const size_t sz = x.size;
+        
+        if (sz != 0)
+        {
+            const auto bucket = getBucketFromHash(hashval);
+            impls[bucket].prefetch_hash(hashval);
+        }
     }
 
     LookupResult ALWAYS_INLINE find(const Key x) { return dispatch(*this, x, typename Impl::FindCallable{}); }

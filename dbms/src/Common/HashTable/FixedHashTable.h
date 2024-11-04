@@ -223,7 +223,7 @@ public:
     using ConstLookupResult = const Cell *;
 
     static constexpr bool isPhMap = false;
-    static constexpr bool isNestedMap = false;
+    static constexpr bool isStringHashMap = false;
 
     size_t hash(const Key & x) const { return x; }
 

@@ -707,120 +707,24 @@ void NO_INLINE Aggregator::executeImpl(
     });
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
-    // TODO two level map prefetch
-    if constexpr (!Method::Data::isNestedMap)
+    if constexpr (Method::Data::isPhMap)
     {
-        // if constexpr (Method::Data::isPhMap && Method::test_serialized)
+        RUNTIME_CHECK_MSG(false, "unexpected phmap");
+    }
+    else
+    {
         if constexpr (Method::test_serialized)
         {
-            if constexpr (Method::Data::isPhMap)
-            {
-                // if (method.data.getBufferSizeInCells() < 8192)
-                //     executeImplMethodStringByCol<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
-                // else
-                
-                executeImplMethodStringByCol<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
-            }
-            else
-            {
-                executeImplMethodStringByColCKMap(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
-            }
+            executeImplMethodStringByColCKMap(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
         }
         else
         {
-            // if (method.data.getBufferSizeInCells() < 8192)
-            //     executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-            // else
-            //     executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
-            executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+            if (method.data.getBufferSizeInCells() < 8192)
+                executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+            else
+                executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
         }
     }
-    else
-    {
-        executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-    }
-}
-
-template <bool enable_prefetch, typename Method>
-void Aggregator::executeImplMethodStringByCol(
-        Method & method,
-        typename Method::State &,
-        TiDB::TiDBCollators & collators,
-        const ColumnRawPtrs & key_columns,
-        Arena * pool,
-        AggProcessInfo & agg_process_info) const
-{
-    LOG_DEBUG(log, "gjt debug executeImplMethodStringByCol");
-    size_t max_one_row_size = 0;
-    for (const auto & key_column : key_columns)
-    {
-        max_one_row_size += key_column->getMaxOneRowSerializeSize();
-    }
-
-    size_t rows = agg_process_info.end_row - agg_process_info.start_row;
-    auto * buffer = pool->alignedAlloc(rows * max_one_row_size, 16);
-    std::vector<size_t> slice_sizes(rows, 0);
-    String sort_key_containers;
-
-    for (size_t i = 0; i < key_columns.size(); ++i)
-    {
-        key_columns[i]->batchSerialize(buffer, max_one_row_size, slice_sizes, collators[i], sort_key_containers);
-    }
-
-    std::vector<AggregateDataPtr> places(rows, nullptr);
-    if constexpr (enable_prefetch)
-    {
-        std::vector<size_t> hashvals(rows, 0);
-        size_t row_offset = 0;
-        for (size_t i = 0; i < rows; ++i)
-        {
-            StringRef key{buffer + row_offset, slice_sizes[i]};
-            row_offset += max_one_row_size;
-            hashvals[i] = method.data.hash(key);
-        }
-
-        row_offset = 0;
-        for (size_t i = 0; i < rows; ++i)
-        {
-            StringRef key{buffer + row_offset, slice_sizes[i]};
-            row_offset += max_one_row_size;
-            auto iter = method.data.lazy_emplace_with_hash(key, hashvals[i], [&](const auto & ctor) {
-                auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-                createAggregateStates(agg_state);
-                ctor(key, agg_state);
-            });
-            places[i] = iter->second;
-        }
-    }
-    else
-    {
-        size_t row_offset = 0;
-        for (size_t i = 0; i < rows; ++i)
-        {
-            StringRef key{buffer + row_offset, slice_sizes[i]};
-            row_offset += max_one_row_size;
-            auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
-                // TODO maybe batch alloc
-                auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-                createAggregateStates(agg_state);
-                ctor(key, agg_state);
-            });
-            places[i] = iter->second;
-        }
-    }
-
-    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
-            ++inst)
-    {
-        inst->batch_that->addBatch(
-                agg_process_info.start_row,
-                rows,
-                &places[0],
-                inst->state_offset,
-                inst->batch_arguments,
-                pool);
-    }
-    agg_process_info.start_row = rows;
 }
 
 template <typename Method>

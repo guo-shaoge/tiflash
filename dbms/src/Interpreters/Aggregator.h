@@ -719,8 +719,9 @@ struct AggregationMethodSerialized
 
     AggregationMethodSerialized()
     {
-        if constexpr (!Data::isNestedMap)
-            data.reserve(8192);
+        // TODO reserve
+        // if constexpr (!Data::isStringHashMap)
+        //     data.reserve(8192);
     }
 
     template <typename Other>

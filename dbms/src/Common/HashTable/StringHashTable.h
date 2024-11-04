@@ -229,7 +229,7 @@ public:
     using ConstLookupResult = StringHashTableLookupResult<const typename Self::mapped_type>;
 
     static constexpr bool isPhMap = SubMaps::isPhMap;
-    static constexpr bool isNestedMap = true;
+    static constexpr bool isStringHashMap = true;
 
     StringHashTable() = default;
 
@@ -390,6 +390,46 @@ public:
     ConstLookupResult ALWAYS_INLINE find(const Key & x) const { return dispatch(*this, x, FindCallable{}); }
 
     bool ALWAYS_INLINE has(const Key & x, size_t = 0) const { return dispatch(*this, x, FindCallable{}) != nullptr; }
+
+    template <typename KeyHolder>
+    void ALWAYS_INLINE prefetch_hash(KeyHolder && key_holder, size_t hashval)
+    {
+        const StringRef & x = keyHolderGetKey(key_holder);
+        const size_t sz = x.size;
+
+        if (x.size == 0)
+            return;
+
+        if (x.data[sz - 1] == 0)
+        {
+            ms.prefetch_hash(hashval);
+            return;
+        }
+
+        switch ((sz - 1) >> 3)
+        {
+        case 0: // 1..8 bytes
+        {
+            m1.prefetch_hash(hashval);
+            return;
+        }
+        case 1: // 9..16 bytes
+        {
+            m2.prefetch_hash(hashval);
+            return;
+        }
+        case 2: // 17..24 bytes
+        {
+            m3.prefetch_hash(hashval);
+            return;
+        }
+        default: // >= 25 bytes
+        {
+            ms.prefetch_hash(hashval);
+            return;
+        }
+        }
+    }
 
     void write(DB::WriteBuffer & wb) const
     {

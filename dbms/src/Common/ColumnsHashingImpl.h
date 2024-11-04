@@ -153,7 +153,14 @@ public:
 
         const size_t prefetch_idx = row + prefetch_step;
         if likely (prefetch_idx < hashvals.size())
-            data.prefetch_hash(hashvals[prefetch_idx]);
+        {
+            // TODO maybe all prefetch_hash pass key_holder
+            // prefetch_hash -> prefetchHash()
+            if constexpr (Data::isStringHashMap)
+                data.prefetch_hash(key_holder, hashvals[prefetch_idx]);
+            else
+                data.prefetch_hash(hashvals[prefetch_idx]);
+        }
 
         return emplaceImpl<true>(key_holder, data, hashvals[row]);
     }

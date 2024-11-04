@@ -91,7 +91,7 @@ template <typename TMapped, typename Allocator>
 struct StringHashMapSubMaps
 {
     static constexpr bool isPhMap = false;
-    static constexpr bool isNestedMap = true;
+    static constexpr bool isStringHashMap = true;
 
     using T0 = StringHashTableEmpty<StringHashMapCell<StringRef, TMapped>>;
     using T1 = HashMapTable<

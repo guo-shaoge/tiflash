@@ -57,7 +57,7 @@ class PhHashTableTemplate : public Base
 {
 public:
     static constexpr bool isPhMap = true;
-    static constexpr bool isNestedMap = false;
+    static constexpr bool isStringHashMap = false;
 
     using Self = PhHashTableTemplate;
 
