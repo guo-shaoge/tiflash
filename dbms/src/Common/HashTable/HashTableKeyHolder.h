@@ -16,6 +16,7 @@
 
 #include <Common/Arena.h>
 #include <common/StringRef.h>
+#include <common/memcpy.h>
 
 /**
   * In some aggregation scenarios, when adding a key to the hash table, we
@@ -111,14 +112,20 @@ inline void ALWAYS_INLINE keyHolderPersistKey(DB::ArenaKeyHolder & holder)
 {
     // Hash table shouldn't ask us to persist a zero key
     assert(holder.key.size > 0);
-    holder.key.data = holder.pool.insert(holder.key.data, holder.key.size);
+    // holder.key.data = holder.pool.insert(holder.key.data, holder.key.size);
+    auto * pos = holder.pool.alignedAlloc(holder.key.size, 16);
+    memcpy_inlined(pos, holder.key.data, holder.key.size);
+    holder.key.data = pos;
 }
 
 inline void ALWAYS_INLINE keyHolderPersistKey(DB::ArenaKeyHolder && holder)
 {
     // Hash table shouldn't ask us to persist a zero key
     assert(holder.key.size > 0);
-    holder.key.data = holder.pool.insert(holder.key.data, holder.key.size);
+    // holder.key.data = holder.pool.insert(holder.key.data, holder.key.size);
+    auto * pos = holder.pool.alignedAlloc(holder.key.size, 16);
+    memcpy_inlined(pos, holder.key.data, holder.key.size);
+    holder.key.data = pos;
 }
 
 inline void ALWAYS_INLINE keyHolderDiscardKey(DB::ArenaKeyHolder &) {}
