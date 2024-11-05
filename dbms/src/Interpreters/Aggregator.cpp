@@ -715,17 +715,19 @@ void NO_INLINE Aggregator::executeImpl(
     {
         if constexpr (Method::test_serialized)
         {
-            if (method.data.getBufferSizeInCells() < 8192)
-                executeImplMethodStringByColCKMap<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
-            else
-                executeImplMethodStringByColCKMap<true>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+            // if (method.data.getBufferSizeInCells() < 8192)
+            //     executeImplMethodStringByColCKMap<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+            // else
+            //     executeImplMethodStringByColCKMap<true>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+            executeImplMethodStringByColCKMap<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
         }
         else
         {
-            if (method.data.getBufferSizeInCells() < 8192)
-                executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-            else
-                executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+            // if (method.data.getBufferSizeInCells() < 8192)
+            //     executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+            // else
+            //     executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+            executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
         }
     }
 }
