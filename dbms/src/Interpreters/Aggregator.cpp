@@ -742,86 +742,33 @@ void Aggregator::executeImplMethodStringByColCKMap(
         AggProcessInfo & agg_process_info) const
 {
     LOG_DEBUG(log, "gjt debug executeImplMethodStringByColCKMap");
-    size_t max_one_row_size = 0;
-    for (const auto & key_column : key_columns)
-    {
-        max_one_row_size += key_column->getMaxOneRowSerializeSize();
-    }
 
     size_t rows = agg_process_info.end_row - agg_process_info.start_row;
-    auto * buffer = pool->alignedAlloc(rows * max_one_row_size, 16);
-    std::vector<size_t> slice_sizes(rows, 0);
-    String sort_key_containers;
-
-    for (size_t i = 0; i < key_columns.size(); ++i)
-    {
-        key_columns[i]->batchSerialize(buffer, max_one_row_size, slice_sizes, collators[i], sort_key_containers);
-    }
-
+    std::vector<String> sort_key_containers;
     std::vector<AggregateDataPtr> places(rows, nullptr);
-    size_t row_offset = 0;
 
-    if constexpr (enable_prefetch)
+    for (size_t i = 0; i < rows; ++i)
     {
-        std::vector<size_t> hashvals(rows, 0);
-        std::vector<StringRef> keys;
-        keys.reserve(rows);
-        for (size_t i = 0; i < rows; ++i)
+        // StringRef key{buffer + row_offset, slice_sizes[i]};
+        // row_offset += max_one_row_size;
+
+        auto key_holder = state.getKeyHolder(i, pool, sort_key_containers);
+
+        typename Method::Data::LookupResult it;
+        bool inserted = false;
+        method.data.emplace(keyHolderGetKey(key_holder), it, inserted);
+        if (inserted)
         {
-            StringRef key{buffer + row_offset, slice_sizes[i]};
-            keys.push_back(key);
-            row_offset += max_one_row_size;
-
-            hashvals[i] = method.data.hash(key);
+            auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+            createAggregateStates(agg_state);
+            it->getMapped() = agg_state;
         }
-
-        size_t prefetch_idx = 16;
-        for (size_t i = 0; i < rows; ++i)
-        {
-            typename Method::Data::LookupResult it;
-            bool inserted = false;
-
-            if (prefetch_idx < rows)
-                method.data.prefetch_hash(hashvals[prefetch_idx++]);
-
-            method.data.emplace(keys[i], it, inserted, hashvals[i]);
-            if (inserted)
-            {
-                auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-                createAggregateStates(agg_state);
-                it->getMapped() = agg_state;
-            }
-            // auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
-            //     // TODO maybe batch alloc
-            //     auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-            //     ctor(key, agg_state);
-            // });
-            places[i] = it->getMapped();
-        }
-    }
-    else
-    {
-        for (size_t i = 0; i < rows; ++i)
-        {
-            StringRef key{buffer + row_offset, slice_sizes[i]};
-            row_offset += max_one_row_size;
-
-            typename Method::Data::LookupResult it;
-            bool inserted = false;
-            method.data.emplace(key, it, inserted);
-            if (inserted)
-            {
-                auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-                createAggregateStates(agg_state);
-                it->getMapped() = agg_state;
-            }
-            // auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
-            //     // TODO maybe batch alloc
-            //     auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
-            //     ctor(key, agg_state);
-            // });
-            places[i] = it->getMapped();
-        }
+        // auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
+        //     // TODO maybe batch alloc
+        //     auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+        //     ctor(key, agg_state);
+        // });
+        places[i] = it->getMapped();
     }
 
     for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
