@@ -719,10 +719,11 @@ void NO_INLINE Aggregator::executeImpl(
         }
         else
         {
-            if (method.data.getBufferSizeInCells() < 8192)
-                executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-            else
-                executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+            // if (method.data.getBufferSizeInCells() < 8192)
+            //     executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+            // else
+            //     executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+            executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
         }
     }
 }
