@@ -113,7 +113,8 @@ using AggregatedDataWithInt256Key = HashMap<Int256, AggregateDataPtr, HashCRC32<
 
 // using AggregatedDataWithKeys128 = HashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 // using AggregatedDataWithKeys128 = HashMap<Int128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
-using AggregatedDataWithKeys128 = HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>;
+// using AggregatedDataWithKeys128 = HashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>;
+using AggregatedDataWithKeys128 = HashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
 
 using AggregatedDataWithUInt32KeyTwoLevel = TwoLevelHashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
@@ -129,7 +130,7 @@ using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringR
 
 // using AggregatedDataWithKeys128TwoLevel = TwoLevelHashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 // using AggregatedDataWithKeys128TwoLevel = TwoLevelHashMap<Int128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
-using AggregatedDataWithKeys128TwoLevel = TwoLevelHashMap<Int128, AggregateDataPtr, HashCRC32<Int128>>;
+using AggregatedDataWithKeys128TwoLevel = TwoLevelHashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 using AggregatedDataWithKeys256TwoLevel = TwoLevelHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
 
 /** Variants with better hash function, using more than 32 bits for hash.
