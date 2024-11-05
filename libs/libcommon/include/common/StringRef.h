@@ -110,8 +110,8 @@ using StringRefs = std::vector<StringRef>;
 // - otherwise, use `mem_utils::avx2_mem_equal`(under x86-64 with avx2)
 inline bool operator==(StringRef lhs, StringRef rhs)
 {
-    // return mem_utils::IsStrViewEqual({lhs}, {rhs});
-    return memequal_padded(lhs.data, lhs.size, rhs.data, rhs.size);
+    return mem_utils::IsStrViewEqual({lhs}, {rhs});
+    // return memequal_padded(lhs.data, lhs.size, rhs.data, rhs.size);
 }
 
 inline bool operator!=(StringRef lhs, StringRef rhs)
