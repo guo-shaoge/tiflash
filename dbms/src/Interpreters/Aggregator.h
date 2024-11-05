@@ -1707,15 +1707,7 @@ protected:
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info) const;
     
-    template <bool enable_prefetch, typename Method>
-    void executeImplMethodStringByCol(Method & method,
-            typename Method::State & state,
-            TiDB::TiDBCollators & collators,
-            const ColumnRawPtrs & key_columns,
-            Arena * pool,
-            AggProcessInfo & agg_process_info) const;
-
-template <typename Method>
+template <bool enable_prefetch, typename Method>
 void executeImplMethodStringByColCKMap(
         Method & method,
         typename Method::State &,
