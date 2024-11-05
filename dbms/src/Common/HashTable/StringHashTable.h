@@ -369,6 +369,102 @@ public:
         this->dispatch(*this, key_holder, EmplaceCallable(it, inserted));
     }
 
+    template <typename KeyHolder>
+    void ALWAYS_INLINE emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
+    {
+        this->dispatchHashval(*this, key_holder, EmplaceCallable(it, inserted), hashval);
+    }
+
+    template <typename Self, typename KeyHolder, typename Func>
+    static auto
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+        NO_INLINE NO_SANITIZE_ADDRESS NO_SANITIZE_THREAD
+#else
+        ALWAYS_INLINE
+#endif
+        dispatchHashval(Self & self, KeyHolder && key_holder, Func && func, size_t hashval)
+    {
+        const StringRef & x = keyHolderGetKey(key_holder);
+        const size_t sz = x.size;
+        if (sz == 0)
+        {
+            keyHolderDiscardKey(key_holder);
+            return func(self.m0, VoidKey{}, 0);
+        }
+
+        if (x.data[sz - 1] == 0)
+        {
+            // Strings with trailing zeros are not representable as fixed-size
+            // string keys. Put them to the generic table.
+            return func(self.ms, std::forward<KeyHolder>(key_holder), hashval);
+        }
+
+        const char * p = x.data;
+        // pending bits that needs to be shifted out
+        const char s = (-sz & 7) * 8;
+        union
+        {
+            StringKey8 k8;
+            StringKey16 k16;
+            StringKey24 k24;
+            UInt64 n[3];
+        };
+        switch ((sz - 1) >> 3)
+        {
+        case 0: // 1..8 bytes
+        {
+            // first half page
+            if ((reinterpret_cast<uintptr_t>(p) & 2048) == 0)
+            {
+                memcpy(&n[0], p, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] &= (-1ULL >> s);
+                else
+                    n[0] &= (-1ULL << s);
+            }
+            else
+            {
+                const char * lp = x.data + x.size - 8;
+                memcpy(&n[0], lp, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] >>= s;
+                else
+                    n[0] <<= s;
+            }
+            keyHolderDiscardKey(key_holder);
+            return func(self.m1, k8, hashval);
+        }
+        case 1: // 9..16 bytes
+        {
+            memcpy(&n[0], p, 8);
+            const char * lp = x.data + x.size - 8;
+            memcpy(&n[1], lp, 8);
+            if constexpr (DB::isLittleEndian())
+                n[1] >>= s;
+            else
+                n[1] <<= s;
+            keyHolderDiscardKey(key_holder);
+            return func(self.m2, k16, hashval);
+        }
+        case 2: // 17..24 bytes
+        {
+            memcpy(&n[0], p, 16);
+            const char * lp = x.data + x.size - 8;
+            memcpy(&n[2], lp, 8);
+            if constexpr (DB::isLittleEndian())
+                n[2] >>= s;
+            else
+                n[2] <<= s;
+            keyHolderDiscardKey(key_holder);
+            return func(self.m3, k24, hashval);
+        }
+        default: // >= 25 bytes
+        {
+            return func(self.ms, std::forward<KeyHolder>(key_holder), hashval);
+        }
+        }
+    }
+
     struct FindCallable
     {
         // find() doesn't need any key memory management, so we don't work with
@@ -390,6 +486,88 @@ public:
     ConstLookupResult ALWAYS_INLINE find(const Key & x) const { return dispatch(*this, x, FindCallable{}); }
 
     bool ALWAYS_INLINE has(const Key & x, size_t = 0) const { return dispatch(*this, x, FindCallable{}) != nullptr; }
+
+    size_t
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+        NO_INLINE NO_SANITIZE_ADDRESS NO_SANITIZE_THREAD
+#else
+        ALWAYS_INLINE
+#endif
+        hash(const StringRef & x) const
+    {
+        const size_t sz = x.size;
+        if (sz == 0)
+        {
+            return 0;
+        }
+
+        if (x.data[sz - 1] == 0)
+        {
+            return ms.hash(x);
+        }
+
+        const char * p = x.data;
+        // pending bits that needs to be shifted out
+        const char s = (-sz & 7) * 8;
+        union
+        {
+            StringKey8 k8;
+            StringKey16 k16;
+            StringKey24 k24;
+            UInt64 n[3];
+        };
+        switch ((sz - 1) >> 3)
+        {
+        case 0: // 1..8 bytes
+        {
+            // first half page
+            if ((reinterpret_cast<uintptr_t>(p) & 2048) == 0)
+            {
+                memcpy(&n[0], p, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] &= (-1ULL >> s);
+                else
+                    n[0] &= (-1ULL << s);
+            }
+            else
+            {
+                const char * lp = x.data + x.size - 8;
+                memcpy(&n[0], lp, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] >>= s;
+                else
+                    n[0] <<= s;
+            }
+            return m1.hash(k8);
+        }
+        case 1: // 9..16 bytes
+        {
+            memcpy(&n[0], p, 8);
+            const char * lp = x.data + x.size - 8;
+            memcpy(&n[1], lp, 8);
+            if constexpr (DB::isLittleEndian())
+                n[1] >>= s;
+            else
+                n[1] <<= s;
+            return m2.hash(k16);
+        }
+        case 2: // 17..24 bytes
+        {
+            memcpy(&n[0], p, 16);
+            const char * lp = x.data + x.size - 8;
+            memcpy(&n[2], lp, 8);
+            if constexpr (DB::isLittleEndian())
+                n[2] >>= s;
+            else
+                n[2] <<= s;
+            return m3.hash(k24);
+        }
+        default: // >= 25 bytes
+        {
+            return ms.hash(x);
+        }
+        }
+    }
 
     template <typename KeyHolder>
     void ALWAYS_INLINE prefetch_hash(KeyHolder && key_holder, size_t hashval)

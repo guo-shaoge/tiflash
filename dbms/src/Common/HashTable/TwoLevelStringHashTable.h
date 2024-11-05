@@ -226,6 +226,106 @@ public:
     {
         dispatch(*this, key_holder, typename Impl::EmplaceCallable{it, inserted});
     }
+    template <typename KeyHolder>
+    void ALWAYS_INLINE emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
+    {
+        dispatchHashval(*this, key_holder, typename Impl::EmplaceCallable{it, inserted}, hashval);
+    }
+
+    template <typename Self, typename Func, typename KeyHolder>
+    static auto
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+        NO_INLINE NO_SANITIZE_ADDRESS NO_SANITIZE_THREAD
+#else
+        ALWAYS_INLINE
+#endif
+        dispatchHashval(Self & self, KeyHolder && key_holder, Func && func, size_t res)
+    {
+        const StringRef & x = keyHolderGetKey(key_holder);
+        const size_t sz = x.size;
+        if (sz == 0)
+        {
+            keyHolderDiscardKey(key_holder);
+            return func(self.impls[0].m0, VoidKey{}, 0);
+        }
+
+        if (x.data[x.size - 1] == 0)
+        {
+            // Strings with trailing zeros are not representable as fixed-size
+            // string keys. Put them to the generic table.
+            auto buck = getBucketFromHash(res);
+            return func(self.impls[buck].ms, std::forward<KeyHolder>(key_holder), res);
+        }
+
+        const char * p = x.data;
+        // pending bits that needs to be shifted out
+        const char s = (-sz & 7) * 8;
+        union
+        {
+            StringKey8 k8;
+            StringKey16 k16;
+            StringKey24 k24;
+            UInt64 n[3];
+        };
+        switch ((sz - 1) >> 3)
+        {
+        case 0:
+        {
+            // first half page
+            if ((reinterpret_cast<uintptr_t>(p) & 2048) == 0)
+            {
+                memcpy(&n[0], p, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] &= (-1ULL >> s);
+                else
+                    n[0] &= (-1ULL << s);
+            }
+            else
+            {
+                const char * lp = x.data + x.size - 8;
+                memcpy(&n[0], lp, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] >>= s;
+                else
+                    n[0] <<= s;
+            }
+            auto buck = getBucketFromHash(res);
+            keyHolderDiscardKey(key_holder);
+            return func(self.impls[buck].m1, k8, res);
+        }
+        case 1:
+        {
+            memcpy(&n[0], p, 8);
+            const char * lp = x.data + x.size - 8;
+            memcpy(&n[1], lp, 8);
+            if constexpr (DB::isLittleEndian())
+                n[1] >>= s;
+            else
+                n[1] <<= s;
+            auto buck = getBucketFromHash(res);
+            keyHolderDiscardKey(key_holder);
+            return func(self.impls[buck].m2, k16, res);
+        }
+        case 2:
+        {
+            memcpy(&n[0], p, 16);
+            const char * lp = x.data + x.size - 8;
+            memcpy(&n[2], lp, 8);
+            if constexpr (DB::isLittleEndian())
+                n[2] >>= s;
+            else
+                n[2] <<= s;
+            auto buck = getBucketFromHash(res);
+            keyHolderDiscardKey(key_holder);
+            return func(self.impls[buck].m3, k24, res);
+        }
+        default:
+        {
+            auto buck = getBucketFromHash(res);
+            return func(self.impls[buck].ms, std::forward<KeyHolder>(key_holder), res);
+        }
+        }
+    }
 
     template <typename KeyHolder>
     void ALWAYS_INLINE prefetch_hash(KeyHolder && key_holder, size_t hashval)
@@ -236,7 +336,7 @@ public:
         if (sz != 0)
         {
             const auto bucket = getBucketFromHash(hashval);
-            impls[bucket].prefetch_hash(hashval);
+            impls[bucket].prefetch_hash(key_holder, hashval);
         }
     }
 

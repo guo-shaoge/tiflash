@@ -104,8 +104,8 @@ using AggregatedDataWithUInt32Key = HashMap<UInt32, AggregateDataPtr, HashCRC32<
 // using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
 using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, PhHash<UInt64, PhHashSeed1>>;
 
-// using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
-using AggregatedDataWithShortStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
+using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
+// using AggregatedDataWithShortStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 // using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr>;
 using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 
@@ -121,8 +121,8 @@ using AggregatedDataWithUInt64KeyTwoLevel = TwoLevelHashMap<UInt64, AggregateDat
 
 using AggregatedDataWithInt256KeyTwoLevel = TwoLevelHashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
 
-// using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMap<AggregateDataPtr>;
-using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
+using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMap<AggregateDataPtr>;
+// using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 // using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr>;
 using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 
@@ -826,7 +826,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         = AggregationMethodOneNumber<Int256, AggregatedDataWithInt256KeyTwoLevel##DATA_POSTFIX, ENABLE_CACHE>;
 
     M_OneNumber(, , true);
-    M_OneNumber(_phmap, PhMap, false);
+    // M_OneNumber(_phmap, PhMap, false);
 #undef M_OneNumber
 
 #define M_StringNoCache(METHOD_POSTFIX, DATA_POSTFIX)                                     \
@@ -836,7 +836,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         = AggregationMethodStringNoCache<AggregatedDataWithShortStringKeyTwoLevel##DATA_POSTFIX>;
 
     M_StringNoCache(, );
-    M_StringNoCache(_phmap, PhMap);
+    // M_StringNoCache(_phmap, PhMap);
 #undef M_StringNoCache
 
 #define M_OneKeyStringNoCache(METHOD_POSTFIX, DATA_POSTFIX)                                                    \
@@ -850,7 +850,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         = AggregationMethodOneKeyStringNoCache<true, AggregatedDataWithShortStringKeyTwoLevel##DATA_POSTFIX>;
 
     M_OneKeyStringNoCache(, );
-    M_OneKeyStringNoCache(_phmap, PhMap);
+    // M_OneKeyStringNoCache(_phmap, PhMap);
 #undef M_OneKeyStringNoCache
 
 #define M_FixedStringNoCache(METHOD_POSTFIX, DATA_POSTFIX)                                     \
@@ -860,7 +860,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         = AggregationMethodFixedStringNoCache<AggregatedDataWithShortStringKeyTwoLevel##DATA_POSTFIX>;
 
     M_FixedStringNoCache(, );
-    M_FixedStringNoCache(_phmap, PhMap);
+    // M_FixedStringNoCache(_phmap, PhMap);
 #undef M_FixedStringNoCache
 
 #define M_KeysFixed(METHOD_POSTFIX, DATA_POSTFIX, NULLABLE, ENABLE_CACHE) \
@@ -891,7 +891,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         = AggregationMethodKeysFixed<AggregatedDataWithKeys256TwoLevel##DATA_POSTFIX, NULLABLE, ENABLE_CACHE>;
 
     M_KeysFixed(, , false, true);
-    M_KeysFixed(_phmap, PhMap, false, false);
+    // M_KeysFixed(_phmap, PhMap, false, false);
 #undef M_KeysFixed
 
 #define M_KeysFixed(METHOD_POSTFIX, DATA_POSTFIX, NULLABLE, ENABLE_CACHE)                                      \
@@ -905,7 +905,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         = AggregationMethodKeysFixed<AggregatedDataWithKeys256TwoLevel##DATA_POSTFIX, NULLABLE, ENABLE_CACHE>;
 
     M_KeysFixed(, , true, true);
-    M_KeysFixed(_phmap, PhMap, true, false);
+    // M_KeysFixed(_phmap, PhMap, true, false);
 #undef M_KeysFixed
 
 #define M_Serialized(METHOD_POSTFIX, DATA_POSTFIX)                                \
@@ -915,7 +915,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         = AggregationMethodSerialized<AggregatedDataWithStringKeyTwoLevel##DATA_POSTFIX>;
 
     M_Serialized(, );
-    M_Serialized(_phmap, PhMap);
+    // M_Serialized(_phmap, PhMap);
 #undef M_Serialized
 
 #define M_FastPathTwoKeysNoCache(METHOD_POSTFIX, DATA_POSTFIX)                                                      \
@@ -976,7 +976,7 @@ struct AggregatedDataVariants : private boost::noncopyable
             AggregatedDataWithStringKeyTwoLevel##DATA_POSTFIX>;
 
     M_FastPathTwoKeysNoCache(, );
-    M_FastPathTwoKeysNoCache(_phmap, PhMap);
+    // M_FastPathTwoKeysNoCache(_phmap, PhMap);
 #undef M_FastPathTwoKeysNoCache
 
 // All methods with DefaultHash hasher.
@@ -1012,7 +1012,7 @@ struct AggregatedDataVariants : private boost::noncopyable
 #undef M_FixedString
 
 /// In this and similar macros, the option without_key is not considered.
-#define APPLY_FOR_AGGREGATED_VARIANTS_NON_PHMAP(M)          \
+#define APPLY_FOR_AGGREGATED_VARIANTS(M)   \
     M(key8, false)                                          \
     M(key16, false)                                         \
     M(key32, false)                                         \
@@ -1062,52 +1062,6 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(two_keys_strbinpadding_strbinpadding_two_level, true) \
     M(one_key_strbin_two_level, true)                       \
     M(one_key_strbinpadding_two_level, true)
-
-#define APPLY_FOR_AGGREGATED_VARIANTS_PHMAP(M)                    \
-    M(key32_phmap, false)                                         \
-    M(key64_phmap, false)                                         \
-    M(key_string_phmap, false)                                    \
-    M(key_fixed_string_phmap, false)                              \
-    M(keys32_phmap, false)                                        \
-    M(keys64_phmap, false)                                        \
-    M(keys128_phmap, false)                                       \
-    M(keys256_phmap, false)                                       \
-    M(key_int256_phmap, false)                                    \
-    M(serialized_phmap, false)                                    \
-    M(nullable_keys128_phmap, false)                              \
-    M(nullable_keys256_phmap, false)                              \
-    M(two_keys_num64_strbin_phmap, false)                         \
-    M(two_keys_num64_strbinpadding_phmap, false)                  \
-    M(two_keys_strbin_num64_phmap, false)                         \
-    M(two_keys_strbin_strbin_phmap, false)                        \
-    M(two_keys_strbinpadding_num64_phmap, false)                  \
-    M(two_keys_strbinpadding_strbinpadding_phmap, false)          \
-    M(one_key_strbin_phmap, false)                                \
-    M(one_key_strbinpadding_phmap, false)                         \
-    M(key32_phmap_two_level, true)                                \
-    M(key64_phmap_two_level, true)                                \
-    M(key_int256_phmap_two_level, true)                           \
-    M(key_string_phmap_two_level, true)                           \
-    M(key_fixed_string_phmap_two_level, true)                     \
-    M(keys32_phmap_two_level, true)                               \
-    M(keys64_phmap_two_level, true)                               \
-    M(keys128_phmap_two_level, true)                              \
-    M(keys256_phmap_two_level, true)                              \
-    M(serialized_phmap_two_level, true)                           \
-    M(nullable_keys128_phmap_two_level, true)                     \
-    M(nullable_keys256_phmap_two_level, true)                     \
-    M(two_keys_num64_strbin_phmap_two_level, true)                \
-    M(two_keys_num64_strbinpadding_phmap_two_level, true)         \
-    M(two_keys_strbin_num64_phmap_two_level, true)                \
-    M(two_keys_strbin_strbin_phmap_two_level, true)               \
-    M(two_keys_strbinpadding_num64_phmap_two_level, true)         \
-    M(two_keys_strbinpadding_strbinpadding_phmap_two_level, true) \
-    M(one_key_strbin_phmap_two_level, true)                       \
-    M(one_key_strbinpadding_phmap_two_level, true)
-
-#define APPLY_FOR_AGGREGATED_VARIANTS(M)   \
-    APPLY_FOR_AGGREGATED_VARIANTS_PHMAP(M) \
-    APPLY_FOR_AGGREGATED_VARIANTS_NON_PHMAP(M)
 
     enum class Type
     {
@@ -1240,7 +1194,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         }
     }
 
-#define APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL_NON_PHMAP(M) \
+#define APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL(M)   \
     M(key32)                                                     \
     M(key64)                                                     \
     M(key_int256)                                                \
@@ -1261,32 +1215,6 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(two_keys_strbinpadding_strbinpadding)                      \
     M(one_key_strbin)                                            \
     M(one_key_strbinpadding)
-
-#define APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL_PHMAP(M) \
-    M(key32_phmap)                                           \
-    M(key64_phmap)                                           \
-    M(key_int256_phmap)                                      \
-    M(key_string_phmap)                                      \
-    M(key_fixed_string_phmap)                                \
-    M(keys32_phmap)                                          \
-    M(keys64_phmap)                                          \
-    M(keys128_phmap)                                         \
-    M(keys256_phmap)                                         \
-    M(serialized_phmap)                                      \
-    M(nullable_keys128_phmap)                                \
-    M(nullable_keys256_phmap)                                \
-    M(two_keys_num64_strbin_phmap)                           \
-    M(two_keys_num64_strbinpadding_phmap)                    \
-    M(two_keys_strbin_num64_phmap)                           \
-    M(two_keys_strbin_strbin_phmap)                          \
-    M(two_keys_strbinpadding_num64_phmap)                    \
-    M(two_keys_strbinpadding_strbinpadding_phmap)            \
-    M(one_key_strbin_phmap)                                  \
-    M(one_key_strbinpadding_phmap)
-
-#define APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL(M)   \
-    APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL_PHMAP(M) \
-    APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL_NON_PHMAP(M)
 
 #define APPLY_FOR_VARIANTS_NOT_CONVERTIBLE_TO_TWO_LEVEL(M) \
     M(key8)                                                \
@@ -1347,27 +1275,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(two_keys_strbinpadding_num64_two_level)               \
     M(two_keys_strbinpadding_strbinpadding_two_level)       \
     M(one_key_strbin_two_level)                             \
-    M(one_key_strbinpadding_two_level)                      \
-    M(key32_phmap_two_level)                                \
-    M(key64_phmap_two_level)                                \
-    M(key_int256_phmap_two_level)                           \
-    M(key_string_phmap_two_level)                           \
-    M(key_fixed_string_phmap_two_level)                     \
-    M(keys32_phmap_two_level)                               \
-    M(keys64_phmap_two_level)                               \
-    M(keys128_phmap_two_level)                              \
-    M(keys256_phmap_two_level)                              \
-    M(serialized_phmap_two_level)                           \
-    M(nullable_keys128_phmap_two_level)                     \
-    M(nullable_keys256_phmap_two_level)                     \
-    M(two_keys_num64_strbin_phmap_two_level)                \
-    M(two_keys_num64_strbinpadding_phmap_two_level)         \
-    M(two_keys_strbin_num64_phmap_two_level)                \
-    M(two_keys_strbin_strbin_phmap_two_level)               \
-    M(two_keys_strbinpadding_num64_phmap_two_level)         \
-    M(two_keys_strbinpadding_strbinpadding_phmap_two_level) \
-    M(one_key_strbin_phmap_two_level)                       \
-    M(one_key_strbinpadding_phmap_two_level)
+    M(one_key_strbinpadding_two_level)
 };
 
 using AggregatedDataVariantsPtr = std::shared_ptr<AggregatedDataVariants>;

@@ -500,22 +500,22 @@ AggregatedDataVariants::Type mapToPhMap(bool enable_phmap, const AggregatedDataV
     if (!enable_phmap)
         return type;
 
-    switch (type)
-    {
-#define M(name)                              \
-    case AggregatedDataVariants::Type::name: \
-        return AggregatedDataVariants::Type::name##_phmap;
-        APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL_NON_PHMAP(M);
-#undef M
-
-#define M(name)                                          \
-    case AggregatedDataVariants::Type::name##_two_level: \
-        return AggregatedDataVariants::Type::name##_phmap_two_level;
-        APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL_NON_PHMAP(M);
-#undef M
-    default:
-        RUNTIME_CHECK_MSG(false, "unexpected method type");
-    }
+//     switch (type)
+//     {
+// #define M(name)                              \
+//     case AggregatedDataVariants::Type::name: \
+//         return AggregatedDataVariants::Type::name##_phmap;
+//         APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL_NON_PHMAP(M);
+// #undef M
+// 
+// #define M(name)                                          \
+//     case AggregatedDataVariants::Type::name##_two_level: \
+//         return AggregatedDataVariants::Type::name##_phmap_two_level;
+//         APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL_NON_PHMAP(M);
+// #undef M
+//     default:
+//         RUNTIME_CHECK_MSG(false, "unexpected method type");
+//     }
 }
 } // namespace
 
