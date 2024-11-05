@@ -109,17 +109,20 @@ using AggregatedDataWithShortStringKey = HashMapWithSavedHash<StringRef, Aggrega
 // using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr>;
 using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 
-using AggregatedDataWithInt256Key = HashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
+// using AggregatedDataWithInt256Key = HashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
+using AggregatedDataWithInt256Key = HashMap<Int256, AggregateDataPtr, Hash256WithSeed<PhHashSeed1>>;
 
 // using AggregatedDataWithKeys128 = HashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 using AggregatedDataWithKeys128 = HashMap<Int128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
-using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
+// using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
+using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, Hash256WithSeed<PhHashSeed1>>;
 
 using AggregatedDataWithUInt32KeyTwoLevel = TwoLevelHashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
 // using AggregatedDataWithUInt64KeyTwoLevel = TwoLevelHashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
 using AggregatedDataWithUInt64KeyTwoLevel = TwoLevelHashMap<UInt64, AggregateDataPtr, PhHash<UInt64, PhHashSeed1>>;
 
-using AggregatedDataWithInt256KeyTwoLevel = TwoLevelHashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
+// using AggregatedDataWithInt256KeyTwoLevel = TwoLevelHashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
+using AggregatedDataWithInt256KeyTwoLevel = TwoLevelHashMap<Int256, AggregateDataPtr, Hash256WithSeed<PhHashSeed1>>;
 
 // using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMap<AggregateDataPtr>;
 using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
@@ -128,7 +131,8 @@ using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringR
 
 // using AggregatedDataWithKeys128TwoLevel = TwoLevelHashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 using AggregatedDataWithKeys128TwoLevel = TwoLevelHashMap<Int128, AggregateDataPtr, Hash128WithSeed<PhHashSeed1>>;
-using AggregatedDataWithKeys256TwoLevel = TwoLevelHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
+// using AggregatedDataWithKeys256TwoLevel = TwoLevelHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
+using AggregatedDataWithKeys256TwoLevel = TwoLevelHashMap<UInt256, AggregateDataPtr, Hash256WithSeed<PhHashSeed1>>;
 
 /** Variants with better hash function, using more than 32 bits for hash.
   * Using for merging phase of external aggregation, where number of keys may be far greater than 4 billion,

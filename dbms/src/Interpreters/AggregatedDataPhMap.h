@@ -136,7 +136,7 @@ inline void hash_combine(uint64_t& seed, const T& val) {
     seed ^= std::hash<T>{}(val) + 0x9e3779b97f4a7c15LLU + (seed << 12) + (seed >> 4);
 }
 
-inline uint64_t hash_128(uint64_t seed, Int128 val) {
+inline uint64_t hash_128(uint64_t seed, const Int128 & val) {
     auto low = static_cast<size_t>(val);
     auto high = static_cast<size_t>(val >> 64);
     hash_combine(seed, low);
@@ -148,6 +148,33 @@ template <PhHashSeed seed>
 struct Hash128WithSeed {
     std::size_t operator()(const Int128 & value) const {
         return PhHashMixSeed<sizeof(size_t), seed>()(hash_128(seed, value));
+    }
+};
+
+inline uint64_t hash_256(uint64_t seed, const Int256 & val) {
+    auto backend_value = val.backend();
+    for (size_t i = 0; i < backend_value.size(); ++i)
+    {
+        hash_combine(seed, backend_value.limbs()[i]);
+    }
+    return seed;
+}
+
+inline uint64_t hash_256(uint64_t seed, const UInt256 & val) {
+    hash_combine(seed, val.a);
+    hash_combine(seed, val.b);
+    hash_combine(seed, val.c);
+    hash_combine(seed, val.d);
+    return seed;
+}
+
+template <PhHashSeed seed>
+struct Hash256WithSeed {
+    std::size_t operator()(const Int256 & value) const {
+        return PhHashMixSeed<sizeof(size_t), seed>()(hash_256(seed, value));
+    }
+    std::size_t operator()(const UInt256 & value) const {
+        return PhHashMixSeed<sizeof(size_t), seed>()(hash_256(seed, value));
     }
 };
 
