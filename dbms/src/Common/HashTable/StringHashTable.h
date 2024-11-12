@@ -16,6 +16,7 @@
 
 #include <Common/HashTable/HashMap.h>
 #include <Common/HashTable/HashTable.h>
+#include <Common/HashTable/HashTableKeyHolder.h>
 
 #include <new>
 #include <variant>
@@ -190,6 +191,10 @@ struct StringHashTableLookupResult
     friend bool operator!=(const StringHashTableLookupResult & a, const std::nullptr_t &) { return a.mapped_ptr; }
     friend bool operator!=(const std::nullptr_t &, const StringHashTableLookupResult & b) { return b.mapped_ptr; }
 };
+
+using StringHashMapPrefetchFunc = std::function<void(size_t)>;
+template <typename LookupResult>
+using StringHashMapEmplaceFunc = std::function<void(DB::ArenaKeyHolder &&, LookupResult &, bool &, size_t)>;
 
 template <typename SubMaps>
 class StringHashTable : private boost::noncopyable
@@ -367,6 +372,186 @@ public:
     void ALWAYS_INLINE emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted)
     {
         this->dispatch(*this, key_holder, EmplaceCallable(it, inserted));
+    }
+
+    std::tuple<size_t, StringHashMapPrefetchFunc, StringHashMapEmplaceFunc<LookupResult>>
+    hashWithCallback(StringRef x)
+    {
+        const size_t sz = x.size;
+
+        if (x.size == 0)
+            return std::make_tuple(
+                    0,
+                        [](size_t)
+                        {
+                            // no need to prefetch for m0;
+                        },
+                        [this](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
+                        {
+                            typename T0::LookupResult result;
+                            this->m0.emplace(key_holder, result, inserted, hashval);
+                            it = &result->getMapped();
+                        });
+
+        if (x.data[sz - 1] == 0)
+        {
+            return std::make_tuple(
+                    ms.hash(x),
+                    [this](size_t hashval)
+                    {
+                        this->ms.prefetch(hashval);
+                    },
+                    [this](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
+                    {
+                        typename Ts::LookupResult result;
+                        this->ms.emplace(key_holder, result, inserted, hashval);
+                        it = &result->getMapped();
+                    });
+        }
+
+        const char * p = x.data;
+        // pending bits that needs to be shifted out
+        const char s = (-sz & 7) * 8;
+        union
+        {
+            StringKey8 k8;
+            StringKey16 k16;
+            StringKey24 k24;
+            UInt64 n[3];
+        };
+
+        StringHashTableHash hash;
+
+        switch ((sz - 1) >> 3)
+        {
+        case 0: // 1..8 bytes
+        {
+            // first half page
+            if ((reinterpret_cast<uintptr_t>(p) & 2048) == 0)
+            {
+                memcpy(&n[0], p, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] &= (-1ULL >> s);
+                else
+                    n[0] &= (-1ULL << s);
+            }
+            else
+            {
+                const char * lp = x.data + x.size - 8;
+                memcpy(&n[0], lp, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] >>= s;
+                else
+                    n[0] <<= s;
+            }
+            // TODO
+            // keyHolderDiscardKey(key_holder);
+
+            return std::make_tuple(
+                    hash(k8),
+                    [this](size_t hashval)
+                    {
+                        this->m1.prefetch_hash(hashval);
+                    },
+                    [this, k8](DB::ArenaKeyHolder &&, LookupResult & it, bool & inserted, size_t hashval) // TODO del KeyHolder
+                    {
+                        typename T1::LookupResult result;
+                        this->m1.emplace(k8, result, inserted, hashval);
+                        it = &result->getMapped();
+                    });
+        }
+        case 1: // 9..16 bytes
+        {
+            memcpy(&n[0], p, 8);
+            const char * lp = x.data + x.size - 8;
+            memcpy(&n[1], lp, 8);
+            if constexpr (DB::isLittleEndian())
+                n[1] >>= s;
+            else
+                n[1] <<= s;
+            // TODO
+            // keyHolderDiscardKey(key_holder);
+
+            return std::make_tuple(
+                    ms.hash(x),
+                    [this](size_t hashval)
+                    {
+                        this->m2.prefetch(hashval);
+                    },
+                    [this, sz, &x](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
+                    {
+                        const char * p = x.data;
+                        // pending bits that needs to be shifted out
+                        const char s = (-sz & 7) * 8;
+                        union
+                        {
+                            StringKey8 k8;
+                            StringKey16 k16;
+                            StringKey24 k24;
+                            UInt64 n[3];
+                        };
+                        memcpy(&n[0], p, 8);
+                        const char * lp = x.data + x.size - 8;
+                        memcpy(&n[1], lp, 8);
+                        if constexpr (DB::isLittleEndian())
+                            n[1] >>= s;
+                        else
+                            n[1] <<= s;
+                        keyHolderDiscardKey(key_holder);
+                        typename T1::LookupResult result;
+                        this->m2.emplace(key_holder, result, inserted, hashval);
+                        it = &result->getMapped();
+                    });
+        }
+        case 2: // 17..24 bytes
+        {
+            return std::make_tuple(
+                    ms.hash(x),
+                    [this](size_t hashval)
+                    {
+                        this->m3.prefetch(hashval);
+                    },
+                    [this, sz, &x](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
+                    {
+                        const char * p = x.data;
+                        // pending bits that needs to be shifted out
+                        const char s = (-sz & 7) * 8;
+                        union
+                        {
+                            StringKey8 k8;
+                            StringKey16 k16;
+                            StringKey24 k24;
+                            UInt64 n[3];
+                        };
+                        memcpy(&n[0], p, 16);
+                        const char * lp = x.data + x.size - 8;
+                        memcpy(&n[2], lp, 8);
+                        if constexpr (DB::isLittleEndian())
+                            n[2] >>= s;
+                        else
+                            n[2] <<= s;
+                        keyHolderDiscardKey(key_holder);
+                        typename T1::LookupResult result;
+                        this->m3.emplace(key_holder, result, inserted, hashval);
+                        it = &result->getMapped();
+                    });
+        }
+        default: // >= 25 bytes
+        {
+            return std::make_tuple(
+                    ms.hash(x),
+                    [this](size_t hashval)
+                    {
+                        this->ms.prefetch(hashval);
+                    },
+                    [this](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
+                    {
+                        typename Ts::LookupResult result;
+                        this->ms.emplace(key_holder, result, inserted, hashval);
+                        it = &result->getMapped();
+                    });
+        }
+        }
     }
 
     struct FindCallable
