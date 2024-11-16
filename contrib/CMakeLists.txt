@@ -20,6 +20,15 @@ if (USE_QPL AND USE_INTERNAL_QPL_LIBRARY)
     add_subdirectory (qpl-cmake)
 endif ()
 
+if (USE_INTERNAL_GRPC_LIBRARY)
+    # Variable RANDOM_FILE will be defined and cached by curl, and break c-ares build if CMake runs the second time.
+    unset(RANDOM_FILE CACHE)
+    add_subdirectory(abseil-cpp-cmake)
+    set (CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+    add_subdirectory(grpc-cmake)
+    unset (CMAKE_POLICY_DEFAULT_CMP0077)
+endif ()
+
 if (USE_INTERNAL_RE2_LIBRARY)
     add_subdirectory (re2-cmake)
 endif ()
@@ -114,15 +123,6 @@ endif ()
 if (USE_INTERNAL_PROTOBUF_LIBRARY)
     message("gjt debug internal protobuf")
     add_subdirectory(protobuf-cmake)
-endif ()
-
-if (USE_INTERNAL_GRPC_LIBRARY)
-    # Variable RANDOM_FILE will be defined and cached by curl, and break c-ares build if CMake runs the second time.
-    unset(RANDOM_FILE CACHE)
-    add_subdirectory(abseil-cpp-cmake)
-    set (CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-    add_subdirectory(grpc-cmake)
-    unset (CMAKE_POLICY_DEFAULT_CMP0077)
 endif ()
 
     add_subdirectory(c-ares-cmake)

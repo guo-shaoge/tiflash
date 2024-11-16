@@ -462,7 +462,7 @@ unsigned OptimizedRegularExpressionImpl<thread_safe>::match(
             matches.resize(limit);
             for (size_t i = 0; i < limit; ++i)
             {
-                if (pieces[i] != nullptr)
+                if (pieces[i] != std::string_view{})
                 {
                     matches[i].offset = pieces[i].data() - subject;
                     matches[i].length = pieces[i].length();

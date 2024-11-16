@@ -1,5 +1,6 @@
 set(ABSL_ROOT_DIR "${TiFlash_SOURCE_DIR}/contrib/abseil-cpp")
 set(ABSL_ROOT_DIR "${ABSL_ROOT_DIR}" PARENT_SCOPE)
+message ("gjt debug absl root in absl: ${ABSL_ROOT_DIR}")
 set(ABSL_COMMON_INCLUDE_DIRS "${ABSL_ROOT_DIR}")
 
 #

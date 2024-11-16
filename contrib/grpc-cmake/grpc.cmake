@@ -159,6 +159,7 @@ target_include_directories(gpr
     ${_gRPC_XXHASH_INCLUDE_DIR}
     ${_gRPC_ZLIB_INCLUDE_DIR}
 )
+message ("gjt debug absl root in grpc: ${ABSL_ROOT_DIR}")
 target_link_libraries(gpr
   ${_gRPC_ALLTARGETS_LIBRARIES}
   absl::base

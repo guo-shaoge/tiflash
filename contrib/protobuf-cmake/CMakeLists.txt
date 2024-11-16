@@ -208,6 +208,7 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
 endif()
 target_include_directories(_libprotobuf SYSTEM PUBLIC ${protobuf_source_dir}/src)
 add_library(protobuf::libprotobuf ALIAS _libprotobuf)
+add_library(libprotobuf ALIAS _libprotobuf)
 
 
 set(libprotoc_files
