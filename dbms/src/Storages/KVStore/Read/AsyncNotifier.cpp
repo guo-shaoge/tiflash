@@ -36,7 +36,7 @@ AsyncNotifier::Status AsyncWaker::Notifier::blockedWaitUtil(const SteadyClock::t
     return res;
 }
 
-void AsyncWaker::Notifier::wake() NO_THREAD_SAFETY_ANALYSIS
+void AsyncWaker::Notifier::wake() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     // if flag from false -> true, then wake up.
     // if flag from true -> true, do nothing.

@@ -26,7 +26,7 @@
 #ifdef __clang__
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-// include to suppress warnings on NO_THREAD_SAFETY_ANALYSIS. clang can't work without this include, don't know why
+// include to suppress warnings on ABSL_NO_THREAD_SAFETY_ANALYSIS. clang can't work without this include, don't know why
 #include <grpcpp/security/credentials.h>
 #pragma GCC diagnostic pop
 
@@ -138,17 +138,17 @@ struct ReadIndexNotifyCtrl : MutexLockWrap
 {
     using Data = std::deque<std::pair<RegionID, Timestamp>>;
 
-    bool empty() const NO_THREAD_SAFETY_ANALYSIS
+    bool empty() const ABSL_NO_THREAD_SAFETY_ANALYSIS
     {
         auto _ = genLockGuard();
         return data.empty();
     }
-    void add(RegionID id, Timestamp ts) NO_THREAD_SAFETY_ANALYSIS
+    void add(RegionID id, Timestamp ts) ABSL_NO_THREAD_SAFETY_ANALYSIS
     {
         auto _ = genLockGuard();
         data.emplace_back(id, ts);
     }
-    Data popAll() NO_THREAD_SAFETY_ANALYSIS
+    Data popAll() ABSL_NO_THREAD_SAFETY_ANALYSIS
     {
         auto _ = genLockGuard();
         return std::move(data);

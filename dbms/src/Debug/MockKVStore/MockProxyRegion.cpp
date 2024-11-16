@@ -29,25 +29,25 @@
 
 namespace DB
 {
-raft_serverpb::RegionLocalState MockProxyRegion::getState() NO_THREAD_SAFETY_ANALYSIS
+raft_serverpb::RegionLocalState MockProxyRegion::getState() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return state;
 }
 
-raft_serverpb::RegionLocalState & MockProxyRegion::mutState() NO_THREAD_SAFETY_ANALYSIS
+raft_serverpb::RegionLocalState & MockProxyRegion::mutState() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return state;
 }
 
-raft_serverpb::RaftApplyState MockProxyRegion::getApply() NO_THREAD_SAFETY_ANALYSIS
+raft_serverpb::RaftApplyState MockProxyRegion::getApply() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return apply;
 }
 
-void MockProxyRegion::updateAppliedIndex(uint64_t index, bool persist_at_once) NO_THREAD_SAFETY_ANALYSIS
+void MockProxyRegion::updateAppliedIndex(uint64_t index, bool persist_at_once) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto l = genLockGuard();
     this->apply.set_applied_index(index);
@@ -57,7 +57,7 @@ void MockProxyRegion::updateAppliedIndex(uint64_t index, bool persist_at_once) N
     }
 }
 
-void MockProxyRegion::persistAppliedIndex() NO_THREAD_SAFETY_ANALYSIS
+void MockProxyRegion::persistAppliedIndex() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     this->persisted_apply = apply;
@@ -68,26 +68,26 @@ void MockProxyRegion::persistAppliedIndex(const std::lock_guard<Mutex> &)
     this->persisted_apply = apply;
 }
 
-uint64_t MockProxyRegion::getPersistedAppliedIndex() NO_THREAD_SAFETY_ANALYSIS
+uint64_t MockProxyRegion::getPersistedAppliedIndex() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     // Assume persist after every advance for simplicity.
     auto _ = genLockGuard();
     return this->persisted_apply.applied_index();
 }
 
-uint64_t MockProxyRegion::getLatestAppliedIndex() NO_THREAD_SAFETY_ANALYSIS
+uint64_t MockProxyRegion::getLatestAppliedIndex() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return this->apply.applied_index();
 }
 
-uint64_t MockProxyRegion::getLatestCommitTerm() NO_THREAD_SAFETY_ANALYSIS
+uint64_t MockProxyRegion::getLatestCommitTerm() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return this->apply.commit_term();
 }
 
-uint64_t MockProxyRegion::getLatestCommitIndex() NO_THREAD_SAFETY_ANALYSIS
+uint64_t MockProxyRegion::getLatestCommitIndex() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return this->apply.commit_index();
@@ -102,19 +102,19 @@ void MockProxyRegion::tryUpdateTruncatedState(uint64_t index, uint64_t term)
     }
 }
 
-void MockProxyRegion::updateCommitIndex(uint64_t index) NO_THREAD_SAFETY_ANALYSIS
+void MockProxyRegion::updateCommitIndex(uint64_t index) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     this->apply.set_commit_index(index);
 }
 
-void MockProxyRegion::setState(raft_serverpb::RegionLocalState s) NO_THREAD_SAFETY_ANALYSIS
+void MockProxyRegion::setState(raft_serverpb::RegionLocalState s) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     this->state = s;
 }
 
-void MockProxyRegion::reload() NO_THREAD_SAFETY_ANALYSIS
+void MockProxyRegion::reload() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     this->apply.set_applied_index(this->persisted_apply.applied_index());
@@ -132,7 +132,7 @@ MockProxyRegion::MockProxyRegion(uint64_t id_)
     state.mutable_region()->set_id(id);
 }
 
-UniversalWriteBatch MockProxyRegion::persistMeta() NO_THREAD_SAFETY_ANALYSIS
+UniversalWriteBatch MockProxyRegion::persistMeta() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     auto wb = UniversalWriteBatch();
@@ -164,7 +164,7 @@ UniversalWriteBatch MockProxyRegion::persistMeta() NO_THREAD_SAFETY_ANALYSIS
     return wb;
 }
 
-void MockProxyRegion::addPeer(uint64_t store_id, uint64_t peer_id, metapb::PeerRole role) NO_THREAD_SAFETY_ANALYSIS
+void MockProxyRegion::addPeer(uint64_t store_id, uint64_t peer_id, metapb::PeerRole role) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     auto & peer = *state.mutable_region()->mutable_peers()->Add();

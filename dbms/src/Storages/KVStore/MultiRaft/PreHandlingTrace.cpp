@@ -18,14 +18,14 @@
 #ifdef __clang__
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-// include to suppress warnings on NO_THREAD_SAFETY_ANALYSIS. clang can't work without this include, don't know why
+// include to suppress warnings on ABSL_NO_THREAD_SAFETY_ANALYSIS. clang can't work without this include, don't know why
 #include <grpcpp/security/credentials.h>
 #pragma GCC diagnostic pop
 
 namespace DB
 {
 
-std::shared_ptr<PreHandlingTrace::Item> PreHandlingTrace::registerTask(uint64_t region_id) NO_THREAD_SAFETY_ANALYSIS
+std::shared_ptr<PreHandlingTrace::Item> PreHandlingTrace::registerTask(uint64_t region_id) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     // Automaticlly override the old one.
     auto _ = genLockGuard();
@@ -34,7 +34,7 @@ std::shared_ptr<PreHandlingTrace::Item> PreHandlingTrace::registerTask(uint64_t 
     return b;
 }
 
-std::shared_ptr<PreHandlingTrace::Item> PreHandlingTrace::deregisterTask(uint64_t region_id) NO_THREAD_SAFETY_ANALYSIS
+std::shared_ptr<PreHandlingTrace::Item> PreHandlingTrace::deregisterTask(uint64_t region_id) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     auto it = tasks.find(region_id);
@@ -46,7 +46,7 @@ std::shared_ptr<PreHandlingTrace::Item> PreHandlingTrace::deregisterTask(uint64_
     }
     return nullptr;
 }
-bool PreHandlingTrace::hasTask(uint64_t region_id) NO_THREAD_SAFETY_ANALYSIS
+bool PreHandlingTrace::hasTask(uint64_t region_id) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return tasks.find(region_id) != tasks.end();

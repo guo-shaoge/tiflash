@@ -16,13 +16,13 @@
 
 namespace DB
 {
-void ReadIndexDataNode::WaitingTasks::add(Timestamp ts, ReadIndexFuturePtr f) NO_THREAD_SAFETY_ANALYSIS
+void ReadIndexDataNode::WaitingTasks::add(Timestamp ts, ReadIndexFuturePtr f) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     waiting_tasks.emplace_back(ts, std::move(f));
 }
 
-std::optional<ReadIndexDataNode::WaitingTasks::Data> ReadIndexDataNode::WaitingTasks::popAll() NO_THREAD_SAFETY_ANALYSIS
+std::optional<ReadIndexDataNode::WaitingTasks::Data> ReadIndexDataNode::WaitingTasks::popAll() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     if (waiting_tasks.empty())
@@ -30,14 +30,14 @@ std::optional<ReadIndexDataNode::WaitingTasks::Data> ReadIndexDataNode::WaitingT
     return std::move(waiting_tasks);
 }
 
-size_t ReadIndexDataNode::WaitingTasks::size() const NO_THREAD_SAFETY_ANALYSIS
+size_t ReadIndexDataNode::WaitingTasks::size() const ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return waiting_tasks.size();
 }
 
 void ReadIndexDataNode::runOneRound(const TiFlashRaftProxyHelper & helper, const ReadIndexNotifyCtrlPtr & notify)
-    NO_THREAD_SAFETY_ANALYSIS
+    ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto opt_waiting_tasks = this->waiting_tasks.popAll();
     if (!opt_waiting_tasks)
@@ -275,7 +275,7 @@ void ReadIndexDataNode::doConsume(const TiFlashRaftProxyHelper & helper, Running
     }
 }
 
-void ReadIndexDataNode::consume(const TiFlashRaftProxyHelper & helper, Timestamp ts) NO_THREAD_SAFETY_ANALYSIS
+void ReadIndexDataNode::consume(const TiFlashRaftProxyHelper & helper, Timestamp ts) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
 
@@ -285,7 +285,7 @@ void ReadIndexDataNode::consume(const TiFlashRaftProxyHelper & helper, Timestamp
     }
 }
 
-ReadIndexDataNode::~ReadIndexDataNode() NO_THREAD_SAFETY_ANALYSIS
+ReadIndexDataNode::~ReadIndexDataNode() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
 

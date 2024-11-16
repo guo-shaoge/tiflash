@@ -162,6 +162,6 @@ public:
 
 private:
     std::mutex mtx;
-    std::list<MergedTaskPtr> merged_task_pool GUARDED_BY(mtx);
+    std::list<MergedTaskPtr> merged_task_pool ABSL_GUARDED_BY(mtx);
 };
 } // namespace DB::DM

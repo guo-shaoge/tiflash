@@ -24,7 +24,7 @@
 #ifdef __clang__
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-// include to suppress warnings on NO_THREAD_SAFETY_ANALYSIS. clang can't work without this include, don't know why
+// include to suppress warnings on ABSL_NO_THREAD_SAFETY_ANALYSIS. clang can't work without this include, don't know why
 #include <grpcpp/security/credentials.h>
 #pragma GCC diagnostic pop
 
@@ -205,7 +205,7 @@ void ReadIndexTest::testError()
 struct Helper
 {
     size_t & counter;
-    void operator()(std::unordered_map<RegionID, ReadIndexDataNodePtr> & d) NO_THREAD_SAFETY_ANALYSIS
+    void operator()(std::unordered_map<RegionID, ReadIndexDataNodePtr> & d) ABSL_NO_THREAD_SAFETY_ANALYSIS
     {
         for (auto & x : d)
         {
@@ -247,7 +247,7 @@ void ReadIndexTest::testBasic()
         // lock wrap
         struct TestMutexLockWrap : MutexLockWrap
         {
-            void test() NO_THREAD_SAFETY_ANALYSIS
+            void test() ABSL_NO_THREAD_SAFETY_ANALYSIS
             {
                 {
                     auto lock = genLockGuard();

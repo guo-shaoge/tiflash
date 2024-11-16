@@ -20,25 +20,25 @@ std::atomic<std::chrono::milliseconds> ReadIndexWorker::max_read_index_task_time
     = std::chrono::milliseconds{8 * 1000};
 //std::atomic<size_t> ReadIndexWorker::max_read_index_history{8};
 
-bool RegionNotifyMap::empty() const NO_THREAD_SAFETY_ANALYSIS
+bool RegionNotifyMap::empty() const ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return data.empty();
 }
 
-void RegionNotifyMap::add(RegionID id) NO_THREAD_SAFETY_ANALYSIS
+void RegionNotifyMap::add(RegionID id) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     data.emplace(id);
 }
 
-RegionNotifyMap::Data RegionNotifyMap::popAll() NO_THREAD_SAFETY_ANALYSIS
+RegionNotifyMap::Data RegionNotifyMap::popAll() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return std::move(data);
 }
 
-void ReadIndexFuture::update(kvrpcpb::ReadIndexResponse resp) NO_THREAD_SAFETY_ANALYSIS
+void ReadIndexFuture::update(kvrpcpb::ReadIndexResponse resp) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     // The future can only be set once.
@@ -58,7 +58,7 @@ void ReadIndexFuture::update(kvrpcpb::ReadIndexResponse resp) NO_THREAD_SAFETY_A
 }
 
 std::optional<kvrpcpb::ReadIndexResponse> ReadIndexFuture::poll(const std::shared_ptr<AsyncNotifier> & notifier_) const
-    NO_THREAD_SAFETY_ANALYSIS
+    ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     if (!finished)

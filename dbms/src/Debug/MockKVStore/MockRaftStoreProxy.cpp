@@ -66,7 +66,7 @@ TiFlashRaftProxyHelper MockRaftStoreProxy::setRaftStoreProxyFFIHelper(RaftStoreP
     return res;
 }
 
-MockProxyRegionPtr MockRaftStoreProxy::getRegion(uint64_t id) NO_THREAD_SAFETY_ANALYSIS
+MockProxyRegionPtr MockRaftStoreProxy::getRegion(uint64_t id) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return doGetRegion(id);
@@ -81,7 +81,7 @@ MockProxyRegionPtr MockRaftStoreProxy::doGetRegion(uint64_t id)
     return nullptr;
 }
 
-MockReadIndexTask * MockRaftStoreProxy::makeReadIndexTask(kvrpcpb::ReadIndexRequest req) NO_THREAD_SAFETY_ANALYSIS
+MockReadIndexTask * MockRaftStoreProxy::makeReadIndexTask(kvrpcpb::ReadIndexRequest req) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
 
@@ -100,7 +100,7 @@ MockReadIndexTask * MockRaftStoreProxy::makeReadIndexTask(kvrpcpb::ReadIndexRequ
     return nullptr;
 }
 
-void MockRaftStoreProxy::init(size_t region_num) NO_THREAD_SAFETY_ANALYSIS
+void MockRaftStoreProxy::init(size_t region_num) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     for (size_t i = 0; i < region_num; ++i)
@@ -118,13 +118,13 @@ std::unique_ptr<TiFlashRaftProxyHelper> MockRaftStoreProxy::generateProxyHelper(
     return proxy_helper;
 }
 
-size_t MockRaftStoreProxy::size() const NO_THREAD_SAFETY_ANALYSIS
+size_t MockRaftStoreProxy::size() const ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return regions.size();
 }
 
-void MockRaftStoreProxy::testRunReadIndex(const std::atomic_bool & over) NO_THREAD_SAFETY_ANALYSIS
+void MockRaftStoreProxy::testRunReadIndex(const std::atomic_bool & over) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     while (!over)
     {
@@ -136,7 +136,7 @@ void MockRaftStoreProxy::testRunReadIndex(const std::atomic_bool & over) NO_THRE
     }
 }
 
-void MockRaftStoreProxy::unsafeInvokeForTest(std::function<void(MockRaftStoreProxy &)> && cb) NO_THREAD_SAFETY_ANALYSIS
+void MockRaftStoreProxy::unsafeInvokeForTest(std::function<void(MockRaftStoreProxy &)> && cb) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     cb(*this);
@@ -146,7 +146,7 @@ void MockRaftStoreProxy::bootstrapWithRegion(
     KVStore & kvs,
     TMTContext & tmt,
     RegionID region_id,
-    std::optional<std::pair<std::string, std::string>> maybe_range) NO_THREAD_SAFETY_ANALYSIS
+    std::optional<std::pair<std::string, std::string>> maybe_range) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     {
         auto _ = genLockGuard();
@@ -164,7 +164,7 @@ void MockRaftStoreProxy::debugAddRegions(
     KVStore & kvs,
     TMTContext & tmt,
     std::vector<UInt64> region_ids,
-    std::vector<std::pair<std::string, std::string>> && ranges) NO_THREAD_SAFETY_ANALYSIS
+    std::vector<std::pair<std::string, std::string>> && ranges) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     UNUSED(tmt);
     int n = ranges.size();
@@ -703,7 +703,7 @@ TableID MockRaftStoreProxy::bootstrapTable(Context & ctx, KVStore & kvs, TMTCont
     return table_id;
 }
 
-void MockRaftStoreProxy::clear() NO_THREAD_SAFETY_ANALYSIS
+void MockRaftStoreProxy::clear() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     regions.clear();
@@ -723,13 +723,13 @@ std::pair<std::string, std::string> MockRaftStoreProxy::generateTiKVKeyValue(uin
     return std::make_pair(value_write, value_default);
 }
 
-void GCMonitor::add(RawObjType type, int64_t diff) NO_THREAD_SAFETY_ANALYSIS
+void GCMonitor::add(RawObjType type, int64_t diff) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     data[type] += diff;
 }
 
-bool GCMonitor::checkClean() NO_THREAD_SAFETY_ANALYSIS
+bool GCMonitor::checkClean() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     for (auto && d : data)
@@ -743,7 +743,7 @@ bool GCMonitor::checkClean() NO_THREAD_SAFETY_ANALYSIS
     return true;
 }
 
-bool GCMonitor::empty() NO_THREAD_SAFETY_ANALYSIS
+bool GCMonitor::empty() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     auto _ = genLockGuard();
     return data.empty();

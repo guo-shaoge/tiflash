@@ -43,7 +43,7 @@
 #ifdef __clang__
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-// include to suppress warnings on NO_THREAD_SAFETY_ANALYSIS. clang can't work without this include, don't know why
+// include to suppress warnings on ABSL_NO_THREAD_SAFETY_ANALYSIS. clang can't work without this include, don't know why
 #include <grpcpp/security/credentials.h>
 #pragma GCC diagnostic pop
 
@@ -98,7 +98,7 @@ BlobStore<Trait>::BlobStore(
 {}
 
 template <typename Trait>
-void BlobStore<Trait>::registerPaths() NO_THREAD_SAFETY_ANALYSIS
+void BlobStore<Trait>::registerPaths() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     for (const auto & path : delegator->listPaths())
     {
@@ -161,7 +161,7 @@ void BlobStore<Trait>::reloadConfig(const BlobConfig & rhs)
 }
 
 template <typename Trait>
-FileUsageStatistics BlobStore<Trait>::getFileUsageStatistics() const NO_THREAD_SAFETY_ANALYSIS
+FileUsageStatistics BlobStore<Trait>::getFileUsageStatistics() const ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     FileUsageStatistics usage;
 
@@ -666,7 +666,7 @@ void BlobStore<Trait>::freezeBlobFiles()
 }
 
 template <typename Trait>
-void BlobStore<Trait>::removeEntries(const PageEntries & del_entries) NO_THREAD_SAFETY_ANALYSIS
+void BlobStore<Trait>::removeEntries(const PageEntries & del_entries) ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     std::set<BlobFileId> blob_updated;
     for (const auto & entry : del_entries)
@@ -724,13 +724,13 @@ void BlobStore<Trait>::removeEntries(const PageEntries & del_entries) NO_THREAD_
 
 template <typename Trait>
 std::pair<BlobFileId, BlobFileOffset> BlobStore<Trait>::getPosFromStats(size_t size, PageType page_type)
-    NO_THREAD_SAFETY_ANALYSIS
+    ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     Stopwatch watch;
     BlobStatPtr stat;
 
     // TODO: make this lambda as a function of BlobStats to simplify code
-    auto lock_stat = [size, this, &stat, &page_type]() NO_THREAD_SAFETY_ANALYSIS {
+    auto lock_stat = [size, this, &stat, &page_type]() ABSL_NO_THREAD_SAFETY_ANALYSIS {
         auto lock_stats = blob_stats.lock();
         BlobFileId blob_file_id = INVALID_BLOBFILE_ID;
         std::tie(stat, blob_file_id) = blob_stats.chooseStat(size, page_type, lock_stats);
@@ -783,7 +783,7 @@ std::pair<BlobFileId, BlobFileOffset> BlobStore<Trait>::getPosFromStats(size_t s
 
 template <typename Trait>
 void BlobStore<Trait>::removePosFromStats(BlobFileId blob_id, BlobFileOffset offset, size_t size)
-    NO_THREAD_SAFETY_ANALYSIS
+    ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     const auto & stat = blob_stats.blobIdToStat(blob_id);
     {
@@ -1179,7 +1179,7 @@ void BlobStore<Trait>::read(
 
 
 template <typename Trait>
-typename BlobStore<Trait>::PageTypeAndBlobIds BlobStore<Trait>::getGCStats() NO_THREAD_SAFETY_ANALYSIS
+typename BlobStore<Trait>::PageTypeAndBlobIds BlobStore<Trait>::getGCStats() ABSL_NO_THREAD_SAFETY_ANALYSIS
 {
     // Get a copy of stats map to avoid the big lock on stats map
     const auto stats_list = blob_stats.getStats();

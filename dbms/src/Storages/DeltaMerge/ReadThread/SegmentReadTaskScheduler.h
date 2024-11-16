@@ -103,7 +103,7 @@ private:
     LoggerPtr log;
 
     std::mutex pending_mtx;
-    SegmentReadTaskPools pending_pools GUARDED_BY(pending_mtx);
+    SegmentReadTaskPools pending_pools ABSL_GUARDED_BY(pending_mtx);
 
     friend class tests::SegmentReadTasksPoolTest;
 };
