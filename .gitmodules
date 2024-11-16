@@ -155,3 +155,6 @@
 [submodule "contrib/highfive"]
 	path = contrib/highfive
 	url = https://github.com/BlueBrain/HighFive
+[submodule "contrib/c-ares"]
+	path = contrib/c-ares
+	url = git@github.com:c-ares/c-ares.git

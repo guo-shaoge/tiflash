@@ -51,7 +51,9 @@ endif ()
 
 if (USE_INTERNAL_ZLIB_LIBRARY)
     set (CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-    add_subdirectory (${INTERNAL_ZLIB_NAME})
+    # add_subdirectory (${INTERNAL_ZLIB_NAME})
+    # add_subdirectory(zlib-ng-cmake)
+    add_subdirectory(zlib-ng)
     unset (CMAKE_POLICY_DEFAULT_CMP0077)
 endif ()
 
@@ -110,6 +112,7 @@ if (USE_INTERNAL_POCO_LIBRARY)
 endif ()
 
 if (USE_INTERNAL_PROTOBUF_LIBRARY)
+    message("gjt debug internal protobuf")
     add_subdirectory(protobuf-cmake)
 endif ()
 
@@ -121,6 +124,8 @@ if (USE_INTERNAL_GRPC_LIBRARY)
     add_subdirectory(grpc-cmake)
     unset (CMAKE_POLICY_DEFAULT_CMP0077)
 endif ()
+
+    add_subdirectory(c-ares-cmake)
 
 add_subdirectory (kvproto/cpp)
 target_no_warning(kvproto deprecated-declarations)

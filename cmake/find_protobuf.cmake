@@ -18,7 +18,7 @@
 # sudo apt-get install libprotobuf-dev protobuf-compiler libprotoc-dev
 option(USE_INTERNAL_PROTOBUF_LIBRARY "Set to FALSE to use system protobuf instead of bundled. (Experimental. Set to FALSE on your own risk)" ${NOT_UNBUNDLED})
 
-if(NOT EXISTS "${TiFlash_SOURCE_DIR}/contrib/protobuf/cmake/CMakeLists.txt")
+if(NOT EXISTS "${TiFlash_SOURCE_DIR}/contrib/protobuf/CMakeLists.txt")
   if(USE_INTERNAL_PROTOBUF_LIBRARY)
     message(WARNING "submodule contrib/protobuf is missing. to fix try run: \n git submodule update --init")
     message(WARNING "Can't use internal protobuf")
