@@ -24,6 +24,7 @@ if (USE_INTERNAL_GRPC_LIBRARY)
     # Variable RANDOM_FILE will be defined and cached by curl, and break c-ares build if CMake runs the second time.
     unset(RANDOM_FILE CACHE)
     add_subdirectory(abseil-cpp-cmake)
+    set (ABSL_ROOT_DIR ${ABSL_ROOT_DIR} PARENT_SCOPE)
     set (CMAKE_POLICY_DEFAULT_CMP0077 NEW)
     add_subdirectory(grpc-cmake)
     unset (CMAKE_POLICY_DEFAULT_CMP0077)

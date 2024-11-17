@@ -353,7 +353,8 @@ option (ENABLE_TESTS "Enables unit tests" ${ENABLE_TESTS_DEFAULT})
 add_subdirectory (contrib) # Should be done after option ENABLE_TESTS, cause we will disable tests under contrib/
 ## TODO!!!
 message ("gjt debug flash main ${ABSL_ROOT_DIR}")
-include_directories(/home/guojiangtao/work/tiflash/contrib/abseil-cpp)
+include_directories(${ABSL_ROOT_DIR})
+#include_directories(/home/guojiangtao/work/tiflash/contrib/abseil-cpp)
 
 # Enable failpoints injection by default when ENABLE_TESTS is turn ON.
 if (ENABLE_TESTS)
