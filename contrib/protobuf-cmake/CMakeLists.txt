@@ -1,5 +1,5 @@
 
-set(Protobuf_INCLUDE_DIR "${TiFlash_SOURCE_DIR}/contrib/google-protobuf/src")
+set(Protobuf_INCLUDE_DIR "${TiFlash_SOURCE_DIR}/contrib/protobuf/src")
 if(OS_FREEBSD AND SANITIZE STREQUAL "address")
   # ../contrib/protobuf/src/google/protobuf/arena_impl.h:45:10: fatal error: 'sanitizer/asan_interface.h' file not found
   # #include <sanitizer/asan_interface.h>
@@ -11,8 +11,8 @@ if(OS_FREEBSD AND SANITIZE STREQUAL "address")
   endif()
 endif()
 
-set(protobuf_source_dir "${TiFlash_SOURCE_DIR}/contrib/google-protobuf")
-set(protobuf_binary_dir "${TiFlash_BINARY_DIR}/contrib/google-protobuf")
+set(protobuf_source_dir "${TiFlash_SOURCE_DIR}/contrib/protobuf")
+set(protobuf_binary_dir "${TiFlash_BINARY_DIR}/contrib/protobuf")
 
 
 add_definitions(-DGOOGLE_PROTOBUF_CMAKE_BUILD)
@@ -309,7 +309,7 @@ else ()
     add_dependencies(protoc "${PROTOC_BUILD_DIR}/protoc")
 endif ()
 
-include("${TiFlash_SOURCE_DIR}/contrib/google-protobuf-cmake/protobuf_generate.cmake")
+include("${TiFlash_SOURCE_DIR}/contrib/protobuf-cmake/protobuf_generate.cmake")
 
 add_library(_protobuf INTERFACE)
 target_link_libraries(_protobuf INTERFACE _libprotobuf)
