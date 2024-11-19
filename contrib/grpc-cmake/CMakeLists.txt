@@ -1,10 +1,3 @@
-# set(ENABLE_GRPC_DEFAULT ${ENABLE_LIBRARIES})
-# option(ENABLE_GRPC "Use gRPC" ${ENABLE_GRPC_DEFAULT})
-# 
-# if(NOT ENABLE_GRPC)
-#   message(STATUS "Not using gRPC")
-#   return()
-# endif()
 
 set(_gRPC_SOURCE_DIR "${TiFlash_SOURCE_DIR}/contrib/grpc")
 set(_gRPC_BINARY_DIR "${TiFlash_BINARY_DIR}/contrib/grpc")

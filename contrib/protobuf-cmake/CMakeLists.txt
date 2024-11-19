@@ -1,4 +1,3 @@
-
 set(Protobuf_INCLUDE_DIR "${TiFlash_SOURCE_DIR}/contrib/protobuf/src")
 if(OS_FREEBSD AND SANITIZE STREQUAL "address")
   # ../contrib/protobuf/src/google/protobuf/arena_impl.h:45:10: fatal error: 'sanitizer/asan_interface.h' file not found
