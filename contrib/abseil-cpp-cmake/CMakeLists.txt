@@ -1667,6 +1667,22 @@ absl_cc_library(
 
 absl_cc_library(
   NAME
+    absl_vlog_is_on
+  COPTS
+    ${ABSL_DEFAULT_COPTS}
+  LINKOPTS
+    ${ABSL_DEFAULT_LINKOPTS}
+  HDRS
+    "absl_vlog_is_on.h"
+  DEPS
+    absl::vlog_config_internal
+    absl::config
+    absl::core_headers
+    absl::strings
+)
+
+absl_cc_library(
+  NAME
     log_internal_log_impl
   SRCS
   HDRS
@@ -1679,6 +1695,7 @@ absl_cc_library(
     absl::log_internal_conditions
     absl::log_internal_message
     absl::log_internal_strip
+    absl::absl_vlog_is_on
 )
 
 absl_cc_library(
