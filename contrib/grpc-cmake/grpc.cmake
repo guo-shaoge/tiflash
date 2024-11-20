@@ -159,10 +159,15 @@ target_link_libraries(gpr
   ${_gRPC_ALLTARGETS_LIBRARIES}
   absl::base
   absl::core_headers
+  absl::log_severity
   absl::flags
   absl::flags_marshalling
   absl::any_invocable
+  absl::check
+  absl::log_globals
+  absl::log
   absl::memory
+  absl::bits
   absl::random_random
   absl::status
   absl::cord
@@ -1017,7 +1022,10 @@ target_link_libraries(grpc
   upb_json_lib
   upb_textformat_lib
   ${_gRPC_ZLIB_LIBRARIES}
+  ${_gRPC_CARES_LIBRARIES}
   absl::algorithm_container
+  absl::config
+  absl::no_destructor
   absl::cleanup
   absl::flat_hash_map
   absl::flat_hash_set
@@ -1031,7 +1039,6 @@ target_link_libraries(grpc
   absl::statusor
   absl::span
   absl::utility
-  ${_gRPC_CARES_LIBRARIES}
   gpr
   ${_gRPC_SSL_LIBRARIES}
   ${_gRPC_ADDRESS_SORTING_LIBRARIES}
@@ -1458,6 +1465,8 @@ target_link_libraries(grpc_unsecure
   upb
   ${_gRPC_ZLIB_LIBRARIES}
   absl::algorithm_container
+  absl::config
+  absl::no_destructor
   absl::cleanup
   absl::flat_hash_map
   absl::flat_hash_set
@@ -1772,6 +1781,8 @@ target_include_directories(grpc++
 target_link_libraries(grpc++
   ${_gRPC_ALLTARGETS_LIBRARIES}
   grpc
+  absl::absl_check
+  absl::absl_log
   ${_gRPC_PROTOBUF_LIBRARIES}
 )
 

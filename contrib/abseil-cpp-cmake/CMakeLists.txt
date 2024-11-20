@@ -1306,6 +1306,17 @@ absl_cc_library(
     absl::strings
 )
 
+absl_cc_library(
+  NAME
+    no_destructor
+  HDRS
+    "no_destructor.h"
+  DEPS
+    absl::config
+  COPTS
+    ${ABSL_DEFAULT_COPTS}
+)
+
 # Internal-only target, do not depend on directly.
 absl_cc_library(
   NAME
