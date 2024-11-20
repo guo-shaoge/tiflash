@@ -1692,6 +1692,32 @@ add_library(upb_textformat_lib
     ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
     ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
     ${_gRPC_SOURCE_DIR}/third_party/upb/upb/text/encode.c
+
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/decode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/encode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/internal/decode_fast.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/hash/common.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/build_enum.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/decode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/base92.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/encode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/link.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/extension_registry.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/internal/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/message.c
+
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/decode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/encode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/internal/decode_fast.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/hash/common.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/build_enum.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/decode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/base92.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/encode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/link.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/extension_registry.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/internal/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/message.c
 )
 
 target_compile_features(upb_textformat_lib PUBLIC cxx_std_14)
