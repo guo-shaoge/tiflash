@@ -1310,7 +1310,7 @@ absl_cc_library(
   NAME
     no_destructor
   HDRS
-    "no_destructor.h"
+  "${DIR}/no_destructor.h"
   DEPS
     absl::config
   COPTS
@@ -1321,9 +1321,9 @@ absl_cc_library(
   NAME
     vlog_config_internal
   SRCS
-    "internal/vlog_config.cc"
+  "${DIR}/internal/vlog_config.cc"
   HDRS
-    "internal/vlog_config.h"
+  "${DIR}/internal/vlog_config.h"
   COPTS
     ${ABSL_DEFAULT_COPTS}
   LINKOPTS
