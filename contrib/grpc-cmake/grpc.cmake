@@ -1592,7 +1592,7 @@ add_library(upb_json_lib
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
 
-  # ${_gRPC_SOURCE_DIR}/src/core/ext/upb-gen/google/protobuf/descriptor.upb_minitable.c
+  ${_gRPC_SOURCE_DIR}/src/core/ext/upb-gen/google/protobuf/descriptor.upb_minitable.c
   # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/json/decode.c
   # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/json/encode.c
   # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/accessors.c
@@ -1665,7 +1665,8 @@ add_library(upb_textformat_lib
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/text/encode.c
-    # ${_gRPC_SOURCE_DIR}/src/core/ext/upb-gen/google/protobuf/descriptor.upb_minitable.c
+
+    ${_gRPC_SOURCE_DIR}/src/core/ext/upb-gen/google/protobuf/descriptor.upb_minitable.c
     # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/accessors.c
     # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/build_enum.c
     # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/decode.c
