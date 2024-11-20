@@ -1592,6 +1592,8 @@ add_library(upb_json_lib
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
 
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/encode.c
+
   ${_gRPC_SOURCE_DIR}/src/core/ext/upb-gen/google/protobuf/descriptor.upb_minitable.c
   # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/json/decode.c
   # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/json/encode.c
