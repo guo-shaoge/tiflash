@@ -1306,40 +1306,6 @@ absl_cc_library(
     absl::strings
 )
 
-absl_cc_library(
-  NAME
-    no_destructor
-  HDRS
-  "${DIR}/no_destructor.h"
-  DEPS
-    absl::config
-  COPTS
-    ${ABSL_DEFAULT_COPTS}
-)
-
-absl_cc_library(
-  NAME
-    vlog_config_internal
-  SRCS
-  "${DIR}/internal/vlog_config.cc"
-  HDRS
-  "${DIR}/internal/vlog_config.h"
-  COPTS
-    ${ABSL_DEFAULT_COPTS}
-  LINKOPTS
-    ${ABSL_DEFAULT_LINKOPTS}
-  DEPS
-    absl::base
-    absl::config
-    absl::core_headers
-    absl::log_internal_fnmatch
-    absl::memory
-    absl::no_destructor
-    absl::strings
-    absl::synchronization
-    absl::optional
-)
-
 # Internal-only target, do not depend on directly.
 absl_cc_library(
   NAME
@@ -1529,6 +1495,43 @@ absl_cc_library(
     absl::int128
     absl::prefetch
 )
+
+set(DIR "${ABSL_ROOT_DIR}/absl/base")
+absl_cc_library(
+  NAME
+    no_destructor
+  HDRS
+  "${DIR}/no_destructor.h"
+  DEPS
+    absl::config
+  COPTS
+    ${ABSL_DEFAULT_COPTS}
+)
+
+set(DIR "${ABSL_ROOT_DIR}/absl/log/internal")
+absl_cc_library(
+  NAME
+    vlog_config_internal
+  SRCS
+  "${DIR}/vlog_config.cc"
+  HDRS
+  "${DIR}/vlog_config.h"
+  COPTS
+    ${ABSL_DEFAULT_COPTS}
+  LINKOPTS
+    ${ABSL_DEFAULT_LINKOPTS}
+  DEPS
+    absl::base
+    absl::config
+    absl::core_headers
+    absl::log_internal_fnmatch
+    absl::memory
+    absl::no_destructor
+    absl::strings
+    absl::synchronization
+    absl::optional
+)
+
 
 set(DIR ${ABSL_ROOT_DIR}/absl/log)
 
