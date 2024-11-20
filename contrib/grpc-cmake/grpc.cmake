@@ -1592,33 +1592,32 @@ add_library(upb_json_lib
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
 
-  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/encode.c
-
   ${_gRPC_SOURCE_DIR}/src/core/ext/upb-gen/google/protobuf/descriptor.upb_minitable.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/json/decode.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/json/encode.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/accessors.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/build_enum.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/decode.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/base92.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/encode.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/link.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/internal/def_builder.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/def_pool.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/def_type.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/desc_state.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_def.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_reserved_range.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_value_def.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/extension_range.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/field_def.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/file_def.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message_def.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message_reserved_range.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/method_def.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
-  # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
+
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/json/decode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/json/encode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/accessors.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/build_enum.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/decode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/base92.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/encode.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/link.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/internal/def_builder.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/def_pool.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/def_type.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/desc_state.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_def.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_reserved_range.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_value_def.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/extension_range.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/field_def.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/file_def.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message_def.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message_reserved_range.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/method_def.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
 )
 
 target_compile_features(upb_json_lib PUBLIC cxx_std_14)
@@ -1669,29 +1668,30 @@ add_library(upb_textformat_lib
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/text/encode.c
 
     ${_gRPC_SOURCE_DIR}/src/core/ext/upb-gen/google/protobuf/descriptor.upb_minitable.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/accessors.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/build_enum.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/decode.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/base92.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/encode.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/link.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/internal/def_builder.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/def_pool.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/def_type.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/desc_state.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_def.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_reserved_range.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_value_def.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/extension_range.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/field_def.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/file_def.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message_def.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message_reserved_range.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/method_def.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
-    # ${_gRPC_SOURCE_DIR}/third_party/upb/upb/text/encode.c
+
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/accessors.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/build_enum.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/decode.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/base92.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/internal/encode.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_descriptor/link.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/internal/def_builder.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/def_pool.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/def_type.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/desc_state.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_def.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_reserved_range.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/enum_value_def.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/extension_range.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/field_def.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/file_def.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message_def.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/message_reserved_range.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/method_def.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
+    ${_gRPC_SOURCE_DIR}/third_party/upb/upb/text/encode.c
 )
 
 target_compile_features(upb_textformat_lib PUBLIC cxx_std_14)
