@@ -1618,6 +1618,7 @@ add_library(upb_json_lib
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/method_def.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
+  ${_gRPC_SOURCE_DIR}/third_party/utf8_range/utf8_range.c
 )
 
 target_compile_features(upb_json_lib PUBLIC cxx_std_14)
@@ -1718,6 +1719,7 @@ add_library(upb_textformat_lib
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/extension_registry.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/internal/message.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/utf8_range/utf8_range.c
 )
 
 target_compile_features(upb_textformat_lib PUBLIC cxx_std_14)
