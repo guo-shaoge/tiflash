@@ -1619,6 +1619,39 @@ add_library(upb_json_lib
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/oneof_def.c
   ${_gRPC_SOURCE_DIR}/third_party/upb/upb/reflection/service_def.c
   ${_gRPC_SOURCE_DIR}/third_party/utf8_range/utf8_range.c
+
+  #${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/internal/extension.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/hash/common.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/accessors.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/array.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/compat.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/internal/compare_unknown.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/internal/extension.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/internal/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/map.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/map_sorter.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/extension_registry.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/internal/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/eps_copy_input_stream.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/reader.c
+
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/hash/common.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/accessors.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/array.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/compat.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/internal/compare_unknown.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/internal/extension.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/internal/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/map.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/map_sorter.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/message/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/extension_registry.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/internal/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/mini_table/message.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/eps_copy_input_stream.c
+  ${_gRPC_SOURCE_DIR}/third_party/upb/upb/wire/reader.c
 )
 
 target_compile_features(upb_json_lib PUBLIC cxx_std_14)
