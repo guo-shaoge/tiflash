@@ -1317,6 +1317,29 @@ absl_cc_library(
     ${ABSL_DEFAULT_COPTS}
 )
 
+absl_cc_library(
+  NAME
+    vlog_config_internal
+  SRCS
+    "internal/vlog_config.cc"
+  HDRS
+    "internal/vlog_config.h"
+  COPTS
+    ${ABSL_DEFAULT_COPTS}
+  LINKOPTS
+    ${ABSL_DEFAULT_LINKOPTS}
+  DEPS
+    absl::base
+    absl::config
+    absl::core_headers
+    absl::log_internal_fnmatch
+    absl::memory
+    absl::no_destructor
+    absl::strings
+    absl::synchronization
+    absl::optional
+)
+
 # Internal-only target, do not depend on directly.
 absl_cc_library(
   NAME
