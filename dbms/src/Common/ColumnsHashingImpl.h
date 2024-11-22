@@ -121,7 +121,7 @@ public:
 
 using StringHashMapPrefetchFunc = std::function<void(size_t)>;
 template <typename LookupResult>
-using StringHashMapEmplaceFunc = std::function<void(ArenaKeyHolder &&, LookupResult &, bool &, size_t)>;
+using StringHashMapEmplaceFunc = std::function<void(const ArenaKeyHolder &, LookupResult &, bool &, size_t)>;
 
 template <typename Derived, typename Value, typename Mapped, bool consecutive_keys_optimization>
 class HashMethodBase
@@ -153,19 +153,14 @@ public:
         Arena & pool,
         std::vector<String> & sort_key_containers)
     {
-        if constexpr (Data::isStringHashMap)
+        if constexpr (!Data::isStringHashMap)
         {
             auto key_holder = static_cast<Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
 
             const size_t prefetch_idx = row + prefetch_step;
             if likely (prefetch_idx < hashvals.size())
             {
-                // TODO maybe all prefetch_hash pass key_holder
-                // prefetch_hash -> prefetchHash()
-                if constexpr (Data::isStringHashMap)
-                    data.prefetch_hash(key_holder, hashvals[prefetch_idx]);
-                else
-                    data.prefetch_hash(hashvals[prefetch_idx]);
+                data.prefetch_hash(hashvals[prefetch_idx]);
             }
 
             return emplaceImpl<true>(key_holder, data, hashvals[row], nullptr);
@@ -191,10 +186,10 @@ public:
         const auto & item = hashvals[row];
         if likely (prefetch_idx < hashvals.size())
         {
-            item.template get<1>()(item.template get<0>());
+            std::get<1>(item)(std::get<0>(item));
         }
 
-        return emplaceImpl<true>(key_holder, data, item.template get<0>(), item.template get<2>());
+        return emplaceImpl<true>(key_holder, data, std::get<0>(item), std::get<2>(item));
     }
 
     template <typename Data>
@@ -223,10 +218,10 @@ public:
     template <typename Data>
     std::tuple<size_t, StringHashMapPrefetchFunc, StringHashMapEmplaceFunc<typename Data::LookupResult>>
     getHashForStringHashMap(
-            const Data & data,
+            Data & data,
             size_t row,
             Arena & pool,
-            std::vector<String> & sort_key_containers) const
+            std::vector<String> & sort_key_containers)
     {
         auto key_holder = static_cast<const Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
         // TODO enable prefetch

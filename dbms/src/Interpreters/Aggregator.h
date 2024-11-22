@@ -104,8 +104,8 @@ using AggregatedDataWithUInt32Key = HashMap<UInt32, AggregateDataPtr, HashCRC32<
 // using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
 using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, PhHash<UInt64, PhHashSeed1>>;
 
-// using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
-using AggregatedDataWithShortStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
+using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
+// using AggregatedDataWithShortStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 // using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr>;
 using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 
@@ -124,8 +124,8 @@ using AggregatedDataWithUInt64KeyTwoLevel = TwoLevelHashMap<UInt64, AggregateDat
 // using AggregatedDataWithInt256KeyTwoLevel = TwoLevelHashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
 using AggregatedDataWithInt256KeyTwoLevel = TwoLevelHashMap<Int256, AggregateDataPtr, Hash256WithSeed<PhHashSeed1>>;
 
-// using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMap<AggregateDataPtr>;
-using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
+using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMap<AggregateDataPtr>;
+// using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 // using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr>;
 using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr, SliceHashWithSeed<PhHashSeed1>>;
 
@@ -1257,7 +1257,6 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(key32)                                                     \
     M(key64)                                                     \
     M(key_int256)                                                \
-    M(key_string)                                                \
     M(key_fixed_string)                                          \
     M(keys32)                                                    \
     M(keys64)                                                    \
@@ -1302,6 +1301,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     APPLY_FOR_VARIANTS_CONVERTIBLE_TO_TWO_LEVEL_NON_PHMAP(M)
 
 #define APPLY_FOR_VARIANTS_NOT_CONVERTIBLE_TO_TWO_LEVEL(M) \
+    M(key_string)                                                \
     M(key8)                                                \
     M(key16)                                               \
     M(keys16)                                              \
