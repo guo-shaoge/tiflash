@@ -155,7 +155,6 @@ struct AggregationMethodOneNumber
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
     static constexpr bool test_serialized = false;
-    static constexpr bool test_string = false;
 
     Data data;
 
@@ -211,7 +210,6 @@ struct AggregationMethodString
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
     static constexpr bool test_serialized = false;
-    static constexpr bool test_string = false;
 
     Data data;
 
@@ -261,7 +259,6 @@ struct AggregationMethodStringNoCache
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
     static constexpr bool test_serialized = false;
-    static constexpr bool test_string = true;
 
     Data data;
 
@@ -312,7 +309,6 @@ struct AggregationMethodOneKeyStringNoCache
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
     static constexpr bool test_serialized = false;
-    static constexpr bool test_string = true;
 
     Data data;
 
@@ -394,7 +390,6 @@ struct AggregationMethodFastPathTwoKeysNoCache
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
     static constexpr bool test_serialized = false;
-    static constexpr bool test_string = false;
 
     Data data;
 
@@ -516,7 +511,6 @@ struct AggregationMethodFixedString
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
     static constexpr bool test_serialized = false;
-    static constexpr bool test_string = false;
 
     Data data;
 
@@ -566,7 +560,6 @@ struct AggregationMethodFixedStringNoCache
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
     static constexpr bool test_serialized = false;
-    static constexpr bool test_string = false;
 
     Data data;
 
@@ -617,7 +610,6 @@ struct AggregationMethodKeysFixed
     using Mapped = typename Data::mapped_type;
     static constexpr bool has_nullable_keys = has_nullable_keys_;
     static constexpr bool test_serialized = false;
-    static constexpr bool test_string = false;
 
     Data data;
 
@@ -726,7 +718,6 @@ struct AggregationMethodSerialized
     using Key = typename Data::key_type;
     using Mapped = typename Data::mapped_type;
     static constexpr bool test_serialized = true;
-    static constexpr bool test_string = false;
 
     Data data;
 
@@ -1719,12 +1710,6 @@ protected:
         typename Method::State & state,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info) const;
-template <bool collect_hit_rate, bool only_lookup, bool enable_prefetch, typename Method>
-void executeImplBatchForStringHashMap(
-    Method & method,
-    typename Method::State & state,
-    Arena * aggregates_pool,
-    AggProcessInfo & agg_process_info) const;
     
 template <bool enable_prefetch, typename Method>
 void executeImplMethodStringByColCKMap(
@@ -1743,15 +1728,6 @@ void executeImplMethodStringByColCKMap(
         const std::vector<size_t> & hashvals,
         Arena & aggregates_pool,
         std::vector<std::string> & sort_key_containers) const;
-
-template <bool only_lookup, bool enable_prefetch, typename Method>
-std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(
-    Method & method,
-    typename Method::State & state,
-    size_t index,
-    const std::vector<std::tuple<size_t, StringHashMapPrefetchFunc, StringHashMapEmplaceFunc<typename Method::Data::LookupResult>>> & hashvals,
-    Arena & aggregates_pool,
-    std::vector<std::string> & sort_key_containers) const;
 
     /// For case when there are no keys (all aggregate into one row).
     static void executeWithoutKeyImpl(AggregatedDataWithoutKey & res, AggProcessInfo & agg_process_info, Arena * arena);

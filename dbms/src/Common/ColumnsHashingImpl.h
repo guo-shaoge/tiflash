@@ -119,10 +119,6 @@ public:
     bool isFound() const { return found; }
 };
 
-using StringHashMapPrefetchFunc = std::function<void(size_t)>;
-template <typename LookupResult>
-using StringHashMapEmplaceFunc = std::function<void(ArenaKeyHolder &&, LookupResult &, bool &, size_t)>;
-
 template <typename Derived, typename Value, typename Mapped, bool consecutive_keys_optimization>
 class HashMethodBase
 {
@@ -142,7 +138,7 @@ public:
         std::vector<String> & sort_key_containers)
     {
         auto key_holder = static_cast<Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
-        return emplaceImpl<false>(key_holder, data, 0, nullptr);
+        return emplaceImpl<false>(key_holder, data, 0);
     }
 
     template <typename Data>
@@ -153,48 +149,20 @@ public:
         Arena & pool,
         std::vector<String> & sort_key_containers)
     {
-        if constexpr (Data::isStringHashMap)
-        {
-            auto key_holder = static_cast<Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
-
-            const size_t prefetch_idx = row + prefetch_step;
-            if likely (prefetch_idx < hashvals.size())
-            {
-                // TODO maybe all prefetch_hash pass key_holder
-                // prefetch_hash -> prefetchHash()
-                if constexpr (Data::isStringHashMap)
-                    data.prefetch_hash(key_holder, hashvals[prefetch_idx]);
-                else
-                    data.prefetch_hash(hashvals[prefetch_idx]);
-            }
-
-            return emplaceImpl<true>(key_holder, data, hashvals[row], nullptr);
-        }
-        else
-        {
-            RUNTIME_CHECK_MSG(false, "this emplaceKey is only for StringHashMap");
-        }
-    }
-
-    template <typename Data>
-    ALWAYS_INLINE inline EmplaceResult emplaceKey(
-        Data & data,
-        size_t row,
-        const std::vector<std::tuple<size_t, StringHashMapPrefetchFunc, StringHashMapEmplaceFunc<typename Data::LookupResult>>> & hashvals,
-        Arena & pool,
-        std::vector<String> & sort_key_containers)
-    {
         auto key_holder = static_cast<Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
-        static_assert(Data::isStringHashMap);
 
         const size_t prefetch_idx = row + prefetch_step;
-        const auto & item = hashvals[row];
         if likely (prefetch_idx < hashvals.size())
         {
-            item.template get<1>()(item.template get<0>());
+            // TODO maybe all prefetch_hash pass key_holder
+            // prefetch_hash -> prefetchHash()
+            if constexpr (Data::isStringHashMap)
+                data.prefetch_hash(key_holder, hashvals[prefetch_idx]);
+            else
+                data.prefetch_hash(hashvals[prefetch_idx]);
         }
 
-        return emplaceImpl<true>(key_holder, data, item.template get<0>(), item.template get<2>());
+        return emplaceImpl<true>(key_holder, data, hashvals[row]);
     }
 
     template <typename Data>
@@ -220,19 +188,6 @@ public:
         return data.hash(keyHolderGetKey(key_holder));
     }
 
-    template <typename Data>
-    std::tuple<size_t, StringHashMapPrefetchFunc, StringHashMapEmplaceFunc<typename Data::LookupResult>>
-    getHashForStringHashMap(
-            const Data & data,
-            size_t row,
-            Arena & pool,
-            std::vector<String> & sort_key_containers) const
-    {
-        auto key_holder = static_cast<const Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
-        // TODO enable prefetch
-        return data.hashWithCallback(keyHolderGetKey(key_holder));
-    }
-
 protected:
     Cache cache;
 
@@ -252,9 +207,7 @@ protected:
     }
 
     template <bool enable_prefetch, typename Data, typename KeyHolder>
-    ALWAYS_INLINE inline EmplaceResult emplaceImpl(KeyHolder & key_holder, Data & data,
-            size_t hashval [[maybe_unused]],
-            const StringHashMapEmplaceFunc<typename Data::LookupResult> & string_hash_map_emplace_func)
+    ALWAYS_INLINE inline EmplaceResult emplaceImpl(KeyHolder & key_holder, Data & data, size_t hashval [[maybe_unused]])
     {
         if constexpr (Cache::consecutive_keys_optimization)
         {
@@ -271,20 +224,9 @@ protected:
         bool inserted = false;
 
         if constexpr (enable_prefetch)
-        {
-            if constexpr (Data::isStringHashMap)
-            {
-                string_hash_map_emplace_func(key_holder, it, inserted, hashval);
-            }
-            else
-            {
-                data.emplace(key_holder, it, inserted, hashval);
-            }
-        }
+            data.emplace(key_holder, it, inserted, hashval);
         else
-        {
             data.emplace(key_holder, it, inserted);
-        }
 
         [[maybe_unused]] Mapped * cached = nullptr;
         if constexpr (has_mapped)
