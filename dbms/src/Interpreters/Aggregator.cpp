@@ -720,7 +720,7 @@ void NO_INLINE Aggregator::executeImpl(
             else
                 executeImplMethodStringByColCKMap<true>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
         }
-        else if constexpr (Method::Data::isStringHashMap)
+        else if constexpr (Method::test_string)
         {
             // if (method.data.getBufferSizeInCells() < 8192)
             //     executeImplMethodStringByColCKMap<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
@@ -922,8 +922,8 @@ ALWAYS_INLINE inline std::vector<size_t> getHashVals(
 template <bool enable_prefetch, typename Data, typename State>
 std::vector<std::tuple<size_t, StringHashMapPrefetchFunc, StringHashMapEmplaceFunc<typename Data::LookupResult>>>
 getHashValsForStringHashMap(
-    Data & data,
-    State & state,
+    const Data & data,
+    const State & state,
     const Aggregator::AggProcessInfo & agg_process_info,
     size_t rows,
     Arena & pool,
@@ -1145,13 +1145,83 @@ ALWAYS_INLINE void Aggregator::executeImplBatchForStringHashMap(
     /// Optimization for special case when there are no aggregate functions.
     if (params.aggregates_size == 0)
     {
-        RUNTIME_CHECK_MSG(false, "executeImplBatchForStringHashMap not support for agg size == 0");
+        /// For all rows.
+        AggregateDataPtr place = aggregates_pool->alloc(0);
+        auto hashvals = getHashValsForStringHashMap<enable_prefetch>(
+            method.data,
+            state,
+            agg_process_info,
+            agg_size,
+            *aggregates_pool,
+            sort_key_containers);
+
+        for (size_t i = 0; i < agg_size; ++i)
+        {
+            auto emplace_result_hold = emplaceOrFindKey<only_lookup, enable_prefetch>(
+                method,
+                state,
+                agg_process_info.start_row,
+                hashvals,
+                *aggregates_pool,
+                sort_key_containers);
+            if likely (emplace_result_hold.has_value())
+            {
+                if constexpr (collect_hit_rate)
+                {
+                    ++agg_process_info.hit_row_cnt;
+                }
+
+                if constexpr (only_lookup)
+                {
+                    if (!emplace_result_hold.value().isFound())
+                        agg_process_info.not_found_rows.push_back(i);
+                }
+                else
+                {
+                    emplace_result_hold.value().setMapped(place);
+                }
+                ++agg_process_info.start_row;
+            }
+            else
+            {
+                LOG_INFO(log, "HashTable resize throw ResizeException since the data is already marked for spill");
+                break;
+            }
+        }
+        return;
     }
 
     /// Optimization for special case when aggregating by 8bit key.
     if constexpr (std::is_same_v<Method, AggregatedDataVariants::AggregationMethod_key8>)
     {
-        RUNTIME_CHECK_MSG(false, "executeImplBatchForStringHashMap not support for key8");
+        for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
+             ++inst)
+        {
+            inst->batch_that->addBatchLookupTable8(
+                agg_process_info.start_row,
+                agg_size,
+                reinterpret_cast<AggregateDataPtr *>(method.data.data()),
+                inst->state_offset,
+                [&](AggregateDataPtr & aggregate_data) {
+                    aggregate_data
+                        = aggregates_pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                    createAggregateStates(aggregate_data);
+                },
+                state.getKeyData(),
+                inst->batch_arguments,
+                aggregates_pool);
+        }
+        agg_process_info.start_row += agg_size;
+
+        // For key8, assume all rows are hit. No need to do state switch for auto pass through hashagg.
+        // Because HashMap of key8 is basically a vector of size 256.
+        if constexpr (collect_hit_rate)
+            agg_process_info.hit_row_cnt = agg_size;
+
+        // Because all rows are hit, so state will not switch to Selective.
+        if constexpr (only_lookup)
+            RUNTIME_CHECK_MSG(false, "Aggregator only_lookup should be false for AggregationMethod_key8");
+        return;
     }
 
     /// Generic case.

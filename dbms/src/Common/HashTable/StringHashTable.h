@@ -194,7 +194,7 @@ struct StringHashTableLookupResult
 
 using StringHashMapPrefetchFunc = std::function<void(size_t)>;
 template <typename LookupResult>
-using StringHashMapEmplaceFunc = std::function<void(const DB::ArenaKeyHolder &, LookupResult &, bool &, size_t)>;
+using StringHashMapEmplaceFunc = std::function<void(DB::ArenaKeyHolder &&, LookupResult &, bool &, size_t)>;
 
 template <typename SubMaps>
 class StringHashTable : private boost::noncopyable
@@ -254,10 +254,6 @@ public:
 
     ~StringHashTable() = default;
 
-    size_t hash(const Key & ) const 
-    { 
-        RUNTIME_CHECK_MSG(false, "StringHashTable hash shouldn't be called");
-    }
     // Dispatch is written in a way that maximizes the performance:
     // 1. Always memcpy 8 times bytes
     // 2. Use switch case extension to generate fast dispatching table
@@ -390,10 +386,10 @@ public:
                         {
                             // no need to prefetch for m0;
                         },
-                        [this](const DB::ArenaKeyHolder &, LookupResult & it, bool & inserted, size_t hashval)
+                        [this](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
                         {
                             typename T0::LookupResult result;
-                            this->m0.emplace(VoidKey{}, result, inserted, hashval);
+                            this->m0.emplace(key_holder, result, inserted, hashval);
                             it = &result->getMapped();
                         });
 
@@ -403,12 +399,12 @@ public:
                     ms.hash(x),
                     [this](size_t hashval)
                     {
-                        this->ms.prefetch_hash(hashval);
+                        this->ms.prefetch(hashval);
                     },
-                    [this, x](const DB::ArenaKeyHolder &, LookupResult & it, bool & inserted, size_t hashval)
+                    [this](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
                     {
                         typename Ts::LookupResult result;
-                        this->ms.emplace(x, result, inserted, hashval);
+                        this->ms.emplace(key_holder, result, inserted, hashval);
                         it = &result->getMapped();
                     });
         }
@@ -416,14 +412,13 @@ public:
         const char * p = x.data;
         // pending bits that needs to be shifted out
         const char s = (-sz & 7) * 8;
-        union MyUnion
+        union
         {
             StringKey8 k8;
             StringKey16 k16;
             StringKey24 k24;
             UInt64 n[3];
         };
-        MyUnion u;
 
         StringHashTableHash hash;
 
@@ -434,31 +429,31 @@ public:
             // first half page
             if ((reinterpret_cast<uintptr_t>(p) & 2048) == 0)
             {
-                memcpy(&u.n[0], p, 8);
+                memcpy(&n[0], p, 8);
                 if constexpr (DB::isLittleEndian())
-                    u.n[0] &= (-1ULL >> s);
+                    n[0] &= (-1ULL >> s);
                 else
-                    u.n[0] &= (-1ULL << s);
+                    n[0] &= (-1ULL << s);
             }
             else
             {
                 const char * lp = x.data + x.size - 8;
-                memcpy(&u.n[0], lp, 8);
+                memcpy(&n[0], lp, 8);
                 if constexpr (DB::isLittleEndian())
-                    u.n[0] >>= s;
+                    n[0] >>= s;
                 else
-                    u.n[0] <<= s;
+                    n[0] <<= s;
             }
             // TODO
             // keyHolderDiscardKey(key_holder);
 
             return std::make_tuple(
-                    hash(u.k8),
+                    hash(k8),
                     [this](size_t hashval)
                     {
                         this->m1.prefetch_hash(hashval);
                     },
-                    [this, k8 = u.k8](const DB::ArenaKeyHolder &, LookupResult & it, bool & inserted, size_t hashval) // TODO del KeyHolder
+                    [this, k8](DB::ArenaKeyHolder &&, LookupResult & it, bool & inserted, size_t hashval) // TODO del KeyHolder
                     {
                         typename T1::LookupResult result;
                         this->m1.emplace(k8, result, inserted, hashval);
@@ -467,64 +462,92 @@ public:
         }
         case 1: // 9..16 bytes
         {
-            memcpy(&u.n[0], p, 8);
+            memcpy(&n[0], p, 8);
             const char * lp = x.data + x.size - 8;
-            memcpy(&u.n[1], lp, 8);
+            memcpy(&n[1], lp, 8);
             if constexpr (DB::isLittleEndian())
-                u.n[1] >>= s;
+                n[1] >>= s;
             else
-                u.n[1] <<= s;
+                n[1] <<= s;
             // TODO
             // keyHolderDiscardKey(key_holder);
 
             return std::make_tuple(
-                    hash(u.k16),
+                    ms.hash(x),
                     [this](size_t hashval)
                     {
-                        this->m2.prefetch_hash(hashval);
+                        this->m2.prefetch(hashval);
                     },
-                    [this, sz, k16 = u.k16](const DB::ArenaKeyHolder & , LookupResult & it, bool & inserted, size_t hashval)
+                    [this, sz, &x](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
                     {
-                        typename T2::LookupResult result;
-                        this->m2.emplace(k16, result, inserted, hashval);
+                        const char * p = x.data;
+                        // pending bits that needs to be shifted out
+                        const char s = (-sz & 7) * 8;
+                        union
+                        {
+                            StringKey8 k8;
+                            StringKey16 k16;
+                            StringKey24 k24;
+                            UInt64 n[3];
+                        };
+                        memcpy(&n[0], p, 8);
+                        const char * lp = x.data + x.size - 8;
+                        memcpy(&n[1], lp, 8);
+                        if constexpr (DB::isLittleEndian())
+                            n[1] >>= s;
+                        else
+                            n[1] <<= s;
+                        keyHolderDiscardKey(key_holder);
+                        typename T1::LookupResult result;
+                        this->m2.emplace(key_holder, result, inserted, hashval);
                         it = &result->getMapped();
                     });
         }
         case 2: // 17..24 bytes
         {
-            memcpy(&u.n[0], p, 16);
-            const char * lp = x.data + x.size - 8;
-            memcpy(&u.n[2], lp, 8);
-            if constexpr (DB::isLittleEndian())
-                u.n[2] >>= s;
-            else
-                u.n[2] <<= s;
-
             return std::make_tuple(
-                    hash(u.k24),
+                    ms.hash(x),
                     [this](size_t hashval)
                     {
-                        this->m3.prefetch_hash(hashval);
+                        this->m3.prefetch(hashval);
                     },
-                    [this, sz, k24 = u.k24](const DB::ArenaKeyHolder & , LookupResult & it, bool & inserted, size_t hashval)
+                    [this, sz, &x](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
                     {
-                        typename T3::LookupResult result;
-                        this->m3.emplace(k24, result, inserted, hashval);
+                        const char * p = x.data;
+                        // pending bits that needs to be shifted out
+                        const char s = (-sz & 7) * 8;
+                        union
+                        {
+                            StringKey8 k8;
+                            StringKey16 k16;
+                            StringKey24 k24;
+                            UInt64 n[3];
+                        };
+                        memcpy(&n[0], p, 16);
+                        const char * lp = x.data + x.size - 8;
+                        memcpy(&n[2], lp, 8);
+                        if constexpr (DB::isLittleEndian())
+                            n[2] >>= s;
+                        else
+                            n[2] <<= s;
+                        keyHolderDiscardKey(key_holder);
+                        typename T1::LookupResult result;
+                        this->m3.emplace(key_holder, result, inserted, hashval);
                         it = &result->getMapped();
                     });
         }
         default: // >= 25 bytes
         {
             return std::make_tuple(
-                    hash(x),
+                    ms.hash(x),
                     [this](size_t hashval)
                     {
-                        this->ms.prefetch_hash(hashval);
+                        this->ms.prefetch(hashval);
                     },
-                    [this, x](const DB::ArenaKeyHolder &, LookupResult & it, bool & inserted, size_t hashval)
+                    [this](DB::ArenaKeyHolder && key_holder, LookupResult & it, bool & inserted, size_t hashval)
                     {
                         typename Ts::LookupResult result;
-                        this->ms.emplace(x, result, inserted, hashval);
+                        this->ms.emplace(key_holder, result, inserted, hashval);
                         it = &result->getMapped();
                     });
         }
