@@ -169,7 +169,7 @@ struct SubMapSelector;
 template <typename TStringHashTable>
 struct SubMapSelector<0, false, TStringHashTable>
 {
-    static typename TStringHashTable::T0 & getsubMap(size_t, TStringHashTable & hash_table)
+    static typename TStringHashTable::T0 & getSubMap(size_t, TStringHashTable & hash_table)
     {
         return hash_table.m0;
     }
