@@ -967,7 +967,8 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
         }
         default: // >= 25 bytes
         {
-            data_key_str.push_back(key);
+            keyHolderPersistKey(key_holder);
+            data_key_str.push_back(keyHolderGetKey(key_holder));
             info_key_str.push_back(row);
             break;
         }
