@@ -848,6 +848,7 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
         Arena * pool,
         AggProcessInfo & agg_process_info) const
 {
+    LOG_DEBUG(log, "gjt debug executeImplBatchMethodStringWithPrefetch");
     RUNTIME_CHECK_MSG(key_columns.size() == 1, "size of key_columns should be 1");
     const size_t rows = key_columns[0]->size();
     size_t reserve_size = std::max(1, rows / 4);
