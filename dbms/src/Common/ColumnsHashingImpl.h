@@ -139,7 +139,7 @@ public:
             const std::vector<size_t> & hashvals)
     {
         static_assert(Data::isStringHashMap);
-        auto & submap = SubMapSelector<Index, Data::isTwoLevel>::getSubMap(hashvals[idx], data);
+        auto & submap = SubMapSelector<Index, Data::isTwoLevel, std::decay_t<decltype(data)>>::getSubMap(hashvals[idx], data);
 
         const auto prefetch_idx = idx + 16;
         if likely (prefetch_idx < hashvals.size())

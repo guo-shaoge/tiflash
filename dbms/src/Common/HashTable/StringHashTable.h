@@ -120,6 +120,8 @@ public:
             zeroValue()->~Cell();
     }
 
+    void prefetch_hash(size_t) {}
+
     Cell * zeroValue() { return std::launder(reinterpret_cast<Cell *>(&zero_value_storage)); }
     const Cell * zeroValue() const { return std::launder(reinterpret_cast<const Cell *>(&zero_value_storage)); }
 
@@ -163,7 +165,7 @@ public:
     size_t getCollisions() const { return 0; }
 };
 
-template <size_t Index, bool is_two_level, typename TStringHashTable = void>
+template <size_t Index, bool is_two_level, typename TStringHashTable>
 struct SubMapSelector;
 
 template <typename TStringHashTable>

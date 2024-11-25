@@ -1021,7 +1021,7 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
 
     if (!info_key_str.empty())
     {
-        if (method.data.getBufferSizeInCelss() < 8192)
+        if (method.data.getBufferSizeInCells() < 8192)
             emplaceStringHashMap<4, false>(method.data, state, data_key_str, info_key_str, pool, places_key_str);
         else
             emplaceStringHashMap<4, true>(method.data, state, data_key_str, info_key_str, pool, places_key_str);
