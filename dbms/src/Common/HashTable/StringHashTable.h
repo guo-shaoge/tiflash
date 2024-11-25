@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Common/HashTable/HashMap.h>
+#include <Common/HashTable/Hash.h>
 #include <Common/HashTable/HashTable.h>
 #include <IO/Endian.h>
 
@@ -49,6 +50,19 @@ inline StringRef ALWAYS_INLINE toStringRef(const StringKey24 & n)
     return {reinterpret_cast<const char *>(&n), 24ul - (__builtin_clzll(n.c) >> 3)};
 }
 
+inline uint64_t hash_u128(uint64_t seed, const UInt128 & val) {
+    hash_combine(seed, val.low);
+    hash_combine(seed, val.high);
+    return seed;
+}
+inline uint64_t hash_stringkey24(uint64_t seed, const StringKey24 & k)
+{
+    hash_combine(seed, k.a);
+    hash_combine(seed, k.b);
+    hash_combine(seed, k.c);
+    return seed;
+}
+
 struct StringHashTableHash
 {
 #if defined(__SSE4_2__)
@@ -58,36 +72,61 @@ struct StringHashTableHash
         res = _mm_crc32_u64(res, key);
         return res;
     }
-    size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
-    {
-        size_t res = -1ULL;
-        res = _mm_crc32_u64(res, key.low);
-        res = _mm_crc32_u64(res, key.high);
-        return res;
-    }
-    size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
-    {
-        size_t res = -1ULL;
-        res = _mm_crc32_u64(res, key.a);
-        res = _mm_crc32_u64(res, key.b);
-        res = _mm_crc32_u64(res, key.c);
-        return res;
-    }
 #else
     size_t ALWAYS_INLINE operator()(StringKey8 key) const
     {
         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 8);
     }
-    size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
-    {
-        return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 16);
-    }
-    size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
-    {
-        return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 24);
-    }
 #endif
-    size_t ALWAYS_INLINE operator()(StringRef key) const { return StringRefHash()(key); }
+size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
+{
+        return PhHashMixSeed<sizeof(size_t), PhHashSeed1>()(hash_u128(PhHashSeed1, key));
+}
+size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
+{
+        return PhHashMixSeed<sizeof(size_t), PhHashSeed1>()(hash_stringkey24(PhHashSeed1, key));
+}
+size_t ALWAYS_INLINE operator()(StringRef key) const
+{
+        return crc_hash_64(key.data, static_cast<int32_t>(key.size), CRC_HASH_SEED1);
+}
+// #if defined(__SSE4_2__)
+//     size_t ALWAYS_INLINE operator()(StringKey8 key) const
+//     {
+//         size_t res = -1ULL;
+//         res = _mm_crc32_u64(res, key);
+//         return res;
+//     }
+//     size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
+//     {
+//         size_t res = -1ULL;
+//         res = _mm_crc32_u64(res, key.low);
+//         res = _mm_crc32_u64(res, key.high);
+//         return res;
+//     }
+//     size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
+//     {
+//         size_t res = -1ULL;
+//         res = _mm_crc32_u64(res, key.a);
+//         res = _mm_crc32_u64(res, key.b);
+//         res = _mm_crc32_u64(res, key.c);
+//         return res;
+//     }
+// #else
+//     size_t ALWAYS_INLINE operator()(StringKey8 key) const
+//     {
+//         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 8);
+//     }
+//     size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
+//     {
+//         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 16);
+//     }
+//     size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
+//     {
+//         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 24);
+//     }
+// #endif
+//     size_t ALWAYS_INLINE operator()(StringRef key) const { return StringRefHash()(key); }
 };
 
 template <typename Cell>
@@ -186,45 +225,63 @@ struct StringHashTableHashKey8
     }
 #endif
 };
-struct StringHashTableHashKey16
-{
-#if defined(__SSE4_2__)
-    size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
-    {
-        size_t res = -1ULL;
-        res = _mm_crc32_u64(res, key.low);
-        res = _mm_crc32_u64(res, key.high);
-        return res;
+
+struct StringHashTableHashKey16 {
+    size_t ALWAYS_INLINE operator()(const StringKey16 & value) const {
+        return PhHashMixSeed<sizeof(size_t), PhHashSeed1>()(hash_u128(PhHashSeed1, value));
     }
-#else
-    size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
-    {
-        return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 16);
-    }
-#endif
 };
-struct StringHashTableHashKey24
-{
-#if defined(__SSE4_2__)
-    size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
-    {
-        size_t res = -1ULL;
-        res = _mm_crc32_u64(res, key.a);
-        res = _mm_crc32_u64(res, key.b);
-        res = _mm_crc32_u64(res, key.c);
-        return res;
+
+// using StringHashTableHashKey16 = Hash128WithSeed<PhHashSeed1>;
+// struct StringHashTableHashKey16
+// {
+// #if defined(__SSE4_2__)
+//     size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
+//     {
+//         size_t res = -1ULL;
+//         res = _mm_crc32_u64(res, key.low);
+//         res = _mm_crc32_u64(res, key.high);
+//         return res;
+//     }
+// #else
+//     size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
+//     {
+//         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 16);
+//     }
+// #endif
+// };
+
+struct HashStringKey24WithSeed {
+    std::size_t operator()(const StringKey24 & value) const {
+        return PhHashMixSeed<sizeof(size_t), PhHashSeed1>()(hash_stringkey24(PhHashSeed1, value));
     }
-#else
-    size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
-    {
-        return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 24);
-    }
-#endif
 };
-struct StringHashTableHashKeyStr
-{
-    size_t ALWAYS_INLINE operator()(StringRef key) const { return StringRefHash()(key); }
-};
+
+using StringHashTableHashKey24 = HashStringKey24WithSeed;
+// struct StringHashTableHashKey24
+// {
+// #if defined(__SSE4_2__)
+//     size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
+//     {
+//         size_t res = -1ULL;
+//         res = _mm_crc32_u64(res, key.a);
+//         res = _mm_crc32_u64(res, key.b);
+//         res = _mm_crc32_u64(res, key.c);
+//         return res;
+//     }
+// #else
+//     size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
+//     {
+//         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 24);
+//     }
+// #endif
+// };
+
+using StringHashTableHashKeyStr = SliceHashWithSeed<PhHashSeed1>;
+// struct StringHashTableHashKeyStr
+// {
+//     size_t ALWAYS_INLINE operator()(StringRef key) const { return StringRefHash()(key); }
+// };
 
 template <size_t Index, bool is_two_level, typename TStringHashTable>
 struct SubMapSelector;
