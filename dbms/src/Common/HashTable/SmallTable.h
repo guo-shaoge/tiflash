@@ -87,6 +87,7 @@ public:
 
     static constexpr bool isPhMap = false;
     static constexpr bool isStringHashMap = false;
+    static constexpr bool isTwoLevel = false;
 
     class Reader final : private Cell::State
     {

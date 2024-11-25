@@ -58,6 +58,7 @@ public:
     static constexpr bool isPhMap = ImplTable::isPhMap;
     // TODO
     static constexpr bool isStringHashMap = false;
+    static constexpr bool isTwoLevel = true;
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;

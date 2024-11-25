@@ -254,6 +254,7 @@ struct StringHashMapPhSubMaps
 {
     static constexpr bool isPhMap = true;
     static constexpr bool isStringHashMap = false;
+    static constexpr bool isTwoLevel = false;
     // TODO StringHashMap for now use StringHashTableHash
     using T0 = StringHashTableEmpty<StringHashMapCell<StringRef, TMapped>>;
     using T1 = PhHashTable<StringKey8, TMapped, StringHashTableHash>;

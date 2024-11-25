@@ -1710,6 +1710,23 @@ protected:
         typename Method::State & state,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info) const;
+
+template <typename Method>
+void executeImplBatchMethodStringWithPrefetch(
+        Method & method,
+        typename Method::State & state,
+        const ColumnRawPtrs & key_columns,
+        Arena * pool,
+        AggProcessInfo & agg_process_info) const;
+
+template <size_t Index, bool enable_prefetch, typename Data, typename KeyType, typename State>
+void emplaceStringHashMap(
+        Data & data,
+        State & state,
+        const std::vector<KeyType> & data_key,
+        const std::vector<size_t> & info_key,
+        Arena * pool,
+        std::vector<AggregateDataPtr> & places) const;
     
 template <bool enable_prefetch, typename Method>
 void executeImplMethodStringByColCKMap(

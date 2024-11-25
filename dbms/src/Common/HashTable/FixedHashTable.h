@@ -224,6 +224,7 @@ public:
 
     static constexpr bool isPhMap = false;
     static constexpr bool isStringHashMap = false;
+    static constexpr bool isTwoLevel = false;
 
     size_t hash(const Key & x) const { return x; }
 

@@ -720,6 +720,10 @@ void NO_INLINE Aggregator::executeImpl(
             else
                 executeImplMethodStringByColCKMap<true>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
         }
+        else if constexpr (Method::Data::isStringHashMap)
+        {
+            executeImplBatchMethodStringWithPrefetch(method, state, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+        }
         else
         {
             if (method.data.getBufferSizeInCells() < 8192)
@@ -834,6 +838,278 @@ void Aggregator::executeImplMethodStringByColCKMap(
                 pool);
     }
     agg_process_info.start_row = rows;
+}
+
+template <typename Method>
+void Aggregator::executeImplBatchMethodStringWithPrefetch(
+        Method & method,
+        typename Method::State & state,
+        const ColumnRawPtrs & key_columns,
+        Arena * pool,
+        AggProcessInfo & agg_process_info) const
+{
+    RUNTIME_CHECK_MSG(key_columns.size() == 1, "size of key_columns should be 1");
+    const size_t rows = key_columns[0]->size();
+    size_t reserve_size = std::max(1, rows / 4);
+
+    std::vector<std::string> sort_key_containers;
+    sort_key_containers.resize(1, "");
+
+    std::vector<StringRef> data_key0;
+    std::vector<size_t> info_key0;
+    data_key0.reserve(reserve_size);
+    info_key0.reserve(reserve_size);
+
+    std::vector<StringKey8> data_key8;
+    std::vector<size_t> info_key8;
+    data_key8.reserve(reserve_size);
+    info_key8.reserve(reserve_size);
+
+    std::vector<StringKey16> data_key16;
+    std::vector<size_t> info_key16;
+    data_key16.reserve(reserve_size);
+    info_key16.reserve(reserve_size);
+
+    std::vector<StringKey24> data_key24;
+    std::vector<size_t> info_key24;
+    data_key24.reserve(reserve_size);
+    info_key24.reserve(reserve_size);
+
+    std::vector<StringRef> data_key_str;
+    std::vector<size_t> info_key_str;
+    data_key_str.reserve(reserve_size);
+    info_key_str.reserve(reserve_size);
+
+    // TODO respect start row
+    for (size_t row = 0; row < key_columns[0]->size(); ++row)
+    {
+        // TODO get key from key_column?
+        auto key_holder = state.getKeyHolder(row, pool, sort_key_containers);
+        const StringRef & key = keyHolderGetKey(key_holder);
+
+        const size_t sz = key.size;
+        if (sz == 0)
+        {
+            data_key0.push_back(key);
+            info_key0.push_back(row);
+            continue;
+        }
+
+        if (key.data[sz - 1] == 0)
+        {
+            data_key_str.push_back(key);
+            info_key_str.push_back(row);
+            continue;
+        }
+
+        const char * p = key.data;
+        // pending bits that needs to be shifted out
+        const char s = (-sz & 7) * 8;
+        union
+        {
+            StringKey8 k8;
+            StringKey16 k16;
+            StringKey24 k24;
+            UInt64 n[3];
+        };
+        switch ((sz - 1) >> 3)
+        {
+        case 0: // 1..8 bytes
+        {
+            // first half page
+            if ((reinterpret_cast<uintptr_t>(p) & 2048) == 0)
+            {
+                memcpy(&n[0], p, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] &= (-1ULL >> s);
+                else
+                    n[0] &= (-1ULL << s);
+            }
+            else
+            {
+                const char * lp = key.data + key.size - 8;
+                memcpy(&n[0], lp, 8);
+                if constexpr (DB::isLittleEndian())
+                    n[0] >>= s;
+                else
+                    n[0] <<= s;
+            }
+            data_key8.push_back(k8);
+            info_key8.push_back(row);
+            break;
+        }
+        case 1: // 9..16 bytes
+        {
+            memcpy(&n[0], p, 8);
+            const char * lp = key.data + key.size - 8;
+            memcpy(&n[1], lp, 8);
+            if constexpr (DB::isLittleEndian())
+                n[1] >>= s;
+            else
+                n[1] <<= s;
+            data_key16.push_back(k16);
+            info_key16.push_back(row);
+            break;
+        }
+        case 2: // 17..24 bytes
+        {
+            memcpy(&n[0], p, 16);
+            const char * lp = key.data + key.size - 8;
+            memcpy(&n[2], lp, 8);
+            if constexpr (DB::isLittleEndian())
+                n[2] >>= s;
+            else
+                n[2] <<= s;
+            data_key24.push_back(k24);
+            info_key24.push_back(row);
+            break;
+        }
+        default: // >= 25 bytes
+        {
+            data_key_str.push_back(key);
+            info_key_str.push_back(row);
+            break;
+        }
+        }
+    }
+
+    std::vector<AggregateDataPtr> places_key0;
+    places_key0.reserve(info_key0.size());
+
+    std::vector<AggregateDataPtr> places_key8;
+    places_key8.reserve(info_key8.size());
+
+    std::vector<AggregateDataPtr> places_key16;
+    places_key16.reserve(info_key16.size());
+
+    std::vector<AggregateDataPtr> places_key24;
+    places_key24.reserve(info_key24.size());
+
+    std::vector<AggregateDataPtr> places_key_str;
+    places_key_str.reserve(info_key_str.size());
+
+    if (!info_key0.empty())
+    {
+        emplaceStringHashMap<0, false>(method.data, state, data_key0, info_key0, pool, places_key0);
+    }
+
+    if (!info_key8.empty())
+    {
+        // TODO check buffer size for sub map instead of upper map
+        if (method.data.getBufferSizeInCells() < 8192)
+            emplaceStringHashMap<1, false>(method.data, state, data_key8, info_key8, pool, places_key8);
+        else
+            emplaceStringHashMap<1, true>(method.data, state, data_key8, info_key8, pool, places_key8);
+    }
+
+    if (!info_key16.empty())
+    {
+        if (method.data.getBufferSizeInCells() < 8192)
+            emplaceStringHashMap<2, false>(method.data, state, data_key16, info_key16, pool, places_key16);
+        else
+            emplaceStringHashMap<2, true>(method.data, state, data_key16, info_key16, pool, places_key16);
+    }
+
+    if (!info_key24.empty())
+    {
+        if (method.data.getBufferSizeInCells() < 8192)
+            emplaceStringHashMap<3, false>(method.data, state, data_key24, info_key24, pool, places_key24);
+        else
+            emplaceStringHashMap<3, true>(method.data, state, data_key24, info_key24, pool, places_key24);
+    }
+
+    if (!info_key_str.empty())
+    {
+        if (method.data.getBufferSizeInCelss() < 8192)
+            emplaceStringHashMap<4, false>(method.data, state, data_key_str, info_key_str, pool, places_key_str);
+        else
+            emplaceStringHashMap<4, true>(method.data, state, data_key_str, info_key_str, pool, places_key_str);
+    }
+
+    std::vector<AggregateDataPtr> places(rows, nullptr);
+    for (size_t i = 0; i < info_key8.size(); ++i)
+    {
+        const auto row = info_key8[i];
+        places[row] = places_key0[i];
+    }
+
+    for (size_t i = 0; i < info_key8.size(); ++i)
+    {
+        const auto row = info_key8[i];
+        places[row] = places_key8[i];
+    }
+
+    for (size_t i = 0; i < info_key16.size(); ++i)
+    {
+        const auto row = info_key16[i];
+        places[row] = places_key16[i];
+    }
+
+    for (size_t i = 0; i < info_key24.size(); ++i)
+    {
+        const auto row = info_key24[i];
+        places[row] = places_key24[i];
+    }
+
+    for (size_t i = 0; i < info_key_str.size(); ++i)
+    {
+        const auto row = info_key_str[i];
+        places[row] = places_key_str[i];
+    }
+
+    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
+            ++inst)
+    {
+        inst->batch_that->addBatch(
+                agg_process_info.start_row,
+                rows,
+                &places[0],
+                inst->state_offset,
+                inst->batch_arguments,
+                pool);
+    }
+    agg_process_info.start_row = rows;
+}
+
+template <size_t Index, bool enable_prefetch, typename Data, typename KeyType, typename State>
+void Aggregator::emplaceStringHashMap(
+        Data & data,
+        State & state,
+        const std::vector<KeyType> & data_key,
+        const std::vector<size_t> & info_key,
+        Arena * pool,
+        std::vector<AggregateDataPtr> & places) const
+{
+    RUNTIME_CHECK(info_key.size() == data_key.size());
+    if (info_key.empty())
+        return;
+
+    std::vector<size_t> hashvals;
+    hashvals.reserve(data_key.size());
+    // TODO virtual method call for hasher
+    StringHashTableHash hasher;
+    for (const auto & key : data_key)
+    {
+        hashvals.push_back(hasher(key));
+    }
+
+    AggregateDataPtr agg_state = nullptr;
+
+    for (size_t i = 0; i < data_key.size(); ++i)
+    {
+        auto emplace_result = state.template emplaceStringKey<Index, enable_prefetch>(data, i, data_key[i], hashvals);
+        if (emplace_result.isInserted())
+        {
+            agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+            createAggregateStates(agg_state);
+            emplace_result.setMapped(agg_state);
+        }
+        else
+        {
+            agg_state = emplace_result.getMapped();
+        }
+        places[i] = agg_state;
+    }
 }
 
 template <bool only_lookup, bool enable_prefetch, typename Method>

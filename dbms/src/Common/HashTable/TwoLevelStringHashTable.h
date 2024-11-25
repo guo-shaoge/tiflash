@@ -28,6 +28,13 @@ public:
     using Impl = ImplTable;
     static constexpr bool isPhMap = ImplTable::isPhMap;
     static constexpr bool isStringHashMap = true;
+    static constexpr bool isTwoLevel = true;
+
+    using T0 = typename ImplTable::T0;
+    using T1 = typename ImplTable::T1;
+    using T2 = typename ImplTable::T2;
+    using T3 = typename ImplTable::T3;
+    using Ts = typename ImplTable::Ts;
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;
@@ -313,5 +320,55 @@ public:
             res += impls[i].getBufferSizeInCells();
 
         return res;
+    }
+};
+
+template <typename TStringHashTable>
+struct SubMapSelector<0, true, TStringHashTable>
+{
+    static typename TStringHashTable::T0 & getsubMap(size_t hashval, TStringHashTable & hash_table)
+    {
+        const auto bucket = hash_table.getBucketFromHash(hashval);
+        return hash_table.impls[bucket].m0;
+    }
+};
+
+template <typename TStringHashTable>
+struct SubMapSelector<1, true, TStringHashTable>
+{
+    static typename TStringHashTable::T1 & getSubMap(size_t hashval, TStringHashTable & hash_table)
+    {
+        const auto bucket = hash_table.getBucketFromHash(hashval);
+        return hash_table.impls[bucket].m1;
+    }
+};
+
+template <typename TStringHashTable>
+struct SubMapSelector<2, true, TStringHashTable>
+{
+    static typename TStringHashTable::T2 & getSubMap(size_t hashval, TStringHashTable & hash_table)
+    {
+        const auto bucket = hash_table.getBucketFromHash(hashval);
+        return hash_table.impls[bucket].m2;
+    }
+};
+
+template <typename TStringHashTable>
+struct SubMapSelector<3, true, TStringHashTable>
+{
+    static typename TStringHashTable::T3 & getSubMap(size_t hashval, TStringHashTable & hash_table)
+    {
+        const auto bucket = hash_table.getBucketFromHash(hashval);
+        return hash_table.impls[bucket].m3;
+    }
+};
+
+template <typename TStringHashTable>
+struct SubMapSelector<4, true, TStringHashTable>
+{
+    static typename TStringHashTable::Ts & getSubMap(size_t hashval, TStringHashTable & hash_table)
+    {
+        const auto bucket = hash_table.getBucketFromHash(hashval);
+        return hash_table.impls[bucket].ms;
     }
 };

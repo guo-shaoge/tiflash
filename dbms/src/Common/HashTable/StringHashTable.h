@@ -16,6 +16,7 @@
 
 #include <Common/HashTable/HashMap.h>
 #include <Common/HashTable/HashTable.h>
+#include <IO/Endian.h>
 
 #include <new>
 #include <variant>
@@ -162,6 +163,54 @@ public:
     size_t getCollisions() const { return 0; }
 };
 
+template <size_t Index, bool is_two_level, typename TStringHashTable = void>
+struct SubMapSelector;
+
+template <typename TStringHashTable>
+struct SubMapSelector<0, false, TStringHashTable>
+{
+    static typename TStringHashTable::T0 & getsubMap(size_t, TStringHashTable & hash_table)
+    {
+        return hash_table.m0;
+    }
+};
+
+template <typename TStringHashTable>
+struct SubMapSelector<1, false, TStringHashTable>
+{
+    static typename TStringHashTable::T1 & getSubMap(size_t, TStringHashTable & hash_table)
+    {
+        return hash_table.m1;
+    }
+};
+
+template <typename TStringHashTable>
+struct SubMapSelector<2, false, TStringHashTable>
+{
+    static typename TStringHashTable::T2 & getSubMap(size_t, TStringHashTable & hash_table)
+    {
+        return hash_table.m2;
+    }
+};
+
+template <typename TStringHashTable>
+struct SubMapSelector<3, false, TStringHashTable>
+{
+    static typename TStringHashTable::T3 & getSubMap(size_t, TStringHashTable & hash_table)
+    {
+        return hash_table.m3;
+    }
+};
+
+template <typename TStringHashTable>
+struct SubMapSelector<4, false, TStringHashTable>
+{
+    static typename TStringHashTable::Ts & getSubMap(size_t, TStringHashTable & hash_table)
+    {
+        return hash_table.ms;
+    }
+};
+
 template <size_t initial_size_degree = 8>
 struct StringHashTableGrower : public HashTableGrower<initial_size_degree>
 {
@@ -194,7 +243,7 @@ struct StringHashTableLookupResult
 template <typename SubMaps>
 class StringHashTable : private boost::noncopyable
 {
-protected:
+public:
     static constexpr size_t NUM_MAPS = 5;
 
     // Map for storing empty string
@@ -230,6 +279,7 @@ public:
 
     static constexpr bool isPhMap = SubMaps::isPhMap;
     static constexpr bool isStringHashMap = true;
+    static constexpr bool isTwoLevel = false;
 
     StringHashTable() = default;
 
@@ -367,6 +417,54 @@ public:
     void ALWAYS_INLINE emplace(KeyHolder && key_holder, LookupResult & it, bool & inserted)
     {
         this->dispatch(*this, key_holder, EmplaceCallable(it, inserted));
+    }
+
+    void ALWAYS_INLINE prefetch_key8(size_t hashval) const
+    {
+        this->m1.prefetch_hash(hashval);
+    }
+
+    void ALWAYS_INLINE emplaceKey8(const StringKey8 & key8, LookupResult & it, bool & inserted, size_t hashval)
+    {
+        typename T1::LookupResult result;
+        this->m1.emplace(key8, result, inserted, hashval);
+        it = &result->getMapped();
+    }
+
+    void ALWAYS_INLINE prefetch_key16(size_t hashval) const
+    {
+        this->m2.prefetch_hash(hashval);
+    }
+
+    void ALWAYS_INLINE emplaceKey16(const StringKey16 & key16, LookupResult & it, bool & inserted, size_t hashval)
+    {
+        typename T2::LookupResult result;
+        this->m2.emplace(key16, result, inserted, hashval);
+        it = &result->getMapped();
+    }
+
+    void ALWAYS_INLINE prefetch_key24(size_t hashval) const
+    {
+        this->m3.prefetch_hash(hashval);
+    }
+
+    void ALWAYS_INLINE emplaceKey24(const StringKey24 & key24, LookupResult & it, bool & inserted, size_t hashval)
+    {
+        typename T3::LookupResult result;
+        this->m3.emplace(key24, result, inserted, hashval);
+        it = &result->getMapped();
+    }
+
+    void ALWAYS_INLINE prefetch_key_str(size_t hashval) const
+    {
+        this->ms.prefetch_hash(hashval);
+    }
+
+    void ALWAYS_INLINE emplaceKeyStr(const StringRef & key_str, LookupResult & it, bool & inserted, size_t hashval)
+    {
+        typename Ts::LookupResult result;
+        this->ms.emplace(key_str, result, inserted, hashval);
+        it = &result->getMapped();
     }
 
     struct FindCallable

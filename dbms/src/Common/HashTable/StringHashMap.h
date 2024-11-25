@@ -92,6 +92,7 @@ struct StringHashMapSubMaps
 {
     static constexpr bool isPhMap = false;
     static constexpr bool isStringHashMap = true;
+    static constexpr bool isTwoLevel = false;
 
     using T0 = StringHashTableEmpty<StringHashMapCell<StringRef, TMapped>>;
     using T1 = HashMapTable<

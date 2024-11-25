@@ -16,6 +16,7 @@
 
 #include <Columns/IColumn.h>
 #include <Common/HashTable/HashTable.h>
+#include <Common/HashTable/StringHashTable.h>
 #include <Common/HashTable/HashTableKeyHolder.h>
 #include <Common/assert_cast.h>
 #include <Functions/FunctionHelpers.h>
@@ -129,6 +130,24 @@ public:
 
     static constexpr bool has_mapped = !std::is_same<Mapped, VoidMapped>::value;
     static constexpr size_t prefetch_step = 16;
+
+    template <size_t Index, bool enable_prefetch, typename Data, typename Key>
+    ALWAYS_INLINE inline EmplaceResult emplaceStringKey(
+            Data & data,
+            size_t idx,
+            const Key & key,
+            const std::vector<size_t> & hashvals)
+    {
+        static_assert(Data::isStringHashMap);
+        auto & submap = SubMapSelector<Index, Data::isTwoLevel>::getSubMap(hashvals[idx], data);
+
+        const auto prefetch_idx = idx + 16;
+        if likely (prefetch_idx < hashvals.size())
+        {
+            submap.prefetch_hash(hashvals[prefetch_idx]);
+        }
+        return emplaceImpl<enable_prefetch>(key, submap, hashvals[idx]);
+    }
 
     template <typename Data>
     ALWAYS_INLINE inline EmplaceResult emplaceKey(

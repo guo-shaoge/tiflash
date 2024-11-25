@@ -404,6 +404,7 @@ public:
 
     static constexpr bool isPhMap = false;
     static constexpr bool isStringHashMap = false;
+    static constexpr bool isTwoLevel = false;
 
 protected:
     friend class const_iterator;

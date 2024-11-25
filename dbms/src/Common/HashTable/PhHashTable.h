@@ -58,6 +58,7 @@ class PhHashTableTemplate : public Base
 public:
     static constexpr bool isPhMap = true;
     static constexpr bool isStringHashMap = false;
+    static constexpr bool isTwoLevel = false;
 
     using Self = PhHashTableTemplate;
 
