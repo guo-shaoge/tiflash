@@ -1031,9 +1031,9 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
             places_key24.size() + places_key_str.size());
 
     std::vector<AggregateDataPtr> places(rows, nullptr);
-    for (size_t i = 0; i < info_key8.size(); ++i)
+    for (size_t i = 0; i < info_key0.size(); ++i)
     {
-        const auto row = info_key8[i];
+        const auto row = info_key0[i];
         places[row] = places_key0[i];
     }
 
