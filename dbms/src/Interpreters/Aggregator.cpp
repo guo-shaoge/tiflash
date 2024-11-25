@@ -848,7 +848,7 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
         Arena * pool,
         AggProcessInfo & agg_process_info) const
 {
-    LOG_DEBUG(log, "gjt debug executeImplBatchMethodStringWithPrefetch");
+    // LOG_DEBUG(log, "gjt debug executeImplBatchMethodStringWithPrefetch");
     RUNTIME_CHECK_MSG(key_columns.size() == 1, "size of key_columns should be 1");
     const size_t rows = key_columns[0]->size();
     size_t reserve_size = std::max(1, rows / 4);
@@ -1027,6 +1027,9 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
             emplaceStringHashMap<4, true>(method.data, state, data_key_str, info_key_str, pool, places_key_str);
     }
 
+    RUNTIME_CHECK(rows == places_key0.size() + places_key8.size() + places_key16.size() +
+            places_key24.size() + places_key_str.size());
+
     std::vector<AggregateDataPtr> places(rows, nullptr);
     for (size_t i = 0; i < info_key8.size(); ++i)
     {
@@ -1109,7 +1112,7 @@ void Aggregator::emplaceStringHashMap(
         {
             agg_state = emplace_result.getMapped();
         }
-        places[i] = agg_state;
+        places.push_back(agg_state);
     }
 }
 
