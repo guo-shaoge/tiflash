@@ -131,7 +131,7 @@ public:
     static constexpr bool has_mapped = !std::is_same<Mapped, VoidMapped>::value;
     static constexpr size_t prefetch_step = 16;
 
-    template <size_t Index, bool enable_prefetch, typename Data, typename Key>
+    template <size_t Index, typename Data, typename Key>
     ALWAYS_INLINE inline EmplaceResult emplaceStringKey(
             Data & data,
             size_t idx,
@@ -146,7 +146,7 @@ public:
         {
             submap.prefetch_hash(hashvals[prefetch_idx]);
         }
-        return emplaceImpl<enable_prefetch>(key, submap, hashvals[idx]);
+        return emplaceImpl<true>(key, submap, hashvals[idx]);
     }
 
     template <typename Data>

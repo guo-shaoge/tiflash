@@ -1101,7 +1101,7 @@ void Aggregator::emplaceStringHashMap(
 
     for (size_t i = 0; i < data_key.size(); ++i)
     {
-        auto emplace_result = state.template emplaceStringKey<Index, enable_prefetch>(data, i, data_key[i], hashvals);
+        auto emplace_result = state.template emplaceStringKey<Index>(data, i, data_key[i], hashvals);
         if (emplace_result.isInserted())
         {
             agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
