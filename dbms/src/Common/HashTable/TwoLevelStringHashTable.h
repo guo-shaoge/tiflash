@@ -326,7 +326,7 @@ public:
 template <typename TStringHashTable>
 struct SubMapSelector<0, true, TStringHashTable>
 {
-    static typename TStringHashTable::T0 & getsubMap(size_t hashval, TStringHashTable & hash_table)
+    static typename TStringHashTable::T0 & getSubMap(size_t hashval, TStringHashTable & hash_table)
     {
         const auto bucket = hash_table.getBucketFromHash(hashval);
         return hash_table.impls[bucket].m0;
