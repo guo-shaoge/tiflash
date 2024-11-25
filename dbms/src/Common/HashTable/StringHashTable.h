@@ -165,6 +165,67 @@ public:
     size_t getCollisions() const { return 0; }
 };
 
+struct StringHashTableHashKey0
+{
+    // TODO no need to calc for key0
+    size_t ALWAYS_INLINE operator()(const StringRef &) { return 0; }
+};
+struct StringHashTableHashKey8
+{
+#if defined(__SSE4_2__)
+    size_t ALWAYS_INLINE operator()(StringKey8 key) const
+    {
+        size_t res = -1ULL;
+        res = _mm_crc32_u64(res, key);
+        return res;
+    }
+#else
+    size_t ALWAYS_INLINE operator()(StringKey8 key) const
+    {
+        return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 8);
+    }
+#endif
+};
+struct StringHashTableHashKey16
+{
+#if defined(__SSE4_2__)
+    size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
+    {
+        size_t res = -1ULL;
+        res = _mm_crc32_u64(res, key.low);
+        res = _mm_crc32_u64(res, key.high);
+        return res;
+    }
+#else
+    size_t ALWAYS_INLINE operator()(const StringKey16 & key) const
+    {
+        return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 16);
+    }
+#endif
+};
+struct StringHashTableHashKey24
+{
+#if defined(__SSE4_2__)
+    size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
+    {
+        size_t res = -1ULL;
+        res = _mm_crc32_u64(res, key.a);
+        res = _mm_crc32_u64(res, key.b);
+        res = _mm_crc32_u64(res, key.c);
+        return res;
+    }
+#else
+    size_t ALWAYS_INLINE operator()(const StringKey24 & key) const
+    {
+        return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 24);
+    }
+#endif
+};
+struct StringHashTableHashKeyStr
+{
+    size_t ALWAYS_INLINE operator()(StringRef key) const { return StringRefHash()(key); }
+};
+
 template <size_t Index, bool is_two_level, typename TStringHashTable>
 struct SubMapSelector;
 
@@ -175,6 +236,11 @@ struct SubMapSelector<0, false, TStringHashTable>
     {
         return hash_table.m0;
     }
+
+    static StringHashTableHashKey0 getHasher()
+    {
+        return StringHashTableHashKey0{};
+    }
 };
 
 template <typename TStringHashTable>
@@ -183,6 +249,10 @@ struct SubMapSelector<1, false, TStringHashTable>
     static typename TStringHashTable::T1 & getSubMap(size_t, TStringHashTable & hash_table)
     {
         return hash_table.m1;
+    }
+    static StringHashTableHashKey8 getHasher()
+    {
+        return StringHashTableHashKey8{};
     }
 };
 
@@ -193,6 +263,10 @@ struct SubMapSelector<2, false, TStringHashTable>
     {
         return hash_table.m2;
     }
+    static StringHashTableHashKey16 getHasher()
+    {
+        return StringHashTableHashKey16{};
+    }
 };
 
 template <typename TStringHashTable>
@@ -202,6 +276,10 @@ struct SubMapSelector<3, false, TStringHashTable>
     {
         return hash_table.m3;
     }
+    static StringHashTableHashKey24 getHasher()
+    {
+        return StringHashTableHashKey24{};
+    }
 };
 
 template <typename TStringHashTable>
@@ -210,6 +288,10 @@ struct SubMapSelector<4, false, TStringHashTable>
     static typename TStringHashTable::Ts & getSubMap(size_t, TStringHashTable & hash_table)
     {
         return hash_table.ms;
+    }
+    static StringHashTableHashKeyStr getHasher()
+    {
+        return StringHashTableHashKeyStr{};
     }
 };
 

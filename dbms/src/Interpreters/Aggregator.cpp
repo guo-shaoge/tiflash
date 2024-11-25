@@ -1109,7 +1109,7 @@ void Aggregator::emplaceStringHashMap(
     std::vector<size_t> hashvals;
     hashvals.reserve(data_key.size());
     // TODO virtual method call for hasher
-    StringHashTableHash hasher;
+    auto hasher = SubMapSelector<Index, false, std::decay_t<Data>>::getHasher();
     for (const auto & key : data_key)
     {
         hashvals.push_back(hasher(key));
