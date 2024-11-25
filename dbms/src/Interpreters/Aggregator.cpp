@@ -840,6 +840,11 @@ void Aggregator::executeImplMethodStringByColCKMap(
     agg_process_info.start_row = rows;
 }
 
+inline size_t alignOf16(size_t l)
+{
+    return (l + 15) & ~15;
+}
+
 template <typename Method>
 void Aggregator::executeImplBatchMethodStringWithPrefetch(
         Method & method,
@@ -880,6 +885,8 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
     std::vector<size_t> info_key_str;
     data_key_str.reserve(reserve_size);
     info_key_str.reserve(reserve_size);
+
+    size_t str_buffer_size = 0;
 
     // TODO respect start row
     for (size_t row = 0; row < key_columns[0]->size(); ++row)
@@ -967,9 +974,10 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
         }
         default: // >= 25 bytes
         {
-            keyHolderPersistKey(key_holder);
-            data_key_str.push_back(keyHolderGetKey(key_holder));
+            // keyHolderPersistKey(key_holder);
+            data_key_str.push_back(key);
             info_key_str.push_back(row);
+            str_buffer_size += alignOf16(sz);
             break;
         }
         }
@@ -1022,6 +1030,15 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
 
     if (!info_key_str.empty())
     {
+        // persist key.
+        auto * buf = pool->alloc(str_buffer_size);
+        for (auto & key : data_key_str)
+        {
+            memcpy_inlined(buf, key.data, key.size);
+            key.data = buf;
+            buf += alignOf16(key.size);
+        }
+
         if (method.data.getBufferSizeInCells() < 8192)
             emplaceStringHashMap<4, false>(method.data, state, data_key_str, info_key_str, pool, places_key_str);
         else
