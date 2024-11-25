@@ -1723,7 +1723,7 @@ template <size_t Index, bool enable_prefetch, typename Data, typename KeyType, t
 void emplaceStringHashMap(
         Data & data,
         State & state,
-        const std::vector<KeyType> & data_key,
+        std::vector<KeyType> & data_key,
         const std::vector<size_t> & info_key,
         Arena * pool,
         std::vector<AggregateDataPtr> & places) const;

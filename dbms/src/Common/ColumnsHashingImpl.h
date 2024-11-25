@@ -131,6 +131,24 @@ public:
     static constexpr bool has_mapped = !std::is_same<Mapped, VoidMapped>::value;
     static constexpr size_t prefetch_step = 16;
 
+    template <size_t Index, typename Data>
+    ALWAYS_INLINE inline EmplaceResult emplaceStringKey(
+            Data & data,
+            size_t idx,
+            ArenaKeyHolder & key,
+            const std::vector<size_t> & hashvals)
+    {
+        static_assert(Data::isStringHashMap);
+        auto & submap = SubMapSelector<Index, Data::isTwoLevel, std::decay_t<decltype(data)>>::getSubMap(hashvals[idx], data);
+
+        const auto prefetch_idx = idx + 16;
+        if likely (prefetch_idx < hashvals.size())
+        {
+            submap.prefetch_hash(hashvals[prefetch_idx]);
+        }
+        return emplaceImpl<true>(key, submap, hashvals[idx]);
+    }
+
     template <size_t Index, typename Data, typename Key>
     ALWAYS_INLINE inline EmplaceResult emplaceStringKey(
             Data & data,

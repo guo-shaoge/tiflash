@@ -881,12 +881,12 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
     data_key24.reserve(reserve_size);
     info_key24.reserve(reserve_size);
 
-    std::vector<StringRef> data_key_str;
+    std::vector<ArenaKeyHolder> data_key_str;
     std::vector<size_t> info_key_str;
     data_key_str.reserve(reserve_size);
     info_key_str.reserve(reserve_size);
 
-    size_t str_buffer_size = 0;
+    // size_t str_buffer_size = 0;
 
     // TODO respect start row
     for (size_t row = 0; row < key_columns[0]->size(); ++row)
@@ -905,7 +905,7 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
 
         if (key.data[sz - 1] == 0)
         {
-            data_key_str.push_back(key);
+            data_key_str.push_back(key_holder);
             info_key_str.push_back(row);
             continue;
         }
@@ -975,9 +975,9 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
         default: // >= 25 bytes
         {
             // keyHolderPersistKey(key_holder);
-            data_key_str.push_back(key);
+            data_key_str.push_back(key_holder);
             info_key_str.push_back(row);
-            str_buffer_size += alignOf16(sz);
+            // str_buffer_size += alignOf16(sz);
             break;
         }
         }
@@ -1030,14 +1030,14 @@ void Aggregator::executeImplBatchMethodStringWithPrefetch(
 
     if (!info_key_str.empty())
     {
-        // persist key.
-        auto * buf = pool->alloc(str_buffer_size);
-        for (auto & key : data_key_str)
-        {
-            memcpy_inlined(buf, key.data, key.size);
-            key.data = buf;
-            buf += alignOf16(key.size);
-        }
+        // // persist key.
+        // auto * buf = pool->alloc(str_buffer_size);
+        // for (auto & key : data_key_str)
+        // {
+        //     memcpy_inlined(buf, key.data, key.size);
+        //     key.data = buf;
+        //     buf += alignOf16(key.size);
+        // }
 
         if (method.data.getBufferSizeInCells() < 8192)
             emplaceStringHashMap<4, false>(method.data, state, data_key_str, info_key_str, pool, places_key_str);
@@ -1097,7 +1097,7 @@ template <size_t Index, bool enable_prefetch, typename Data, typename KeyType, t
 void Aggregator::emplaceStringHashMap(
         Data & data,
         State & state,
-        const std::vector<KeyType> & data_key,
+        std::vector<KeyType> & data_key, // todo const will break keyHolderGetKey()
         const std::vector<size_t> & info_key,
         Arena * pool,
         std::vector<AggregateDataPtr> & places) const
@@ -1110,9 +1110,9 @@ void Aggregator::emplaceStringHashMap(
     hashvals.reserve(data_key.size());
     // TODO virtual method call for hasher
     auto hasher = SubMapSelector<Index, false, std::decay_t<Data>>::getHasher();
-    for (const auto & key : data_key)
+    for (auto & key : data_key)
     {
-        hashvals.push_back(hasher(key));
+        hashvals.push_back(hasher(keyHolderGetKey(key)));
     }
 
     AggregateDataPtr agg_state = nullptr;
