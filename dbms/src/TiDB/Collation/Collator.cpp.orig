@@ -469,16 +469,6 @@ private:
         }
     }
 
-    static inline void writeResult(uint64_t & w, char * buffer, size_t & total_size)
-    {
-        while (w != 0)
-        {
-            buffer[total_size++] = static_cast<char>(w >> 8);
-            buffer[total_size++] = static_cast<char>(w);
-            w >>= 16;
-        }
-    }
-
     static inline bool regexEq(CharType a, CharType b) { return T::regexEq(a, b); }
 
     static inline void weight(uint64_t & first, uint64_t & second, size_t & offset, size_t length, const char * s)
