@@ -14,10 +14,10 @@
 
 #pragma once
 
+#include <Common/Arena.h>
 #include <TiDB/Collation/CollatorCompare.h>
 #include <TiDB/Schema/TiDB_fwd.h>
 #include <common/StringRef.h>
-#include <Common/Arena.h>
 
 #include <memory>
 

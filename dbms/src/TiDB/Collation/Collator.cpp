@@ -273,6 +273,25 @@ public:
         return StringRef(container.data(), total_size);
     }
 
+    StringRef sortKey(const char * s, size_t length, DB::Arena & pool) const override
+    {
+        auto v = rtrim(s, length);
+        const auto size = length * sizeof(WeightType);
+        auto * buffer = pool.alignedAlloc(size, 16);
+        size_t offset = 0;
+        size_t total_size = 0;
+
+        while (offset < v.length())
+        {
+            auto c = decodeChar(s, offset);
+            auto sk = weight(c);
+            buffer[total_size++] = char(sk >> 8);
+            buffer[total_size++] = char(sk);
+        }
+
+        return StringRef(buffer, total_size);
+    }
+
     std::unique_ptr<IPattern> pattern() const override { return std::make_unique<Pattern<GeneralCICollator>>(); }
 
 private:
@@ -449,6 +468,28 @@ public:
         return StringRef(container.data(), total_size);
     }
 
+    StringRef sortKey(const char * s, size_t length, DB::Arena & pool) const override
+    {
+        std::string_view v = preprocess(s, length);
+        // every char have 8 uint16 at most.
+        const auto size = 8 * length * sizeof(uint16_t);
+        auto * buffer = pool.alignedAlloc(size, 16);
+        size_t offset = 0;
+        size_t total_size = 0;
+        size_t v_length = v.length();
+
+        uint64_t first = 0, second = 0;
+
+        while (offset < v_length)
+        {
+            weight(first, second, offset, v_length, s);
+            writeResult(first, buffer, total_size);
+            writeResult(second, buffer, total_size);
+        }
+
+        return StringRef(buffer, total_size);
+    }
+
     std::unique_ptr<IPattern> pattern() const override { return std::make_unique<Pattern<UCACICollator>>(); }
 
 private:
@@ -468,7 +509,6 @@ private:
             w >>= 16;
         }
     }
-
     static inline void writeResult(uint64_t & w, char * buffer, size_t & total_size)
     {
         while (w != 0)
