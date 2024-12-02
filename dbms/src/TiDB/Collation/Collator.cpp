@@ -192,6 +192,10 @@ public:
     {
         return DB::BinCollatorSortKey<padding>(s, length);
     }
+    StringRef sortKey(const char * s, size_t length, DB::Arena &) const override
+    {
+        return DB::BinCollatorSortKey<padding>(s, length);
+    }
 
     std::unique_ptr<IPattern> pattern() const override { return std::make_unique<Pattern<BinCollator<T, padding>>>(); }
 
