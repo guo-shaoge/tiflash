@@ -80,7 +80,7 @@ using AggregatedDataWithUInt16Key = FixedImplicitZeroHashMap<UInt16, AggregateDa
 using AggregatedDataWithUInt32Key = HashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
 using AggregatedDataWithUInt64Key = HashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
 
-using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr>;
+using AggregatedDataWithShortStringKey = StringHashMap<AggregateDataPtr, StringHashTableHashSelector<false>>;
 using AggregatedDataWithStringKey = HashMapWithSavedHash<StringRef, AggregateDataPtr>;
 
 using AggregatedDataWithInt256Key = HashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
@@ -88,16 +88,19 @@ using AggregatedDataWithInt256Key = HashMap<Int256, AggregateDataPtr, HashCRC32<
 using AggregatedDataWithKeys128 = HashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
 using AggregatedDataWithKeys256 = HashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
 
-using AggregatedDataWithUInt32KeyTwoLevel = TwoLevelHashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
-using AggregatedDataWithUInt64KeyTwoLevel = TwoLevelHashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
+// For numeric group key, the Hash of single level and the Hash of two level are different.
+// Because Compared to HashCRC32, HashWithMixSeed has a lower probability of collisions but requires more computational effort.
+// So single level use HashCRC32 because we assume single level HashTable is small.
+using AggregatedDataWithUInt32KeyTwoLevel = TwoLevelHashMap<UInt32, AggregateDataPtr, HashWithMixSeed<UInt32>>;
+using AggregatedDataWithUInt64KeyTwoLevel = TwoLevelHashMap<UInt64, AggregateDataPtr, HashWithMixSeed<UInt64>>;
 
-using AggregatedDataWithInt256KeyTwoLevel = TwoLevelHashMap<Int256, AggregateDataPtr, HashCRC32<Int256>>;
+using AggregatedDataWithInt256KeyTwoLevel = TwoLevelHashMap<Int256, AggregateDataPtr, HashWithMixSeed<Int256>>;
 
-using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMap<AggregateDataPtr>;
+using AggregatedDataWithShortStringKeyTwoLevel = TwoLevelStringHashMap<AggregateDataPtr, StringHashTableHashSelector<true>>;
 using AggregatedDataWithStringKeyTwoLevel = TwoLevelHashMapWithSavedHash<StringRef, AggregateDataPtr>;
 
-using AggregatedDataWithKeys128TwoLevel = TwoLevelHashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
-using AggregatedDataWithKeys256TwoLevel = TwoLevelHashMap<UInt256, AggregateDataPtr, HashCRC32<UInt256>>;
+using AggregatedDataWithKeys128TwoLevel = TwoLevelHashMap<UInt128, AggregateDataPtr, HashWithMixSeed<UInt128>>;
+using AggregatedDataWithKeys256TwoLevel = TwoLevelHashMap<UInt256, AggregateDataPtr, HashWithMixSeed<UInt256>>;
 
 /** Variants with better hash function, using more than 32 bits for hash.
   * Using for merging phase of external aggregation, where number of keys may be far greater than 4 billion,
@@ -125,7 +128,7 @@ struct AggregationMethodOneNumber
     AggregationMethodOneNumber() = default;
 
     template <typename Other>
-    explicit AggregationMethodOneNumber(const Other & other)
+    explicit AggregationMethodOneNumber(Other & other)
         : data(other.data)
     {}
 
@@ -179,7 +182,7 @@ struct AggregationMethodString
     AggregationMethodString() = default;
 
     template <typename Other>
-    explicit AggregationMethodString(const Other & other)
+    explicit AggregationMethodString(Other & other)
         : data(other.data)
     {}
 
@@ -227,7 +230,7 @@ struct AggregationMethodStringNoCache
     AggregationMethodStringNoCache() = default;
 
     template <typename Other>
-    explicit AggregationMethodStringNoCache(const Other & other)
+    explicit AggregationMethodStringNoCache(Other & other)
         : data(other.data)
     {}
 
@@ -275,7 +278,7 @@ struct AggregationMethodOneKeyStringNoCache
     AggregationMethodOneKeyStringNoCache() = default;
 
     template <typename Other>
-    explicit AggregationMethodOneKeyStringNoCache(const Other & other)
+    explicit AggregationMethodOneKeyStringNoCache(Other & other)
         : data(other.data)
     {}
 
@@ -325,7 +328,7 @@ struct AggregationMethodMultiStringNoCache
     AggregationMethodMultiStringNoCache() = default;
 
     template <typename Other>
-    explicit AggregationMethodMultiStringNoCache(const Other & other)
+    explicit AggregationMethodMultiStringNoCache(Other & other)
         : data(other.data)
     {}
 
@@ -355,7 +358,7 @@ struct AggregationMethodFastPathTwoKeysNoCache
     AggregationMethodFastPathTwoKeysNoCache() = default;
 
     template <typename Other>
-    explicit AggregationMethodFastPathTwoKeysNoCache(const Other & other)
+    explicit AggregationMethodFastPathTwoKeysNoCache(Other & other)
         : data(other.data)
     {}
 
@@ -475,7 +478,7 @@ struct AggregationMethodFixedString
     AggregationMethodFixedString() = default;
 
     template <typename Other>
-    explicit AggregationMethodFixedString(const Other & other)
+    explicit AggregationMethodFixedString(Other & other)
         : data(other.data)
     {}
 
@@ -523,7 +526,7 @@ struct AggregationMethodFixedStringNoCache
     AggregationMethodFixedStringNoCache() = default;
 
     template <typename Other>
-    explicit AggregationMethodFixedStringNoCache(const Other & other)
+    explicit AggregationMethodFixedStringNoCache(Other & other)
         : data(other.data)
     {}
 
@@ -572,7 +575,7 @@ struct AggregationMethodKeysFixed
     AggregationMethodKeysFixed() = default;
 
     template <typename Other>
-    explicit AggregationMethodKeysFixed(const Other & other)
+    explicit AggregationMethodKeysFixed(Other & other)
         : data(other.data)
     {}
 
@@ -679,7 +682,7 @@ struct AggregationMethodSerialized
     AggregationMethodSerialized() = default;
 
     template <typename Other>
-    explicit AggregationMethodSerialized(const Other & other)
+    explicit AggregationMethodSerialized(Other & other)
         : data(other.data)
     {}
 
@@ -1325,7 +1328,7 @@ public:
         std::vector<size_t> submap_m2_infos{};
         std::vector<size_t> submap_m3_infos{};
         std::vector<size_t> submap_m4_infos{};
-        std::vector<StringRef> submap_m0_datas{};
+        std::vector<StringKey0> submap_m0_datas{};
         std::vector<StringKey8> submap_m1_datas{};
         std::vector<StringKey16> submap_m2_datas{};
         std::vector<StringKey24> submap_m3_datas{};

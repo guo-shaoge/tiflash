@@ -1060,6 +1060,7 @@ try
     }
 
     FailPointHelper::enableFailPoint(FailPoints::force_agg_prefetch);
+    LOG_DEBUG(Logger::get(), "gjt debug 1");
     {
         // case-1: select count(1), col_tinyint from t group by col_int, col_tinyint
         // agg method: keys64(AggregationMethodKeysFixed)
@@ -1078,6 +1079,7 @@ try
         executeAndAssertColumnsEqual(request, expected);
         WRAP_FOR_AGG_STRING_TEST_END
     }
+    LOG_DEBUG(Logger::get(), "gjt debug 1");
 
     {
         // case-2: select count(1), col_int from t group by col_int
@@ -1096,6 +1098,7 @@ try
         executeAndAssertColumnsEqual(request, expected);
         WRAP_FOR_AGG_STRING_TEST_END
     }
+    LOG_DEBUG(Logger::get(), "gjt debug 1");
 
     {
         // case-3: select count(1), col_string_no_collator from t group by col_string_no_collator
@@ -1113,6 +1116,7 @@ try
         };
         executeAndAssertColumnsEqual(request, expected);
     }
+    LOG_DEBUG(Logger::get(), "gjt debug 1");
 
     {
         // case-4: select count(1), col_string_with_collator from t group by col_string_with_collator
@@ -1132,6 +1136,7 @@ try
         executeAndAssertColumnsEqual(request, expected);
         WRAP_FOR_AGG_STRING_TEST_END
     }
+    LOG_DEBUG(Logger::get(), "gjt debug 1");
 
     {
         // case-4-1: select count(1) from t group by col_string_with_collator
@@ -1151,6 +1156,7 @@ try
         executeAndAssertColumnsEqual(request, expected);
         WRAP_FOR_AGG_STRING_TEST_END
     }
+    LOG_DEBUG(Logger::get(), "gjt debug 1");
 
     // case-5: none
     // agg method: key_fixed_string(AggregationMethodFixedStringNoCache)
@@ -1175,6 +1181,7 @@ try
         executeAndAssertColumnsEqual(request, expected);
         WRAP_FOR_AGG_STRING_TEST_END
     }
+    LOG_DEBUG(Logger::get(), "gjt debug 1");
 
     {
         // case-7: select count(1), col_string_with_collator, col_int from t group by col_string_with_collator, col_int
@@ -1194,6 +1201,7 @@ try
         executeAndAssertColumnsEqual(request, expected);
         WRAP_FOR_AGG_STRING_TEST_END
     }
+    LOG_DEBUG(Logger::get(), "gjt debug 1");
     FailPointHelper::disableFailPoint(FailPoints::force_agg_prefetch);
 #undef WRAP_FOR_AGG_STRING_TEST_BEGIN
 #undef WRAP_FOR_AGG_STRING_TEST_END

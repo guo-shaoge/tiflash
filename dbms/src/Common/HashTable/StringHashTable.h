@@ -23,6 +23,7 @@
 #include <new>
 #include <variant>
 
+struct StringKey0 {};
 using StringKey8 = UInt64;
 using StringKey16 = DB::UInt128;
 struct StringKey24
@@ -67,27 +68,28 @@ struct HashWithMixSeed<StringKey24>
     }
 };
 
-// struct StringHashTableHash
-// {
-//     using StringKey8Hasher = HashWithMixSeed<StringKey8>;
-//     using StringKey16Hasher = HashWithMixSeed<StringKey16>;
-//     using StringKey24Hasher = HashWithMixSeed<StringKey24>;
-//     using StringRefHasher = StringRefHash;
-// 
-//     static size_t ALWAYS_INLINE operator()(StringKey8 key) { return StringKey8Hasher::operator()(key); }
-//     static size_t ALWAYS_INLINE operator()(const StringKey16 & key) { return StringKey16Hasher::operator()(key); }
-//     static size_t ALWAYS_INLINE operator()(const StringKey24 & key) { return StringKey24Hasher::operator()(key); }
-//     static size_t ALWAYS_INLINE operator()(const StringRef & key) { return StringRefHasher::operator()(key); }
-// };
-struct StringHashTableHash
+struct StringKey0Hash
 {
+    static ALWAYS_INLINE inline size_t operator()(StringKey0) { return 0; }
+};
+
+using StringKey8HashWithMixSeed = HashWithMixSeed<StringKey8>;
+using StringKey16HashWithMixSeed = HashWithMixSeed<StringKey16>;
+using StringKey24HashWithMixSeed = HashWithMixSeed<StringKey24>;
+
 #if defined(__SSE4_2__)
+struct StringKey8Hash
+{
     static size_t ALWAYS_INLINE operator()(StringKey8 key)
     {
         size_t res = -1ULL;
         res = _mm_crc32_u64(res, key);
         return res;
     }
+};
+
+struct StringKey16Hash
+{
     static size_t ALWAYS_INLINE operator()(const StringKey16 & key)
     {
         size_t res = -1ULL;
@@ -95,6 +97,10 @@ struct StringHashTableHash
         res = _mm_crc32_u64(res, key.high);
         return res;
     }
+};
+
+struct StringKey24Hash
+{
     static size_t ALWAYS_INLINE operator()(const StringKey24 & key)
     {
         size_t res = -1ULL;
@@ -103,21 +109,58 @@ struct StringHashTableHash
         res = _mm_crc32_u64(res, key.c);
         return res;
     }
+};
 #else
+struct StringKey8Hash
+{
     static size_t ALWAYS_INLINE operator()(StringKey8 key)
     {
         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 8);
     }
+};
+
+struct StringKey16Hash
+{
     static size_t ALWAYS_INLINE operator()(const StringKey16 & key)
     {
         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 16);
     }
+};
+
+struct StringKey24Hash
+{
     static size_t ALWAYS_INLINE operator()(const StringKey24 & key)
     {
         return CityHash_v1_0_2::CityHash64(reinterpret_cast<const char *>(&key), 24);
     }
+};
 #endif
+struct StringStrHash
+{
     static size_t ALWAYS_INLINE operator()(StringRef key){ return StringRefHash()(key); }
+};
+
+template <bool choose_mix_version>
+struct StringHashTableHashSelector;
+
+template <>
+struct StringHashTableHashSelector<true>
+{
+    using StringKey0Hash = StringKey0Hash;
+    using StringKey8Hash = StringKey8HashWithMixSeed;
+    using StringKey16Hash = StringKey16HashWithMixSeed;
+    using StringKey24Hash = StringKey24HashWithMixSeed;
+    using StringStrHash = StringStrHash;
+};
+
+template <>
+struct StringHashTableHashSelector<false>
+{
+    using StringKey0Hash = StringKey0Hash;
+    using StringKey8Hash = StringKey8Hash;
+    using StringKey16Hash = StringKey16Hash;
+    using StringKey24Hash = StringKey24Hash;
+    using StringStrHash = StringStrHash;
 };
 
 template <typename Cell>
@@ -129,6 +172,8 @@ struct StringHashTableEmpty //-V730
     std::aligned_storage_t<sizeof(Cell), alignof(Cell)> zero_value_storage; /// Storage of element with zero key.
 
 public:
+    using Hash = StringKey0Hash;
+
     bool hasZero() const { return has_zero; }
 
     void setHasZero()
@@ -243,7 +288,7 @@ static auto
     const size_t sz = x.size;
     if (sz == 0)
     {
-        return func0(x, row);
+        return func0(StringKey0{}, row);
     }
 
     if (x.data[sz - 1] == 0)
@@ -316,7 +361,7 @@ static auto
     }
 }
 
-template <typename SubMaps>
+template <typename TSubMaps>
 class StringHashTable : private boost::noncopyable
 {
 protected:
@@ -324,15 +369,15 @@ protected:
     using Self = StringHashTable;
 
     // Map for storing empty string
-    using T0 = typename SubMaps::T0;
+    using T0 = typename TSubMaps::T0;
 
     // Short strings are stored as numbers
-    using T1 = typename SubMaps::T1;
-    using T2 = typename SubMaps::T2;
-    using T3 = typename SubMaps::T3;
+    using T1 = typename TSubMaps::T1;
+    using T2 = typename TSubMaps::T2;
+    using T3 = typename TSubMaps::T3;
 
     // Long strings are stored as StringRef along with saved hash
-    using Ts = typename SubMaps::Ts;
+    using Ts = typename TSubMaps::Ts;
 
     template <typename, typename, size_t>
     friend class TwoLevelStringHashTable;
@@ -351,6 +396,7 @@ public:
     using mapped_type = typename Ts::mapped_type;
     using value_type = typename Ts::value_type;
     using cell_type = typename Ts::cell_type;
+    using SubMaps = TSubMaps;
 
     using LookupResult = StringHashTableLookupResult<typename cell_type::mapped_type>;
     using ConstLookupResult = StringHashTableLookupResult<const typename cell_type::mapped_type>;
@@ -401,7 +447,7 @@ public:
         {
             // Strings with trailing zeros are not representable as fixed-size
             // string keys. Put them to the generic table.
-            return func(self.ms, std::forward<KeyHolder>(key_holder), StringHashTableHash::operator()(x));
+            return func(self.ms, std::forward<KeyHolder>(key_holder), SubMaps::Ts::Hash::operator()(x));
         }
 
         const char * p = x.data;
@@ -437,7 +483,7 @@ public:
                     n[0] <<= s;
             }
             keyHolderDiscardKey(key_holder);
-            return func(self.m1, k8, StringHashTableHash::operator()(k8));
+            return func(self.m1, k8, SubMaps::T1::Hash::operator()(k8));
         }
         case 1: // 9..16 bytes
         {
@@ -449,7 +495,7 @@ public:
             else
                 n[1] <<= s;
             keyHolderDiscardKey(key_holder);
-            return func(self.m2, k16, StringHashTableHash::operator()(k16));
+            return func(self.m2, k16, SubMaps::T2::Hash::operator()(k16));
         }
         case 2: // 17..24 bytes
         {
@@ -461,11 +507,11 @@ public:
             else
                 n[2] <<= s;
             keyHolderDiscardKey(key_holder);
-            return func(self.m3, k24, StringHashTableHash::operator()(k24));
+            return func(self.m3, k24, SubMaps::T3::Hash::operator()(k24));
         }
         default: // >= 25 bytes
         {
-            return func(self.ms, std::forward<KeyHolder>(key_holder), StringHashTableHash::operator()(x));
+            return func(self.ms, std::forward<KeyHolder>(key_holder), SubMaps::Ts::Hash::operator()(x));
         }
         }
     }
@@ -601,42 +647,34 @@ struct StringHashTableSubMapSelector;
 template <typename Data>
 struct StringHashTableSubMapSelector<0, false, Data>
 {
-    struct Hash
-    {
-        static ALWAYS_INLINE size_t operator()(const StringRef &) { return 0; }
-    };
-
+    using Hash = typename Data::SubMaps::T0::Hash;
     static typename Data::T0 & getSubMap(size_t, Data & data) { return data.m0; }
 };
 
 template <typename Data>
 struct StringHashTableSubMapSelector<1, false, Data>
 {
-    using Hash = StringHashTableHash;
-
+    using Hash = typename Data::SubMaps::T1::Hash;
     static typename Data::T1 & getSubMap(size_t, Data & data) { return data.m1; }
 };
 
 template <typename Data>
 struct StringHashTableSubMapSelector<2, false, Data>
 {
-    using Hash = StringHashTableHash;
-
+    using Hash = typename Data::SubMaps::T2::Hash;
     static typename Data::T2 & getSubMap(size_t, Data & data) { return data.m2; }
 };
 
 template <typename Data>
 struct StringHashTableSubMapSelector<3, false, Data>
 {
-    using Hash = StringHashTableHash;
-
+    using Hash = typename Data::SubMaps::T3::Hash;
     static typename Data::T3 & getSubMap(size_t, Data & data) { return data.m3; }
 };
 
 template <typename Data>
 struct StringHashTableSubMapSelector<4, false, Data>
 {
-    using Hash = StringHashTableHash;
-
+    using Hash = typename Data::SubMaps::Ts::Hash;
     static typename Data::Ts & getSubMap(size_t, Data & data) { return data.ms; }
 };

@@ -16,7 +16,7 @@
 
 #include <Common/HashTable/StringHashTable.h>
 
-template <typename SubMaps, typename ImplTable = StringHashTable<SubMaps>, size_t BITS_FOR_BUCKET = 8>
+template <typename TSubMaps, typename ImplTable = StringHashTable<TSubMaps>, size_t BITS_FOR_BUCKET = 8>
 class TwoLevelStringHashTable : private boost::noncopyable
 {
 protected:
@@ -26,6 +26,7 @@ protected:
 public:
     using Key = StringRef;
     using Impl = ImplTable;
+    using SubMaps = TSubMaps;
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;
@@ -65,34 +66,74 @@ public:
     TwoLevelStringHashTable() = default;
 
     template <typename Source>
-    explicit TwoLevelStringHashTable(const Source & src)
+    explicit TwoLevelStringHashTable(Source & src)
     {
         if (src.m0.hasZero())
             impls[0].m0.setHasZero(*src.m0.zeroValue());
 
         for (auto & v : src.m1)
         {
-            size_t hash_value = v.getHash(src.m1);
-            size_t buck = getBucketFromHash(hash_value);
-            impls[buck].m1.insertUniqueNonZero(&v, hash_value);
+            if constexpr (std::is_same_v<typename Source::SubMaps::T1::Hash, typename SubMaps::T1::Hash>)
+            {
+                const size_t hash_value = v.getHash(src.m1);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].m1.insertUniqueNonZero(&v, hash_value);
+            }
+            else
+            {
+                const size_t hash_value = SubMaps::T1::Hash::operator()(v.getKey(v.getValue()));
+                v.setHash(hash_value);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].m1.insertUniqueNonZero(&v, hash_value);
+            }
         }
         for (auto & v : src.m2)
         {
-            size_t hash_value = v.getHash(src.m2);
-            size_t buck = getBucketFromHash(hash_value);
-            impls[buck].m2.insertUniqueNonZero(&v, hash_value);
+            if constexpr (std::is_same_v<typename Source::SubMaps::T2::Hash, typename SubMaps::T2::Hash>)
+            {
+                const size_t hash_value = v.getHash(src.m2);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].m2.insertUniqueNonZero(&v, hash_value);
+            }
+            else
+            {
+                const size_t hash_value = SubMaps::T2::Hash::operator()(v.getKey(v.getValue()));
+                v.setHash(hash_value);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].m2.insertUniqueNonZero(&v, hash_value);
+            }
         }
         for (auto & v : src.m3)
         {
-            size_t hash_value = v.getHash(src.m3);
-            size_t buck = getBucketFromHash(hash_value);
-            impls[buck].m3.insertUniqueNonZero(&v, hash_value);
+            if constexpr (std::is_same_v<typename Source::SubMaps::T3::Hash, typename SubMaps::T3::Hash>)
+            {
+                const size_t hash_value = v.getHash(src.m3);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].m3.insertUniqueNonZero(&v, hash_value);
+            }
+            else
+            {
+                const size_t hash_value = SubMaps::T3::Hash::operator()(v.getKey(v.getValue()));
+                v.setHash(hash_value);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].m3.insertUniqueNonZero(&v, hash_value);
+            }
         }
         for (auto & v : src.ms)
         {
-            size_t hash_value = v.getHash(src.ms);
-            size_t buck = getBucketFromHash(hash_value);
-            impls[buck].ms.insertUniqueNonZero(&v, hash_value);
+            if constexpr (std::is_same_v<typename Source::SubMaps::Ts::Hash, typename SubMaps::Ts::Hash>)
+            {
+                const size_t hash_value = v.getHash(src.ms);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].ms.insertUniqueNonZero(&v, hash_value);
+            }
+            else
+            {
+                const size_t hash_value = SubMaps::Ts::Hash::operator()(v.getKey(v.getValue()));
+                v.setHash(hash_value);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].ms.insertUniqueNonZero(&v, hash_value);
+            }
         }
     }
 
@@ -119,7 +160,7 @@ public:
         {
             // Strings with trailing zeros are not representable as fixed-size
             // string keys. Put them to the generic table.
-            auto res = SubMaps::Hash::operator()(x);
+            auto res = SubMaps::Ts::Hash::operator()(x);
             auto buck = getBucketFromHash(res);
             return func(self.impls[buck].ms, std::forward<KeyHolder>(key_holder), res);
         }
@@ -156,7 +197,7 @@ public:
                 else
                     n[0] <<= s;
             }
-            auto res = SubMaps::Hash::operator()(k8);
+            auto res = SubMaps::T1::Hash::operator()(k8);
             auto buck = getBucketFromHash(res);
             keyHolderDiscardKey(key_holder);
             return func(self.impls[buck].m1, k8, res);
@@ -170,7 +211,7 @@ public:
                 n[1] >>= s;
             else
                 n[1] <<= s;
-            auto res = SubMaps::Hash::operator()(k16);
+            auto res = SubMaps::T2::Hash::operator()(k16);
             auto buck = getBucketFromHash(res);
             keyHolderDiscardKey(key_holder);
             return func(self.impls[buck].m2, k16, res);
@@ -184,14 +225,14 @@ public:
                 n[2] >>= s;
             else
                 n[2] <<= s;
-            auto res = SubMaps::Hash::operator()(k24);
+            auto res = SubMaps::T3::Hash::operator()(k24);
             auto buck = getBucketFromHash(res);
             keyHolderDiscardKey(key_holder);
             return func(self.impls[buck].m3, k24, res);
         }
         default:
         {
-            auto res = SubMaps::Hash::operator()(x);
+            auto res = SubMaps::Ts::Hash::operator()(x);
             auto buck = getBucketFromHash(res);
             return func(self.impls[buck].ms, std::forward<KeyHolder>(key_holder), res);
         }
@@ -281,11 +322,7 @@ public:
 template <typename Data>
 struct StringHashTableSubMapSelector<0, true, Data>
 {
-    struct Hash
-    {
-        static ALWAYS_INLINE size_t operator()(const StringRef &) { return 0; }
-    };
-
+    using Hash = typename Data::SubMaps::T0::Hash;
     static typename Data::Impl::T0 & getSubMap(size_t hashval, Data & data)
     {
         const auto bucket = Data::getBucketFromHash(hashval);
@@ -296,8 +333,7 @@ struct StringHashTableSubMapSelector<0, true, Data>
 template <typename Data>
 struct StringHashTableSubMapSelector<1, true, Data>
 {
-    using Hash = StringHashTableHash;
-
+    using Hash = typename Data::SubMaps::T1::Hash;
     static typename Data::Impl::T1 & getSubMap(size_t hashval, Data & data)
     {
         const auto bucket = Data::getBucketFromHash(hashval);
@@ -308,8 +344,7 @@ struct StringHashTableSubMapSelector<1, true, Data>
 template <typename Data>
 struct StringHashTableSubMapSelector<2, true, Data>
 {
-    using Hash = StringHashTableHash;
-
+    using Hash = typename Data::SubMaps::T2::Hash;
     static typename Data::Impl::T2 & getSubMap(size_t hashval, Data & data)
     {
         const auto bucket = Data::getBucketFromHash(hashval);
@@ -320,8 +355,7 @@ struct StringHashTableSubMapSelector<2, true, Data>
 template <typename Data>
 struct StringHashTableSubMapSelector<3, true, Data>
 {
-    using Hash = StringHashTableHash;
-
+    using Hash = typename Data::SubMaps::T3::Hash;
     static typename Data::Impl::T3 & getSubMap(size_t hashval, Data & data)
     {
         const auto bucket = Data::getBucketFromHash(hashval);
@@ -332,8 +366,7 @@ struct StringHashTableSubMapSelector<3, true, Data>
 template <typename Data>
 struct StringHashTableSubMapSelector<4, true, Data>
 {
-    using Hash = StringHashTableHash;
-
+    using Hash = typename Data::SubMaps::Ts::Hash;
     static typename Data::Impl::Ts & getSubMap(size_t hashval, Data & data)
     {
         const auto bucket = Data::getBucketFromHash(hashval);

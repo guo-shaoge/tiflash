@@ -38,14 +38,14 @@ struct TwoLevelHashTableGrower : public HashTableGrower<initial_size_degree>
 template <
     typename Key,
     typename Cell,
-    typename Hash,
+    typename HashType,
     typename Grower,
     typename Allocator,
-    typename ImplTable = HashTable<Key, Cell, Hash, Grower, Allocator>,
+    typename ImplTable = HashTable<Key, Cell, HashType, Grower, Allocator>,
     size_t BITS_FOR_BUCKET = 8>
 class TwoLevelHashTable : private boost::noncopyable
     ,
-                          protected Hash /// empty base optimization
+                          protected HashType /// empty base optimization
 {
 protected:
     friend class const_iterator;
@@ -56,6 +56,7 @@ protected:
 
 public:
     using Impl = ImplTable;
+    using Hash = HashType;
 
     static constexpr size_t NUM_BUCKETS = 1ULL << BITS_FOR_BUCKET;
     static constexpr size_t MAX_BUCKET = NUM_BUCKETS - 1;
@@ -115,9 +116,9 @@ public:
 
     /// Copy the data from another (normal) hash table. It should have the same hash function.
     template <typename Source>
-    explicit TwoLevelHashTable(const Source & src)
+    explicit TwoLevelHashTable(Source & src)
     {
-        typename Source::const_iterator it = src.begin();
+        typename Source::iterator it = src.begin();
 
         /// It is assumed that the zero key (stored separately) is first in iteration order.
         if (it != src.end() && it.getPtr()->isZero(src))
@@ -128,10 +129,23 @@ public:
 
         for (; it != src.end(); ++it)
         {
-            const Cell * cell = it.getPtr();
-            size_t hash_value = cell->getHash(src);
-            size_t buck = getBucketFromHash(hash_value);
-            impls[buck].insertUniqueNonZero(cell, hash_value);
+            auto * cell = it.getPtr();
+            // Normally Hash of single level and Hash of two level are same.
+            // For Aggregation, they are different for numeric group by key. And for string key, they are same.
+            if constexpr (std::is_same_v<typename Source::Hash, typename Self::Hash>)
+            {
+                size_t hash_value = cell->getHash(src);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].insertUniqueNonZero(cell, hash_value);
+            }
+            else
+            {
+                size_t hash_value = Hash::operator()(cell->getKey());
+                // TODO check if necessary to set hash
+                cell->setHash(hash_value);
+                size_t buck = getBucketFromHash(hash_value);
+                impls[buck].insertUniqueNonZero(cell, hash_value);
+            }
         }
     }
 
