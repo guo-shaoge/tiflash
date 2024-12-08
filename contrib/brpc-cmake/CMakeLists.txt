@@ -720,3 +720,15 @@ install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/output/include/
 # configure_file(cmake/brpc.pc.in ${PROJECT_BINARY_DIR}/brpc.pc @ONLY)
 # install(FILES ${PROJECT_BINARY_DIR}/brpc.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
+
+## brpc example
+set (BRPC_EXAMPLE_SOURCE_DIR ${_brpc_SOURCE_DIR}/example/streaming_echo_c++)
+set (BRPC_EXAMPLE_BINARY_DIR ${_brpc_BINARY_DIR}/example/streaming_echo_c++)
+
+set (BRPC_EXAMPLE_PROTOS echo.proto)
+compile_proto(ECHO_PROTO_HDRS ECHO_PROTO_SRCS ${BRPC_EXAMPLE_SOURCE_DIR} ${BRPC_EXAMPLE_SOURCE_DIR} ${BRPC_EXAMPLE_SOURCE_DIR} ${BRPC_EXAMPLE_PROTOS})
+add_executable(streaming_echo_client ${BRPC_EXAMPLE_SOURCE_DIR}/client.cpp ${ECHO_PROTO_HDRS} ${ECHO_PROTO_SRCS})
+target_link_libraries(streaming_echo_client brpc-static ${DYNAMIC_LIB})
+
+add_executable(streaming_echo_server ${BRPC_EXAMPLE_SOURCE_DIR}/server.cpp ${ECHO_PROTO_HDRS} ${ECHO_PROTO_SRCS})
+target_link_libraries(streaming_echo_server brpc-static ${DYNAMIC_LIB})
