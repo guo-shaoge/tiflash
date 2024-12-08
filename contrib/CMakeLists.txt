@@ -122,6 +122,10 @@ if (USE_INTERNAL_GRPC_LIBRARY)
     unset (CMAKE_POLICY_DEFAULT_CMP0077)
 endif ()
 
+add_subdirectory (gflags)
+add_subdirectory (leveldb)
+add_subdirectory (brpc-cmake)
+
 add_subdirectory (kvproto/cpp)
 target_no_warning(kvproto deprecated-declarations)
 target_no_warning(kvproto non-c-typedef-for-linkage)
