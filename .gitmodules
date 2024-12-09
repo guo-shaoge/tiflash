@@ -155,3 +155,12 @@
 [submodule "contrib/highfive"]
 	path = contrib/highfive
 	url = https://github.com/BlueBrain/HighFive
+[submodule "contrib/brpc"]
+	path = contrib/brpc
+	url = git@github.com:apache/brpc.git
+[submodule "contrib/gflags"]
+	path = contrib/gflags
+	url = git@github.com:gflags/gflags.git
+[submodule "contrib/leveldb"]
+	path = contrib/leveldb
+	url = git@github.com:google/leveldb.git
