@@ -23,6 +23,18 @@
 #include <kvproto/mpp.pb.h>
 #include <pingcap/kv/Cluster.h>
 #include <tipb/executor.pb.h>
+// /root/tiflash/contrib/brpc/src/butil/iobuf.h:68:25: error: expected member name or ';' after declaration specifiers
+//    68 |     static const size_t DEFAULT_BLOCK_SIZE = 8192;
+//       |     ~~~~~~~~~~~~~~~~~~~ ^
+// /root/tiflash/dbms/src/Core/Defines.h:63:28: note: expanded from macro 'DEFAULT_BLOCK_SIZE'
+//    63 | #define DEFAULT_BLOCK_SIZE 65536
+//       |                            ^
+#undef DEFAULT_BLOCK_SIZE
+#include <brpc/stream.h>
+#define DEFAULT_BLOCK_SIZE 65536
+#include <brpc/channel.h>
+#include <butil/iobuf.h>
+#include <kvproto/tiflashbrpc.pb.h>
 
 #include <memory>
 
@@ -115,5 +127,120 @@ private:
     std::shared_ptr<MPPTaskManager> task_manager;
     bool enable_local_tunnel;
     bool enable_async_grpc;
+};
+
+struct BRPCContext
+{
+
+    BRPCContext() = default;
+
+    struct StreamReceiver : public brpc::StreamInputHandler
+    {
+        StreamReceiver(std::shared_ptr<MPMCQueue<mpp::MPPDataPacket>> q_ptr_,
+            LoggerPtr log_)
+            : brpc::StreamInputHandler()
+            , q(q_ptr_)
+            , log(log_)
+        {}
+        virtual ~StreamReceiver() = default;
+
+        virtual int on_received_messages(brpc::StreamId id,
+                butil::IOBuf * const messages[],
+                size_t size) override
+        {
+            RUNTIME_CHECK(id == myid);
+            for (size_t i = 0; i < size; ++i)
+            {
+                mpp::MPPDataPacket packet;
+                // TODO not copy 
+                // https://github.com/apache/brpc/blob/master/docs/cn/iobuf.md#%E8%A7%A3%E6%9E%90
+                // IOBufAsZeroCopyInputStream wrapper(&iobuf);
+                // pb_message.ParseFromZeroCopyStream(&wrapper);
+                packet.ParseFromString(messages[i]->to_string());
+                q->push(std::move(packet));
+            }
+            return 0;
+        }
+
+        virtual void on_idle_timeout(brpc::StreamId id) override
+        {
+            RUNTIME_CHECK(id == myid);
+
+            LOG_INFO(log, "brpc stream got idle timeout: {}", id);
+        }
+
+        virtual void on_closed(brpc::StreamId id) override
+        {
+            RUNTIME_CHECK(myid == id);
+
+            LOG_INFO(log, "brpc stream got closed: {}", id);
+            RUNTIME_CHECK(q->finish());
+        }
+
+        std::shared_ptr<MPMCQueue<mpp::MPPDataPacket>> q;
+        LoggerPtr log;
+        brpc::StreamId myid{};
+    };
+
+    bool init(LoggerPtr log, const ExchangeRecvRequest & req)
+    {
+        channel = std::make_unique<brpc::Channel>();
+        // TODO change rpc server port for brpc
+        if (channel->Init(req.req.sender_meta().address().c_str(), NULL) != 0)
+        {
+            LOG_ERROR(log, "init brpc channel failed");
+            return false;
+        }
+
+        packet_queue = std::make_shared<MPMCQueue<mpp::MPPDataPacket>>(50);
+        handler = std::make_unique<StreamReceiver>(packet_queue, log);
+
+        cntl = std::make_unique<brpc::Controller>();
+        brpc::StreamOptions stream_options;
+        stream_options.handler = handler.get();
+        if (brpc::StreamCreate(&stream_id, *cntl, NULL) != 0)
+        {
+            LOG_ERROR(log, "init brpc stream failed");
+            return false;
+        }
+        handler->myid = stream_id;
+
+        stub = std::make_unique<tiflashbrpc::TiFlashBRPC_Stub>(channel.get());
+
+        mpp::EstablishBRPCMPPConnectionRequest mpp_req;
+        mpp::EstablishBRPCMPPConnectionResponse mpp_resp;
+        stub->EstablishBRPCMPPConnection(cntl.get(), &mpp_req, &mpp_resp, NULL);
+        if (cntl->Failed())
+        {
+            LOG_ERROR(log, "call EstablishBRPCMPPConnection for brpc failed");
+            return false;
+        }
+        if (mpp_resp.has_error())
+        {
+            LOG_ERROR(log, "call EstablishBRPCMPPConnection for brpc failed");
+            return false;
+        }
+        return true;
+    }
+
+    bool read(TrackedMppDataPacketPtr tracked_packet) const
+    {
+        mpp::MPPDataPacket packet;
+        auto res = packet_queue->pop(packet);
+        tracked_packet->read(std::move(packet));
+        return res == MPMCQueueResult::OK;
+    }
+
+    std::pair<int, std::string> getError()
+    {
+        return std::make_pair(cntl->ErrorCode(), cntl->ErrorText());
+    }
+
+    std::unique_ptr<brpc::Channel> channel{};
+    std::unique_ptr<tiflashbrpc::TiFlashBRPC_Stub> stub{};
+    std::unique_ptr<brpc::Controller> cntl{};
+    brpc::StreamId stream_id{};
+    std::unique_ptr<StreamReceiver> handler;
+    std::shared_ptr<MPMCQueue<mpp::MPPDataPacket>> packet_queue{};
 };
 } // namespace DB

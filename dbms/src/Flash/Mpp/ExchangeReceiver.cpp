@@ -345,7 +345,8 @@ ExchangeReceiverBase<RPCContext>::ExchangeReceiverBase(
     try
     {
         rpc_context->fillSchema(schema);
-        setUpConnection();
+        // setUpConnection();
+        setUpBRPCConnection();
     }
     catch (...)
     {
@@ -489,6 +490,38 @@ void ExchangeReceiverBase<RPCContext>::setUpConnection()
 }
 
 template <typename RPCContext>
+void ExchangeReceiverBase<RPCContext>::setUpBRPCConnection()
+{
+    mem_tracker = current_memory_tracker ? current_memory_tracker->shared_from_this() : nullptr;
+    std::vector<Request> async_requests;
+    std::vector<Request> local_requests;
+    bool has_remote_conn = false;
+
+    for (size_t index = 0; index < source_num; ++index)
+    {
+        auto req = rpc_context->makeRequest(index);
+        if (rpc_context->supportAsync(req))
+        {
+            // async_requests.push_back(std::move(req));
+            // has_remote_conn = true;
+            RUNTIME_CHECK_MSG(false, "brpc doesn't support async for now");
+        }
+        else if (req.is_local)
+        {
+            local_requests.push_back(req);
+        }
+        else
+        {
+            setUpBRPCConnectionWithReadLoop(std::move(req));
+            has_remote_conn = true;
+        }
+    }
+
+    setUpLocalConnections(local_requests, has_remote_conn);
+    setUpAsyncConnection(std::move(async_requests));
+}
+
+template <typename RPCContext>
 void ExchangeReceiverBase<RPCContext>::setUpSyncConnection(Request && req)
 {
     setUpConnectionWithReadLoop(std::move(req));
@@ -567,6 +600,15 @@ template <typename RPCContext>
 void ExchangeReceiverBase<RPCContext>::setUpConnectionWithReadLoop(Request && req)
 {
     thread_manager->schedule(true, "Receiver", [this, req = std::move(req)] { readLoop(req); });
+
+    ++thread_count;
+    --connection_uncreated_num;
+}
+
+template <typename RPCContext>
+void ExchangeReceiverBase<RPCContext>::setUpBRPCConnectionWithReadLoop(Request && req)
+{
+    thread_manager->schedule(true, "Receiver", [this, req = std::move(req)] { brpcReadLoop(req); });
 
     ++thread_count;
     --connection_uncreated_num;
@@ -696,6 +738,82 @@ void ExchangeReceiverBase<RPCContext>::readLoop(const Request & req)
         {
             meet_error = true;
             local_err_msg = status.error_message();
+        }
+    }
+    catch (...)
+    {
+        meet_error = true;
+        local_err_msg = getCurrentExceptionMessage(false);
+    }
+    connectionDone(meet_error, local_err_msg, log);
+    if (recv_mode == ReceiverMode::Local)
+        LOG_INFO(
+            log,
+            "connection for {} cost {} ms, including {} ms to waiting task.",
+            req_info,
+            watch.elapsedMilliseconds(),
+            waiting_task_time);
+}
+
+template <typename RPCContext>
+void ExchangeReceiverBase<RPCContext>::brpcReadLoop(const Request & req)
+{
+    GET_METRIC(tiflash_thread_count, type_threads_of_receiver_read_loop).Increment();
+    SCOPE_EXIT({ GET_METRIC(tiflash_thread_count, type_threads_of_receiver_read_loop).Decrement(); });
+
+    CPUAffinityManager::getInstance().bindSelfQueryThread();
+    Stopwatch watch;
+    bool meet_error = false;
+    String local_err_msg;
+    String req_info = fmt::format("tunnel{}+{}", req.send_task_id, req.recv_task_id);
+    ReceiverMode recv_mode = req.is_local ? ReceiverMode::Local : ReceiverMode::Sync;
+    UInt64 waiting_task_time = 0;
+
+    LoggerPtr log = exc_log->getChild(req_info);
+
+    try
+    {
+        waiting_task_time = watch.elapsedMilliseconds();
+        BRPCContext brpc_context;
+        bool ok = brpc_context.init(log, req);
+        if (!ok)
+        {
+            meet_error = true;
+            local_err_msg = fmt::format("init brpc context failed");
+        }
+        else
+        {
+            for (;;)
+            {
+                LOG_TRACE(log, "begin next ");
+                TrackedMppDataPacketPtr packet = std::make_shared<TrackedMppDataPacket>(MPPDataPacketV0);
+                // bool success = reader->read(packet);
+                bool success = brpc_context.read(packet);
+                if (!success)
+                    break;
+                if (packet->hasError())
+                {
+                    meet_error = true;
+                    local_err_msg = fmt::format("Read error message from mpp packet: {}", packet->error());
+                    break;
+                }
+
+                if (!received_message_queue.pushPacket<false>(req.source_index, req_info, packet, recv_mode))
+                {
+                    meet_error = true;
+                    local_err_msg = fmt::format("Push mpp packet failed. {}", getStatusString());
+                    break;
+                }
+            }
+        }
+        if (!meet_error)
+        {
+            auto [err_code, err_str] = brpc_context.getError();
+            if (err_code != 0)
+            {
+                meet_error = true;
+                local_err_msg = fmt::format("brpcReadLoop got rpc error: {}, {}", err_code, err_str);
+            }
         }
     }
     catch (...)

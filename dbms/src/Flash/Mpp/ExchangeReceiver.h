@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "common/types.h"
 #include <Common/ThreadManager.h>
 #include <Flash/Coprocessor/ChunkDecodeAndSquash.h>
 #include <Flash/Coprocessor/DAGUtils.h>
@@ -150,10 +151,15 @@ private:
     using Request = typename RPCContext::Request;
 
     void readLoop(const Request & req);
+    void brpcReadLoop(const Request & req);
 
     void reactor(const std::vector<Request> & async_requests);
 
     void setUpConnection();
+    void setUpBRPCConnection();
+
+    void setUpBRPCConnectionWithReadLoop(Request && req);
+
     bool setEndState(ExchangeReceiverState new_state);
     String getStatusString();
 

@@ -175,6 +175,13 @@ struct TrackedMppDataPacket
         return ret;
     }
 
+    void read(mpp::MPPDataPacket && packet_)
+    {
+        packet = std::move(packet_);
+        mem_tracker_wrapper.freeAll();
+        mem_tracker_wrapper.alloc(estimateAllocatedSize(packet));
+    }
+
     void switchMemTracker(MemoryTracker * new_memory_tracker)
     {
         mem_tracker_wrapper.switchMemTracker(new_memory_tracker);
