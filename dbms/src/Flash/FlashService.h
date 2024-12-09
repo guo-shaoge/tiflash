@@ -27,7 +27,11 @@
 #endif
 #include <grpcpp/server_context.h>
 #include <kvproto/tikvpb.grpc.pb.h>
+#include <kvproto/tiflashbrpc.pb.h>
 #pragma GCC diagnostic pop
+#undef DEFAULT_BLOCK_SIZE
+#include <brpc/stream.h>
+#define DEFAULT_BLOCK_SIZE 65536
 
 namespace DB
 {
@@ -47,6 +51,29 @@ namespace S3
 {
 class S3LockService;
 } // namespace S3
+
+class BRPCFlashService : public tiflashbrpc::TiFlashBRPC
+{
+public:
+    BRPCFlashService() = default;
+    virtual ~BRPCFlashService() = default;
+
+    void init(Context & context_)
+    {
+        context = &context_;
+        log = Logger::get("BRPCFlashService");
+    }
+
+    virtual void EstablishBRPCMPPConnection(google::protobuf::RpcController * controller,
+            const mpp::EstablishMPPConnectionRequest * req,
+            mpp::EstablishBRPCMPPConnectionResponse * resp,
+            google::protobuf::Closure * done);
+
+private:
+    brpc::StreamId stream_id = brpc::INVALID_STREAM_ID;
+    Context * context = nullptr;
+    LoggerPtr log;
+};
 
 class FlashService
     : public tikvpb::Tikv::Service

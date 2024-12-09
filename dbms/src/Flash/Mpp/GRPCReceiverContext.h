@@ -179,14 +179,25 @@ struct BRPCContext
 
         std::shared_ptr<MPMCQueue<mpp::MPPDataPacket>> q;
         LoggerPtr log;
-        brpc::StreamId myid{};
+        brpc::StreamId myid{brpc::INVALID_STREAM_ID};
     };
 
     bool init(LoggerPtr log, const ExchangeRecvRequest & req)
     {
         channel = std::make_unique<brpc::Channel>();
+        brpc::ChannelOptions channel_opts;
+        channel_opts.timeout_ms = 10000;
         // TODO change rpc server port for brpc
-        if (channel->Init(req.req.sender_meta().address().c_str(), NULL) != 0)
+        auto addr = req.req.sender_meta().address();
+        auto find_res = addr.find(":3930");
+        if (find_res == std::string::npos)
+        {
+            LOG_ERROR(log, "unexpected sender addr: {}", addr);
+            return false;
+        }
+        addr = addr.replace(find_res, 5, ":3931");
+        LOG_DEBUG(log, "brpc sender addr: {}", addr);
+        if (channel->Init(addr.c_str(), &channel_opts) != 0)
         {
             LOG_ERROR(log, "init brpc channel failed");
             return false;
@@ -207,12 +218,11 @@ struct BRPCContext
 
         stub = std::make_unique<tiflashbrpc::TiFlashBRPC_Stub>(channel.get());
 
-        mpp::EstablishBRPCMPPConnectionRequest mpp_req;
         mpp::EstablishBRPCMPPConnectionResponse mpp_resp;
-        stub->EstablishBRPCMPPConnection(cntl.get(), &mpp_req, &mpp_resp, NULL);
+        stub->EstablishBRPCMPPConnection(cntl.get(), &req.req, &mpp_resp, NULL);
         if (cntl->Failed())
         {
-            LOG_ERROR(log, "call EstablishBRPCMPPConnection for brpc failed");
+            LOG_ERROR(log, "call EstablishBRPCMPPConnection for brpc failed: {}", cntl->ErrorText());
             return false;
         }
         if (mpp_resp.has_error())

@@ -212,12 +212,30 @@ FlashGrpcServerHolder::FlashGrpcServerHolder(
                 ThreadFactory::newThread(false, "async_poller", [notify_cq, this] { handleRpcs(notify_cq, log); }));
         }
     }
+
+    brpc_flash_service = std::make_unique<BRPCFlashService>();
+    brpc_flash_service->init(context);
+
+    auto addr = raft_config.flash_server_addr;
+    auto find_res = addr.find(":3930");
+    if (find_res == std::string::npos)
+    {
+        LOG_ERROR(log, "unexpected flash addr: {}", addr);
+        throw Exception("unexpected flash addr", ErrorCodes::IP_ADDRESS_NOT_ALLOWED);
+    }
+    addr = addr.replace(find_res, 5, ":3931");
+    LOG_INFO(log, "brpc server addr: {}", addr);
+    brpc_server = std::make_unique<brpc::Server>();
+    RUNTIME_CHECK(brpc_server->AddService(brpc_flash_service.get(), brpc::SERVER_DOESNT_OWN_SERVICE) == 0);
+    RUNTIME_CHECK_MSG(brpc_server->Start(addr.c_str(), NULL) == 0, "create brpc server failed");
 }
 
 FlashGrpcServerHolder::~FlashGrpcServerHolder()
 {
     try
     {
+        brpc_server->Stop(10000000);
+
         /// Shut down grpc server.
         LOG_INFO(log, "Begin to shut down flash grpc server");
         flash_grpc_server->Shutdown();
@@ -258,6 +276,9 @@ FlashGrpcServerHolder::~FlashGrpcServerHolder()
         LOG_INFO(log, "Begin to shut down flash service");
         flash_service.reset();
         LOG_INFO(log, "Shut down flash service");
+
+        // TODO handle ret
+        brpc_server->Join();
     }
     catch (...)
     {

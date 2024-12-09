@@ -24,6 +24,7 @@
 #include <Storages/KVStore/TiKVHelpers/PDTiKVClient.h>
 #include <grpc/grpc_security.h>
 
+#include <brpc/server.h>
 
 namespace DB
 {
@@ -56,6 +57,9 @@ private:
     std::vector<std::thread> cq_workers;
     std::vector<std::thread> notify_cq_workers;
     CollectProcInfoBackgroundTask background_task;
+
+    std::unique_ptr<BRPCFlashService> brpc_flash_service = nullptr;
+    std::unique_ptr<brpc::Server> brpc_server = nullptr;
 };
 
 } // namespace DB

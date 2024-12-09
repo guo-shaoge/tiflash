@@ -56,6 +56,8 @@
 #include <chrono>
 #include <ext/scope_guard.h>
 
+#include <brpc/server.h>
+
 namespace DB
 {
 namespace ErrorCodes
@@ -95,6 +97,47 @@ extern const char pause_before_wn_establish_task[];
     }
 
 constexpr char tls_err_msg[] = "common name check is failed";
+
+void BRPCFlashService::EstablishBRPCMPPConnection(google::protobuf::RpcController * controller,
+        const mpp::EstablishMPPConnectionRequest * req,
+        mpp::EstablishBRPCMPPConnectionResponse * resp,
+        google::protobuf::Closure * done)
+{
+    brpc::ClosureGuard done_guard(done);
+
+    auto * cntl = static_cast<brpc::Controller *>(controller);
+    // brpc::StreamOptions stream_opts;
+    // stream_opts.handler = 
+    if (brpc::StreamAccept(&stream_id, *cntl, NULL) != 0)
+    {
+        cntl->SetFailed("brpc StreamAccept failed");
+        auto * err = new mpp::Error();
+        err->set_msg("brpc StreamAccept failed");
+        resp->set_allocated_error(err);
+        return;
+    }
+
+    auto & tmt_context = context->getTMTContext();
+    auto task_manager = tmt_context.getMPPTaskManager();
+    std::chrono::seconds timeout(10);
+    Stopwatch watch;
+    auto [tunnel, err_msg] = task_manager->findTunnelWithTimeout(req, timeout);
+    // TODO unused
+    auto waiting_task_time = watch.elapsedMilliseconds();
+    if (tunnel == nullptr)
+    {
+        auto * err = new mpp::Error();
+        err->set_msg("cannot find tunnel withing 10 sec");
+        resp->set_allocated_error(err);
+    }
+    else
+    {
+        BRPCSyncPacketWriter writer(stream_id);
+        tunnel->connectSync(&writer);
+        tunnel->waitForFinish();
+    }
+    return;
+}
 
 FlashService::FlashService() = default;
 

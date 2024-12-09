@@ -20,6 +20,10 @@
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 #include <kvproto/tikvpb.grpc.pb.h>
+#undef DEFAULT_BLOCK_SIZE
+#include <butil/iobuf.h>
+#include <brpc/stream.h>
+#define DEFAULT_BLOCK_SIZE 65536
 
 #pragma GCC diagnostic pop
 
@@ -47,6 +51,24 @@ public:
 
 private:
     ::grpc::ServerWriter<::mpp::MPPDataPacket> * writer;
+};
+
+class BRPCSyncPacketWriter : public PacketWriter
+{
+public:
+    BRPCSyncPacketWriter(const brpc::StreamId & id) : stream_id(id) {}
+
+    virtual ~BRPCSyncPacketWriter() = default;
+
+    virtual bool write(const mpp::MPPDataPacket & packet) override
+    {
+        butil::IOBuf msg;
+        msg.append(packet.SerializeAsString());
+        return brpc::StreamWrite(stream_id, msg) == 0;
+    }
+
+private:
+    brpc::StreamId stream_id;
 };
 
 }; // namespace DB
