@@ -161,6 +161,11 @@ else ()
 endif ()
 
 target_include_directories(dbms PUBLIC "${TIFLASH_PROXY_INCLUDE_DIR}")
+set (BRPC_INCLUDE_DIR "${TiFlash_SOURCE_DIR}/contrib/brpc/src")
+message ("gjt debug brpc_INCLUDE_DIR main cmake: ${BRPC_INCLUDE_DIR}")
+target_include_directories(dbms PUBLIC "${BRPC_INCLUDE_DIR}")
+set (GFLAGS_INCLUDE_PATH "${TiFlash_BINARY_DIR}/contrib/gflags/include")
+target_include_directories(dbms PUBLIC "${GFLAGS_INCLUDE_PATH}")
 
 if (CMAKE_BUILD_TYPE_UC STREQUAL "RELEASE" OR CMAKE_BUILD_TYPE_UC STREQUAL "RELWITHDEBINFO" OR CMAKE_BUILD_TYPE_UC STREQUAL "MINSIZEREL")
     # Won't generate debug info for files with heavy template instantiation to achieve faster linking and lower size.
