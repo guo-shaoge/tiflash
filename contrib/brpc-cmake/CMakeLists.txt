@@ -573,7 +573,12 @@ compile_proto(PROTO_HDRS PROTO_SRCS ${PROJECT_BINARY_DIR}
                                     ${PROJECT_BINARY_DIR}/output/include
                                     ${_brpc_SOURCE_DIR}/src
                                     "${PROTO_FILES}")
+include_directories (${PROJECT_BINARY_DIR})
+include_directories (${PROJECT_BINARY_DIR}/output/include)
 add_library(PROTO_LIB OBJECT ${PROTO_SRCS} ${PROTO_HDRS})
+# message (" gjt debug brpc-cmake ${PROJECT_BINARY_DIR}")
+# target_include_directories (PROTO_LIB PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_BINARY_DIR}/output/include)
+# include_directories (${PROJECT_BINARY_DIR} ${PROJECT_BINARY_DIR}/output/include)
 
 set(SOURCES
     ${BVAR_SOURCES}
@@ -606,6 +611,8 @@ add_library(brpc-static STATIC $<TARGET_OBJECTS:BUTIL_LIB>
                                $<TARGET_OBJECTS:PROTO_LIB>)
 target_link_libraries(brpc-static gflags::gflags)
 target_link_libraries(brpc-static leveldb)
+# target_include_directories(brpc-static PUBLIC ${TiFlash_BINARY_DIR})
+# include_directories (${PROJECT_BINARY_DIR} ${PROJECT_BINARY_DIR}/output/include)
 
 # function(check_thrift_version target_arg)
 #     #use thrift command to get version
