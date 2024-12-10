@@ -23,6 +23,7 @@
 #undef DEFAULT_BLOCK_SIZE
 #include <butil/iobuf.h>
 #include <brpc/stream.h>
+#include <butil/errno.h>
 #define DEFAULT_BLOCK_SIZE 65536
 
 #pragma GCC diagnostic pop
@@ -38,6 +39,8 @@ public:
 
     // Write a packet and return false if any error occurs.
     virtual bool write(const mpp::MPPDataPacket & packet) = 0;
+
+    virtual bool needDelete() { return false; }
 };
 
 class SyncPacketWriter : public PacketWriter
@@ -58,14 +61,55 @@ class BRPCSyncPacketWriter : public PacketWriter
 public:
     BRPCSyncPacketWriter(const brpc::StreamId & id) : stream_id(id) {}
 
-    virtual ~BRPCSyncPacketWriter() = default;
+    virtual ~BRPCSyncPacketWriter()
+    {
+        auto err = brpc::StreamClose(stream_id);
+        if (err != 0)
+        {
+            LOG_ERROR(Logger::get(), "close brpc stream failed {}", err);
+        }
+    }
 
     virtual bool write(const mpp::MPPDataPacket & packet) override
     {
         butil::IOBuf msg;
         msg.append(packet.SerializeAsString());
-        return brpc::StreamWrite(stream_id, msg) == 0;
+        bool ok = true;
+        while (true)
+        {
+            auto err = brpc::StreamWrite(stream_id, msg);
+            if (err != 0)
+            {
+                auto log = Logger::get();
+                LOG_DEBUG(log, "gjt debug brpc write: {}, beg StreamWait", err);
+                if (err == EAGAIN)
+                {
+                    err = brpc::StreamWait(stream_id, NULL);
+                    LOG_DEBUG(log, "gjt debug brpc wait done, : {}", err);
+                    if (err != 0)
+                    {
+                        LOG_DEBUG(log, "gjt debug brpc write: {}", err);
+                        ok = false;
+                        break;
+                    }
+                    continue;
+                }
+                else
+                {
+                    ok = false;
+                    break;
+                }
+            }
+            else
+            {
+                ok = true;
+                break;
+            }
+        }
+        return ok;
     }
+
+    virtual bool needDelete() override { return true; }
 
 private:
     brpc::StreamId stream_id;

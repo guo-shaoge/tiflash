@@ -149,6 +149,7 @@ struct BRPCContext
                 size_t size) override
         {
             RUNTIME_CHECK(id == myid);
+            LOG_DEBUG(log, "gjt debug got brpc packet: {}", size);
             for (size_t i = 0; i < size; ++i)
             {
                 mpp::MPPDataPacket packet;
@@ -159,6 +160,7 @@ struct BRPCContext
                 packet.ParseFromString(messages[i]->to_string());
                 q->push(std::move(packet));
             }
+            LOG_DEBUG(log, "gjt debug got brpc packet: done {}", size);
             return 0;
         }
 
@@ -208,8 +210,10 @@ struct BRPCContext
 
         cntl = std::make_unique<brpc::Controller>();
         brpc::StreamOptions stream_options;
+        stream_options.max_buf_size = 0;
+        stream_options.min_buf_size = 0;
         stream_options.handler = handler.get();
-        if (brpc::StreamCreate(&stream_id, *cntl, NULL) != 0)
+        if (brpc::StreamCreate(&stream_id, *cntl, &stream_options) != 0)
         {
             LOG_ERROR(log, "init brpc stream failed");
             return false;

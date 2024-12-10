@@ -512,6 +512,7 @@ void ExchangeReceiverBase<RPCContext>::setUpBRPCConnection()
         }
         else
         {
+            LOG_DEBUG(Logger::get(), "gjt debug setUpBRPCConnectionWithReadLoop");
             setUpBRPCConnectionWithReadLoop(std::move(req));
             has_remote_conn = true;
         }
@@ -776,6 +777,7 @@ void ExchangeReceiverBase<RPCContext>::brpcReadLoop(const Request & req)
         waiting_task_time = watch.elapsedMilliseconds();
         BRPCContext brpc_context;
         bool ok = brpc_context.init(log, req);
+        LOG_DEBUG(log, "gjt debug init brpc context done {}", ok);
         if (!ok)
         {
             meet_error = true;
@@ -789,6 +791,7 @@ void ExchangeReceiverBase<RPCContext>::brpcReadLoop(const Request & req)
                 TrackedMppDataPacketPtr packet = std::make_shared<TrackedMppDataPacket>(MPPDataPacketV0);
                 // bool success = reader->read(packet);
                 bool success = brpc_context.read(packet);
+                // LOG_DEBUG(log, "gjt debug brpc_context read done");
                 if (!success)
                     break;
                 if (packet->hasError())

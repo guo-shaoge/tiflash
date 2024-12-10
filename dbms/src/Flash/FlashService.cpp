@@ -104,6 +104,7 @@ void BRPCFlashService::EstablishBRPCMPPConnection(google::protobuf::RpcControlle
         google::protobuf::Closure * done)
 {
     brpc::ClosureGuard done_guard(done);
+    LOG_DEBUG(log, "BRPCFlashService::EstablishBRPCMPPConnection");
 
     auto * cntl = static_cast<brpc::Controller *>(controller);
     // brpc::StreamOptions stream_opts;
@@ -132,10 +133,11 @@ void BRPCFlashService::EstablishBRPCMPPConnection(google::protobuf::RpcControlle
     }
     else
     {
-        BRPCSyncPacketWriter writer(stream_id);
-        tunnel->connectSync(&writer);
-        tunnel->waitForFinish();
+        auto * writer = new BRPCSyncPacketWriter(stream_id);
+        tunnel->connectSync(writer);
+        // tunnel->waitForFinish();
     }
+    LOG_DEBUG(log, "EstablishBRPCMPPConnection done: {}, {}", cntl->ErrorCode(), cntl->ErrorText());
     return;
 }
 

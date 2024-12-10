@@ -449,6 +449,7 @@ void SyncTunnelSender::sendJob(PacketWriter * writer)
         TrackedMppDataPacketPtr res;
         while (send_queue.pop(res) == MPMCQueueResult::OK)
         {
+            LOG_DEBUG(log, "gjt debug send queue ok");
             MPPTunnelMetric::subDataSizeMetric(*data_size_in_queue, res->getPacket().ByteSizeLong());
             if (!writer->write(res->packet))
             {
@@ -459,6 +460,7 @@ void SyncTunnelSender::sendJob(PacketWriter * writer)
         /// write the last error packet if needed
         if (send_queue.getStatus() == MPMCQueueStatus::CANCELLED)
         {
+            LOG_DEBUG(log, "gjt debug send queue cancel");
             RUNTIME_ASSERT(!send_queue.getCancelReason().empty(), "Tunnel sender cancelled without reason");
             if (!writer->write(getPacketWithError(send_queue.getCancelReason())))
             {
@@ -469,6 +471,7 @@ void SyncTunnelSender::sendJob(PacketWriter * writer)
     catch (...)
     {
         err_msg = getCurrentExceptionMessage(true);
+            LOG_DEBUG(log, "gjt debug send queue exception, {}", err_msg);
     }
     if (!err_msg.empty())
     {
@@ -476,6 +479,8 @@ void SyncTunnelSender::sendJob(PacketWriter * writer)
         LOG_ERROR(log, err_msg);
         trimStackTrace(err_msg);
     }
+    if (writer->needDelete())
+        delete writer;
     consumerFinish(err_msg);
     GET_METRIC(tiflash_thread_count, type_active_threads_of_establish_mpp).Decrement();
 }
