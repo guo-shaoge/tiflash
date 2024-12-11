@@ -449,7 +449,7 @@ void SyncTunnelSender::sendJob(PacketWriter * writer)
         TrackedMppDataPacketPtr res;
         while (send_queue.pop(res) == MPMCQueueResult::OK)
         {
-            // LOG_DEBUG(log, "gjt debug send queue ok");
+            LOG_DEBUG(log, "gjt debug send queue ok");
             MPPTunnelMetric::subDataSizeMetric(*data_size_in_queue, res->getPacket().ByteSizeLong());
             if (!writer->write(res->packet))
             {

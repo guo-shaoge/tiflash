@@ -216,14 +216,16 @@ FlashGrpcServerHolder::FlashGrpcServerHolder(
     brpc_flash_service = std::make_unique<BRPCFlashService>();
     brpc_flash_service->init(context);
 
+    // abc:123
     auto addr = raft_config.flash_server_addr;
-    auto find_res = addr.find(":3930");
+    auto find_res = addr.find(":");
     if (find_res == std::string::npos)
     {
         LOG_ERROR(log, "unexpected flash addr: {}", addr);
         throw Exception("unexpected flash addr", ErrorCodes::IP_ADDRESS_NOT_ALLOWED);
     }
-    addr = addr.replace(find_res, 5, ":3931");
+    addr.resize(find_res);
+    addr = addr + ":13931";
     LOG_INFO(log, "brpc server addr: {}", addr);
     brpc_server = std::make_unique<brpc::Server>();
     RUNTIME_CHECK(brpc_server->AddService(brpc_flash_service.get(), brpc::SERVER_DOESNT_OWN_SERVICE) == 0);
