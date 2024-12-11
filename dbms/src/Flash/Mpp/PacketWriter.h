@@ -26,6 +26,9 @@
 #include <butil/errno.h>
 #define DEFAULT_BLOCK_SIZE 65536
 
+#include <Common/Logger.h>
+#include <common/logger_useful.h>
+
 #pragma GCC diagnostic pop
 
 namespace DB
@@ -59,14 +62,14 @@ private:
 class BRPCSyncPacketWriter : public PacketWriter
 {
 public:
-    BRPCSyncPacketWriter(const brpc::StreamId & id) : stream_id(id) {}
+    BRPCSyncPacketWriter(const brpc::StreamId & id, LoggerPtr log_) : stream_id(id), log(log_) {}
 
     virtual ~BRPCSyncPacketWriter()
     {
         auto err = brpc::StreamClose(stream_id);
         if (err != 0)
         {
-            LOG_ERROR(Logger::get(), "close brpc stream failed {}", err);
+            LOG_ERROR(log, "close brpc stream failed {}", err);
         }
     }
 
@@ -80,7 +83,6 @@ public:
             auto err = brpc::StreamWrite(stream_id, msg);
             if (err != 0)
             {
-                auto log = Logger::get();
                 LOG_DEBUG(log, "gjt debug brpc write: {}, beg StreamWait", err);
                 if (err == EAGAIN)
                 {
@@ -113,6 +115,7 @@ public:
 
 private:
     brpc::StreamId stream_id;
+    LoggerPtr log;
 };
 
 }; // namespace DB

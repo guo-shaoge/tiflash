@@ -133,7 +133,9 @@ void BRPCFlashService::EstablishBRPCMPPConnection(google::protobuf::RpcControlle
     }
     else
     {
-        auto * writer = new BRPCSyncPacketWriter(stream_id);
+        MPPTaskId id(req->sender_meta());
+        auto log = Logger::get(id.toString());
+        auto * writer = new BRPCSyncPacketWriter(stream_id, log);
         tunnel->connectSync(writer);
         // tunnel->waitForFinish();
     }
