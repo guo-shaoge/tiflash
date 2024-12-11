@@ -104,11 +104,17 @@ void BRPCFlashService::EstablishBRPCMPPConnection(google::protobuf::RpcControlle
         google::protobuf::Closure * done)
 {
     brpc::ClosureGuard done_guard(done);
-    LOG_DEBUG(log, "BRPCFlashService::EstablishBRPCMPPConnection");
+
+    MPPTaskId sender_id(req->sender_meta());
+    MPPTaskId recv_id(req->receiver_meta());
+    String ider = fmt::format("sender(self) meta: {}, recv(remote) meta: {}", sender_id.toString(), recv_id.toString());
+    auto tmp_log = Logger::get();
+    LOG_DEBUG(tmp_log, "BRPCFlashService::EstablishBRPCMPPConnection");
 
     auto * cntl = static_cast<brpc::Controller *>(controller);
     // brpc::StreamOptions stream_opts;
     // stream_opts.handler = 
+    brpc::StreamId stream_id = brpc::INVALID_STREAM_ID;
     if (brpc::StreamAccept(&stream_id, *cntl, NULL) != 0)
     {
         cntl->SetFailed("brpc StreamAccept failed");
@@ -133,14 +139,13 @@ void BRPCFlashService::EstablishBRPCMPPConnection(google::protobuf::RpcControlle
     }
     else
     {
-        MPPTaskId id(req->sender_meta());
-        auto log = Logger::get(id.toString());
+        auto log = Logger::get(sender_id.toString());
         auto * writer = new BRPCSyncPacketWriter(stream_id, log);
         done_guard.reset(nullptr);
         tunnel->connectSync(writer);
         // tunnel->waitForFinish();
     }
-    LOG_DEBUG(log, "EstablishBRPCMPPConnection done: {}, {}", cntl->ErrorCode(), cntl->ErrorText());
+    LOG_DEBUG(tmp_log, "EstablishBRPCMPPConnection done: {}, {}, {}", stream_id, cntl->ErrorCode(), cntl->ErrorText());
     return;
 }
 

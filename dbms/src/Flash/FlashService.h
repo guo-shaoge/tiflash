@@ -70,7 +70,6 @@ public:
             google::protobuf::Closure * done);
 
 private:
-    brpc::StreamId stream_id = brpc::INVALID_STREAM_ID;
     Context * context = nullptr;
     LoggerPtr log;
 };

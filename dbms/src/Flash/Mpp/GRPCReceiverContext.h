@@ -226,6 +226,7 @@ struct BRPCContext
             LOG_ERROR(log, "init brpc stream failed");
             return false;
         }
+        LOG_DEBUG(log, "brpc StreamCreate done {}", stream_id);
         handler->myid = stream_id;
 
         stub = std::make_unique<tiflashbrpc::TiFlashBRPC_Stub>(channel.get());
@@ -261,7 +262,7 @@ struct BRPCContext
     std::unique_ptr<brpc::Channel> channel{};
     std::unique_ptr<tiflashbrpc::TiFlashBRPC_Stub> stub{};
     std::unique_ptr<brpc::Controller> cntl{};
-    brpc::StreamId stream_id{};
+    brpc::StreamId stream_id{brpc::INVALID_STREAM_ID};
     std::unique_ptr<StreamReceiver> handler;
     std::shared_ptr<LooseBoundedMPMCQueue<mpp::MPPDataPacket>> packet_queue{};
 };
