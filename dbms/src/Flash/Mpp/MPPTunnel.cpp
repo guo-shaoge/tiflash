@@ -480,7 +480,10 @@ void SyncTunnelSender::sendJob(PacketWriter * writer)
         trimStackTrace(err_msg);
     }
     if (writer->needDelete())
+    {
+        LOG_DEBUG(log, "delete brpc writer");
         delete writer;
+    }
     consumerFinish(err_msg);
     GET_METRIC(tiflash_thread_count, type_active_threads_of_establish_mpp).Decrement();
 }
