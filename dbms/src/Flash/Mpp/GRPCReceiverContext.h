@@ -188,7 +188,7 @@ struct BRPCContext
     {
         channel = std::make_unique<brpc::Channel>();
         brpc::ChannelOptions channel_opts;
-        channel_opts.timeout_ms = 10000;
+        channel_opts.timeout_ms = -1;
         // TODO change rpc server port for brpc
         auto addr = req.req.sender_meta().address();
         auto find_res = addr.find(":");
