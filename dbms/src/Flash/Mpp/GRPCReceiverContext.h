@@ -136,7 +136,7 @@ struct BRPCContext
 
     struct StreamReceiver : public brpc::StreamInputHandler
     {
-        StreamReceiver(std::shared_ptr<MPMCQueue<mpp::MPPDataPacket>> q_ptr_,
+        StreamReceiver(std::shared_ptr<LooseBoundedMPMCQueue<mpp::MPPDataPacket>> q_ptr_,
             LoggerPtr log_)
             : brpc::StreamInputHandler()
             , q(q_ptr_)
@@ -158,7 +158,7 @@ struct BRPCContext
                 // IOBufAsZeroCopyInputStream wrapper(&iobuf);
                 // pb_message.ParseFromZeroCopyStream(&wrapper);
                 packet.ParseFromString(messages[i]->to_string());
-                q->push(std::move(packet));
+                q->forcePush(std::move(packet));
             }
             LOG_DEBUG(log, "gjt debug got brpc packet: done {}", size);
             return 0;
@@ -179,7 +179,7 @@ struct BRPCContext
             RUNTIME_CHECK(q->finish());
         }
 
-        std::shared_ptr<MPMCQueue<mpp::MPPDataPacket>> q;
+        std::shared_ptr<LooseBoundedMPMCQueue<mpp::MPPDataPacket>> q;
         LoggerPtr log;
         brpc::StreamId myid{brpc::INVALID_STREAM_ID};
     };
@@ -191,13 +191,21 @@ struct BRPCContext
         channel_opts.timeout_ms = 10000;
         // TODO change rpc server port for brpc
         auto addr = req.req.sender_meta().address();
-        auto find_res = addr.find(":3930");
+        auto find_res = addr.find(":");
         if (find_res == std::string::npos)
         {
-            LOG_ERROR(log, "unexpected sender addr: {}", addr);
-            return false;
+            LOG_ERROR(log, "unexpected flash addr: {}", addr);
+            throw Exception("unexpected flash addr", ErrorCodes::LOGICAL_ERROR);
         }
-        addr = addr.replace(find_res, 5, ":3931");
+        addr.resize(find_res);
+        addr = addr + ":13931";
+        // auto find_res = addr.find(":3930");
+        // if (find_res == std::string::npos)
+        // {
+        //     LOG_ERROR(log, "unexpected sender addr: {}", addr);
+        //     return false;
+        // }
+        // addr = addr.replace(find_res, 5, ":3931");
         LOG_DEBUG(log, "brpc sender addr: {}", addr);
         if (channel->Init(addr.c_str(), &channel_opts) != 0)
         {
@@ -205,7 +213,7 @@ struct BRPCContext
             return false;
         }
 
-        packet_queue = std::make_shared<MPMCQueue<mpp::MPPDataPacket>>(50);
+        packet_queue = std::make_shared<LooseBoundedMPMCQueue<mpp::MPPDataPacket>>(50);
         handler = std::make_unique<StreamReceiver>(packet_queue, log);
 
         cntl = std::make_unique<brpc::Controller>();
@@ -255,6 +263,6 @@ struct BRPCContext
     std::unique_ptr<brpc::Controller> cntl{};
     brpc::StreamId stream_id{};
     std::unique_ptr<StreamReceiver> handler;
-    std::shared_ptr<MPMCQueue<mpp::MPPDataPacket>> packet_queue{};
+    std::shared_ptr<LooseBoundedMPMCQueue<mpp::MPPDataPacket>> packet_queue{};
 };
 } // namespace DB

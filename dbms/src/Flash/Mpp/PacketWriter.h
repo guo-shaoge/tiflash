@@ -67,10 +67,7 @@ public:
     virtual ~BRPCSyncPacketWriter()
     {
         auto err = brpc::StreamClose(stream_id);
-        if (err != 0)
-        {
-            LOG_ERROR(log, "close brpc stream failed {}", err);
-        }
+        LOG_DEBUG(Logger::get(), "close brpc stream {}, {}", stream_id, err);
     }
 
     virtual bool write(const mpp::MPPDataPacket & packet) override
