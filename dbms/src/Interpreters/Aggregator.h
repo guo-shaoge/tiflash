@@ -1494,6 +1494,23 @@ protected:
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info) const;
 
+template <bool only_lookup, typename Method>
+typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType emplaceOrFindKeyNoException(
+    Method & method,
+    typename Method::State & state,
+    size_t index,
+    Arena & aggregates_pool,
+    std::vector<std::string> & sort_key_containers,
+    const std::vector<size_t> & hashvals) const;
+
+template <bool only_lookup, typename Method>
+typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType emplaceOrFindKeyNoException(
+    Method & method,
+    typename Method::State & state,
+    size_t index,
+    Arena & aggregates_pool,
+    std::vector<std::string> & sort_key_containers) const;
+
     template <bool only_lookup, typename Method>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(
         Method & method,

@@ -492,11 +492,11 @@ protected:
     /// Increase the size of the buffer.
     void resize(size_t for_num_elems = 0, size_t for_buf_size = 0)
     {
-        if (resize_callback != nullptr)
-        {
-            if unlikely (!resize_callback())
-                throw DB::ResizeException("Error in hash table resize");
-        }
+        // if (resize_callback != nullptr)
+        // {
+        //     if unlikely (!resize_callback())
+        //         throw DB::ResizeException("Error in hash table resize");
+        // }
 
         size_t old_size = grower.bufSize();
 
