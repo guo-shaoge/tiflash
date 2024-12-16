@@ -122,11 +122,11 @@ struct AggregationMethodOneNumber
 
     Data data;
 
-    AggregationMethodOneNumber()
-    {
-        if constexpr (!Data::is_two_level)
-            data.reserve(100000);
-    }
+    AggregationMethodOneNumber() = default;
+    // {
+    //     // if constexpr (!Data::is_two_level)
+    //     //     data.reserve(100000);
+    // }
 
     template <typename Other>
     explicit AggregationMethodOneNumber(const Other & other)
