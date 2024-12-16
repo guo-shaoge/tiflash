@@ -226,6 +226,8 @@ public:
 
     size_t hash(const Key & x) const { return x; }
 
+    void reserve(size_t) {}
+
     FixedHashTable() { alloc(); }
 
     FixedHashTable(FixedHashTable && rhs)
