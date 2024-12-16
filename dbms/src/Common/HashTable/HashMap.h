@@ -243,11 +243,29 @@ public:
     ///  have a key equals to the given cell, a new cell gets emplaced into that map,
     ///  and func is invoked with the third argument emplaced set to true. Otherwise
     ///  emplaced is set to false.
+    typename Base::iterator advanceIterator(typename Base::iterator it, size_t n)
+    {
+        size_t i = 0;
+        while (i < n && it != this->end())
+        {
+            ++i;
+            ++it;
+        }
+        return it;
+    }
     template <typename Func>
     void ALWAYS_INLINE mergeToViaEmplace(Self & that, Func && func)
     {
+        auto prefetch_it = advanceIterator(this->begin(), 16);
+
         for (auto it = this->begin(), end = this->end(); it != end; ++it)
         {
+            if likely (prefetch_it != this->end())
+            {
+                that.prefetch(prefetch_it.getHash());
+                ++prefetch_it;
+            }
+
             typename Self::LookupResult res_it;
             bool inserted;
             that.emplace(Cell::getKey(it->getValue()), res_it, inserted, it.getHash());
