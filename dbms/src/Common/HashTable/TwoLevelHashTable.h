@@ -112,7 +112,11 @@ public:
     Impl impls[NUM_BUCKETS];
 
 
-    TwoLevelHashTable() = default;
+    TwoLevelHashTable()
+    {
+        for (auto & impl : impls)
+            impl.reserve(10000000/NUM_BUCKETS);
+    }
 
     /// Copy the data from another (normal) hash table. It should have the same hash function.
     template <typename Source>
