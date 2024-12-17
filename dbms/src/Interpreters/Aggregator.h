@@ -113,7 +113,7 @@ using AggregatedDataWithKeys256Hash64 = HashMap<UInt256, AggregateDataPtr, Defau
 
 /// For the case where there is one numeric key.
 /// FieldType is UInt8/16/32/64 for any type with corresponding bit width.
-template <typename FieldType, typename TData, bool consecutive_keys_optimization = true>
+template <typename FieldType, typename TData, bool consecutive_keys_optimization = false>
 struct AggregationMethodOneNumber
 {
     using Data = TData;
@@ -559,7 +559,7 @@ struct AggregationMethodFixedStringNoCache
 };
 
 /// For the case where all keys are of fixed length, and they fit in N (for example, 128) bits.
-template <typename TData, bool has_nullable_keys_ = false, bool use_cache = true>
+template <typename TData, bool has_nullable_keys_ = false, bool use_cache = false>
 struct AggregationMethodKeysFixed
 {
     using Data = TData;
