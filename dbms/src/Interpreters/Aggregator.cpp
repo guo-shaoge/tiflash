@@ -1893,13 +1893,24 @@ void Aggregator::convertToBlocksImpl(
     }
 
     if (final)
-        convertToBlocksImplFinal<decltype(method), decltype(data), skip_convert_key>(
-            method,
-            data,
-            key_sizes,
-            std::move(raw_key_columns_vec),
-            final_aggregate_columns_vec,
-            arena);
+    {
+        if (params.aggregates_size == 0)
+            convertToBlocksImplFinal<decltype(method), decltype(data), skip_convert_key, true>(
+                method,
+                data,
+                key_sizes,
+                std::move(raw_key_columns_vec),
+                final_aggregate_columns_vec,
+                arena);
+        else
+            convertToBlocksImplFinal<decltype(method), decltype(data), skip_convert_key, false>(
+                method,
+                data,
+                key_sizes,
+                std::move(raw_key_columns_vec),
+                final_aggregate_columns_vec,
+                arena);
+    }
     else
         convertToBlocksImplNotFinal<decltype(method), decltype(data), skip_convert_key>(
             method,
@@ -2146,7 +2157,7 @@ std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<Method>>> initAg
 }
 } // namespace
 
-template <typename Method, typename Table, bool skip_convert_key>
+template <typename Method, typename Table, bool skip_convert_key, bool skip_insert_agg_func>
 void NO_INLINE Aggregator::convertToBlocksImplFinal(
     Method & method,
     Table & data,
@@ -2175,17 +2186,64 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
         agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
     }
 
-    size_t data_index = 0;
-    data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
-        size_t key_columns_vec_index = data_index / params.max_block_size;
-        if constexpr (!skip_convert_key)
-        {
-            agg_keys_helpers[key_columns_vec_index]
+    if constexpr (std::decay_t<Table>::is_string_hash_map)
+    {
+        size_t data_index = 0;
+        data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
+            size_t key_columns_vec_index = data_index / params.max_block_size;
+            if constexpr (!skip_convert_key)
+            {
+                agg_keys_helpers[key_columns_vec_index]
                 ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+            }
+            insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+            ++data_index;
+        });
+    }
+    else
+    {
+        size_t data_index = 0;
+        size_t key_columns_vec_index = 0;
+        auto it = data.begin();
+        auto prefetch_it = it;
+
+        size_t i = 0;
+        while (i < 16 && prefetch_it != data.end())
+        {
+            ++i;
+            ++prefetch_it;
         }
-        insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
-        ++data_index;
-    });
+
+        while (it != data.end())
+        {
+            if likely (prefetch_it != data.end())
+            {
+                data.prefetch(prefetch_it.getHash());
+                ++prefetch_it;
+            }
+
+            const auto & key = it->getKey();
+            if constexpr (!skip_convert_key)
+            {
+                agg_keys_helpers[key_columns_vec_index]
+                    ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+            }
+
+            if constexpr (!skip_insert_agg_func)
+            {
+                auto & mapped = it->getMapped();
+                insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+            }
+            ++data_index;
+            ++it;
+            if unlikely(data_index == params.max_block_size)
+            {
+                ++key_columns_vec_index;
+                data_index = 0;
+            }
+        }
+    }
+
 }
 
 template <typename Method, typename Table, bool skip_convert_key>

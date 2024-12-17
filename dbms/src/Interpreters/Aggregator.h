@@ -158,7 +158,7 @@ struct AggregationMethodOneNumber
     std::optional<Sizes> shuffleKeyColumns(std::vector<IColumn *> &, const Sizes &) { return {}; }
 
     // Insert the key from the hash table into columns.
-    static void insertKeyIntoColumns(
+    static ALWAYS_INLINE inline void insertKeyIntoColumns(
         const Key & key,
         std::vector<IColumn *> & key_columns,
         const Sizes & /*key_sizes*/,
@@ -1596,7 +1596,7 @@ protected:
         MutableColumns & final_aggregate_columns,
         Arena * arena) const;
 
-    template <typename Method, typename Table, bool skip_convert_key>
+    template <typename Method, typename Table, bool skip_convert_key, bool skip_insert_agg_func>
     void convertToBlocksImplFinal(
         Method & method,
         Table & data,
