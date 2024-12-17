@@ -110,14 +110,22 @@ public:
 
     Impl impls[NUM_BUCKETS];
 
-
-    TwoLevelHashTable() = default;
+    TwoLevelHashTable()
+    {
+        const size_t size = 10000000/(NUM_BUCKETS*16);
+        for (auto & impl : impls)
+            impl.reserve(size);
+    }
 
     /// Copy the data from another (normal) hash table. It should have the same hash function.
     template <typename Source>
     explicit TwoLevelHashTable(const Source & src)
     {
         typename Source::const_iterator it = src.begin();
+
+        const size_t size = 10000000/(NUM_BUCKETS*16);
+        for (auto & impl : impls)
+            impl.reserve(size);
 
         /// It is assumed that the zero key (stored separately) is first in iteration order.
         if (it != src.end() && it.getPtr()->isZero(src))
