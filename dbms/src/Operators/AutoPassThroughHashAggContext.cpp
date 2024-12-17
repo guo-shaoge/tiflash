@@ -25,53 +25,55 @@ void AutoPassThroughHashAggContext::onBlockAuto(Block & block)
     // If need_spill or already_get_data_from_hash_table is true, should not insert new data into HashTable.
     RUNTIME_CHECK(state == State::PassThrough || (!many_data[0]->need_spill && !already_get_data_from_hash_table));
     agg_process_info->resetBlock(block);
-    switch (state)
-    {
-    case State::Init:
-    {
-        aggregator->executeOnBlock(*agg_process_info, *many_data[0], 0);
-        trySwitchFromInitState();
-        break;
-    }
-    case State::Adjust:
-    {
-        aggregator->executeOnBlockCollectHitRate(*agg_process_info, *many_data[0], 0);
-        trySwitchFromAdjustState(agg_process_info->block.rows(), agg_process_info->hit_row_cnt);
-        break;
-    }
-    case State::PreHashAgg:
-    {
-        aggregator->executeOnBlock(*agg_process_info, *many_data[0], 0);
-        trySwitchBackAdjustState(agg_process_info->block.rows());
-        break;
-    }
-    case State::PassThrough:
-    {
-        const auto total_rows = agg_process_info->block.rows();
-        onBlockForceStreaming(agg_process_info->block);
-        trySwitchBackAdjustState(total_rows);
-        break;
-    }
-    case State::Selective:
-    {
-        aggregator->executeOnBlockOnlyLookup(*agg_process_info, *many_data[0], 0);
-        auto pass_through_rows = agg_process_info->not_found_rows;
-        const auto total_rows = agg_process_info->block.rows();
-        if (!pass_through_rows.empty())
-        {
-            RUNTIME_CHECK(!agg_process_info->block.info.selective);
-            auto new_block = getPassThroughBlock(agg_process_info->block);
-            new_block.info.selective = std::make_shared<std::vector<UInt64>>(std::move(pass_through_rows));
-            pushPassThroughBuffer(new_block);
-        }
-        trySwitchBackAdjustState(total_rows);
-        break;
-    }
-    default:
-    {
-        __builtin_unreachable();
-    }
-    };
+    aggregator->executeOnBlock(*agg_process_info, *many_data[0], 0);
+
+    // switch (state)
+    // {
+    // case State::Init:
+    // {
+    //     aggregator->executeOnBlock(*agg_process_info, *many_data[0], 0);
+    //     trySwitchFromInitState();
+    //     break;
+    // }
+    // case State::Adjust:
+    // {
+    //     aggregator->executeOnBlockCollectHitRate(*agg_process_info, *many_data[0], 0);
+    //     trySwitchFromAdjustState(agg_process_info->block.rows(), agg_process_info->hit_row_cnt);
+    //     break;
+    // }
+    // case State::PreHashAgg:
+    // {
+    //     aggregator->executeOnBlock(*agg_process_info, *many_data[0], 0);
+    //     trySwitchBackAdjustState(agg_process_info->block.rows());
+    //     break;
+    // }
+    // case State::PassThrough:
+    // {
+    //     const auto total_rows = agg_process_info->block.rows();
+    //     onBlockForceStreaming(agg_process_info->block);
+    //     trySwitchBackAdjustState(total_rows);
+    //     break;
+    // }
+    // case State::Selective:
+    // {
+    //     aggregator->executeOnBlockOnlyLookup(*agg_process_info, *many_data[0], 0);
+    //     auto pass_through_rows = agg_process_info->not_found_rows;
+    //     const auto total_rows = agg_process_info->block.rows();
+    //     if (!pass_through_rows.empty())
+    //     {
+    //         RUNTIME_CHECK(!agg_process_info->block.info.selective);
+    //         auto new_block = getPassThroughBlock(agg_process_info->block);
+    //         new_block.info.selective = std::make_shared<std::vector<UInt64>>(std::move(pass_through_rows));
+    //         pushPassThroughBuffer(new_block);
+    //     }
+    //     trySwitchBackAdjustState(total_rows);
+    //     break;
+    // }
+    // default:
+    // {
+    //     __builtin_unreachable();
+    // }
+    // };
     // allBlockDataHandled() will return false if HashTable resize when callback is set.
     // But for auto pass through, resize callback will not be set.
     RUNTIME_CHECK(agg_process_info->allBlockDataHandled());

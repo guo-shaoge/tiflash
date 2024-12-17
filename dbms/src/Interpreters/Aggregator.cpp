@@ -563,7 +563,7 @@ AggregatedDataVariants::Type Aggregator::chooseAggregationMethod()
         if (size_of_field == 4)
             return AggregatedDataVariants::Type::key32;
         if (size_of_field == 8)
-            return AggregatedDataVariants::Type::key64;
+            return AggregatedDataVariants::Type::key64_two_level;
         if (size_of_field == 16)
             return AggregatedDataVariants::Type::keys128;
         if (size_of_field == 32)
