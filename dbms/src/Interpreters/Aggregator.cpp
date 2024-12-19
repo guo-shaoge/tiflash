@@ -662,7 +662,9 @@ void NO_INLINE Aggregator::executeImpl(
     Method & method,
     Arena * aggregates_pool,
     AggProcessInfo & agg_process_info,
-    TiDB::TiDBCollators & collators) const
+    TiDB::TiDBCollators & collators,
+    AggregatedDataVariants::Type type,
+    ResultKeysAllocator & result_keys_allocator) const
 {
     typename Method::State state(agg_process_info.key_columns, key_sizes, collators);
 
@@ -686,19 +688,19 @@ void NO_INLINE Aggregator::executeImpl(
         //     executeImplSerializedKeyByCol();
         // else
         //     executeImplByRow<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-        executeImplByRow<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+        executeImplByRow<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info, type, result_keys_allocator);
     }
     else if constexpr (Method::Data::is_string_hash_map)
     {
         // StringHashMap doesn't support prefetch.
-        executeImplByRow<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+        executeImplByRow<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info, type, result_keys_allocator);
     }
     else
     {
         if (disable_prefetch)
-            executeImplByRow<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+            executeImplByRow<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info, type, result_keys_allocator);
         else
-            executeImplByRow<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+            executeImplByRow<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info, type, result_keys_allocator);
     }
 }
 
@@ -763,7 +765,9 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
     Method & method,
     typename Method::State & state,
     Arena * aggregates_pool,
-    AggProcessInfo & agg_process_info) const
+    AggProcessInfo & agg_process_info,
+    AggregatedDataVariants::Type type,
+    ResultKeysAllocator & result_keys_allocator) const
 {
     // collect_hit_rate and only_lookup cannot be true at the same time.
     static_assert(!(collect_hit_rate && only_lookup));
@@ -794,7 +798,20 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
         }                                                                                                   \
         else                                                                                                \
         {                                                                                                   \
-            emplace_result.setMapped(place);                                                   \
+            if (emplace_result.isInserted()) \
+            { \
+                emplace_result.setMapped(place);                                                   \
+        if constexpr (std::is_same_v<typename Method::Data, AggregatedDataWithUInt64Key> || \
+        std::is_same_v<typename Method::Data, AggregatedDataWithUInt64KeyTwoLevel>) \
+        { \
+                if (type == AggregatedDataVariants::Type::key64 || type == AggregatedDataVariants::Type::key64_two_level) \
+                { \
+                    auto key_holder = state.getKeyHolder(i, aggregates_pool, sort_key_containers); \
+                    auto * ptr = result_keys_allocator.allocate(); \
+                    *reinterpret_cast<UInt64*>(ptr) = keyHolderGetKey(key_holder); \
+                }\
+            } \
+            } \
         }                                                                                                   \
         processed_rows = i;
 
@@ -1101,6 +1118,8 @@ bool Aggregator::executeOnBlockImpl(
         result.init(method_chosen);
         result.keys_size = params.keys_size;
         result.key_sizes = key_sizes;
+        result.result_keys_allocator.batch_size = params.max_block_size;
+        result.result_keys_allocator.aggregates_pool = result.aggregates_pools[0].get();
         LOG_TRACE(log, "Aggregation method: `{}`", result.getMethodName());
     }
 
@@ -1134,7 +1153,9 @@ bool Aggregator::executeOnBlockImpl(
             *ToAggregationMethodPtr(NAME, result.aggregation_method_impl), \
             result.aggregates_pool,                                        \
             agg_process_info,                                              \
-            params.collators);                                             \
+            params.collators, \
+            result.type, \
+                result.result_keys_allocator);                                             \
         break;                                                             \
     }
 
@@ -1300,7 +1321,7 @@ BlocksList Aggregator::convertOneBucketToBlocks(
     size_t bucket) const
 {
 #define FILLER_DEFINE(name, skip_convert_key)                                                         \
-    auto filler_##name = [bucket, &method, arena, this](                                              \
+    auto filler_##name = [bucket, &method, arena, &data_variants, this](                                              \
                              const Sizes & key_sizes,                                                 \
                              std::vector<MutableColumns> & key_columns_vec,                           \
                              std::vector<AggregateColumnsData> & aggregate_columns_vec,               \
@@ -1314,7 +1335,8 @@ BlocksList Aggregator::convertOneBucketToBlocks(
             aggregate_columns_vec,                                                                    \
             final_aggregate_columns_vec,                                                              \
             arena,                                                                                    \
-            final_);                                                                                  \
+            final_, \
+            data_variants.type, data_variants.result_keys_allocator);                                                                                   \
     };
 
     FILLER_DEFINE(convert_key, false);
@@ -1488,6 +1510,72 @@ void Aggregator::convertToBlocksImpl(
     std::vector<AggregateColumnsData> & aggregate_columns_vec,
     std::vector<MutableColumns> & final_aggregate_columns_vec,
     Arena * arena,
+    bool final,
+    AggregatedDataVariants::Type type,
+    ResultKeysAllocator & result_keys_allocator) const
+{
+    if (data.empty())
+        return;
+
+    std::vector<std::vector<IColumn *>> raw_key_columns_vec;
+    raw_key_columns_vec.reserve(key_columns_vec.size());
+    for (auto & key_columns : key_columns_vec)
+    {
+        std::vector<IColumn *> raw_key_columns;
+        raw_key_columns.reserve(key_columns.size());
+        for (auto & column : key_columns)
+        {
+            raw_key_columns.push_back(column.get());
+        }
+
+        raw_key_columns_vec.push_back(raw_key_columns);
+    }
+
+    if (final)
+    {
+        if (type == AggregatedDataVariants::Type::key64 || type == AggregatedDataVariants::Type::key64_two_level)
+        {
+            convertToBlocksImplFinal<decltype(method), decltype(data), skip_convert_key>(
+                method,
+                data,
+                key_sizes,
+                std::move(raw_key_columns_vec),
+                final_aggregate_columns_vec,
+                arena,
+                result_keys_allocator);
+        }
+        else
+        {
+            convertToBlocksImplFinal<decltype(method), decltype(data), skip_convert_key>(
+                method,
+                data,
+                key_sizes,
+                std::move(raw_key_columns_vec),
+                final_aggregate_columns_vec,
+                arena);
+        }
+    }
+    else
+        convertToBlocksImplNotFinal<decltype(method), decltype(data), skip_convert_key>(
+            method,
+            data,
+            key_sizes,
+            std::move(raw_key_columns_vec),
+            aggregate_columns_vec);
+
+    /// In order to release memory early.
+    data.clearAndShrink();
+}
+
+template <typename Method, typename Table, bool skip_convert_key>
+void Aggregator::convertToBlocksImpl(
+    Method & method,
+    Table & data,
+    const Sizes & key_sizes,
+    std::vector<MutableColumns> & key_columns_vec,
+    std::vector<AggregateColumnsData> & aggregate_columns_vec,
+    std::vector<MutableColumns> & final_aggregate_columns_vec,
+    Arena * arena,
     bool final) const
 {
     if (data.empty())
@@ -1508,13 +1596,15 @@ void Aggregator::convertToBlocksImpl(
     }
 
     if (final)
-        convertToBlocksImplFinal<decltype(method), decltype(data), skip_convert_key>(
-            method,
-            data,
-            key_sizes,
-            std::move(raw_key_columns_vec),
-            final_aggregate_columns_vec,
-            arena);
+    {
+            convertToBlocksImplFinal<decltype(method), decltype(data), skip_convert_key>(
+                method,
+                data,
+                key_sizes,
+                std::move(raw_key_columns_vec),
+                final_aggregate_columns_vec,
+                arena);
+    }
     else
         convertToBlocksImplNotFinal<decltype(method), decltype(data), skip_convert_key>(
             method,
@@ -1804,6 +1894,66 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
 }
 
 template <typename Method, typename Table, bool skip_convert_key>
+void NO_INLINE Aggregator::convertToBlocksImplFinal(
+    Method & method,
+    Table & data,
+    const Sizes & key_sizes,
+    std::vector<std::vector<IColumn *>> && key_columns_vec,
+    std::vector<MutableColumns> & final_aggregate_columns_vec,
+    Arena * arena,
+    ResultKeysAllocator & result_keys_allocator) const
+{
+    assert(!key_columns_vec.empty());
+#ifndef NDEBUG
+    for (const auto & key_columns : key_columns_vec)
+    {
+        assert(key_columns.size() == key_sizes.size());
+    }
+#endif
+    std::vector<std::unique_ptr<AggregatorMethodInitKeyColumnHelper<std::decay_t<Method>>>> agg_keys_helpers;
+    Sizes key_sizes_ref = key_sizes; // NOLINT
+    if constexpr (!skip_convert_key)
+    {
+        auto shuffled_key_sizes = shuffleKeyColumnsForKeyColumnsVec(method, key_columns_vec, key_sizes);
+        if (shuffled_key_sizes)
+        {
+            RUNTIME_CHECK(params.key_ref_agg_func.empty());
+            key_sizes_ref = *shuffled_key_sizes;
+        }
+        agg_keys_helpers = initAggKeysForKeyColumnsVec(method, key_columns_vec, params.max_block_size, data.size());
+    }
+
+    RUNTIME_CHECK_MSG(false, "should not be here");
+    for (auto & key_columns : key_columns_vec)
+    {
+        RUNTIME_CHECK(result_keys_allocator.iter < result_keys_allocator.batch_agg_states.size());
+        auto b = result_keys_allocator.currentBatch();
+        // method.insertKeyIntoColumnsBatch(b, key_columns, key_sizes_ref, params.collators);
+        LOG_ERROR(log, "gjt debug here, total batch size: {}, {}, iter: {}, first is null: {}, size in one batch: {}", result_keys_allocator.batch_agg_states.size(), key_columns_vec.size(), result_keys_allocator.iter,
+                b.first == nullptr, b.second);
+        result_keys_allocator.nextBatch();
+    }
+    // for (auto & keys_info : result_keys_allocator.batch_agg_states)
+    // {
+    //     LOG_ERROR(log, "gjt debug here 1, {}", key_columns_vec[i++].size());
+    //     method.insertKeyIntoColumnsBatch(keys_info, key_columns_vec[i++], key_sizes_ref, params.collators);
+    // }
+
+
+    // size_t data_index = 0;
+    // data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
+    //     size_t key_columns_vec_index = data_index / params.max_block_size;
+    //     if constexpr (!skip_convert_key)
+    //     {
+    //         agg_keys_helpers[key_columns_vec_index]
+    //             ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
+    //     }
+    //     insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
+    //     ++data_index;
+    // });
+}
+
+template <typename Method, typename Table, bool skip_convert_key>
 void NO_INLINE Aggregator::convertToBlockImplNotFinal(
     Method & method,
     Table & data,
@@ -1977,6 +2127,7 @@ BlocksList Aggregator::prepareBlocksAndFill(
     Block header = getHeader(final);
 
     size_t block_count = (rows + params.max_block_size - 1) / params.max_block_size;
+    // LOG_DEBUG(log, "gjt debug prepareBlocksAndFill block count: {}, rows: {}", block_count, rows);
     std::vector<MutableColumns> key_columns_vec;
     std::vector<AggregateColumnsData> aggregate_columns_data_vec;
     std::vector<MutableColumns> aggregate_columns_vec;
@@ -1998,6 +2149,7 @@ BlocksList Aggregator::prepareBlocksAndFill(
             block_rows = rows % block_rows;
         }
 
+        // LOG_ERROR(log, "gjt debug prepareBlocksAndFill convert_key_size: {}", convert_key_size);
         key_columns_vec.push_back(MutableColumns(convert_key_size));
         aggregate_columns_data_vec.push_back(AggregateColumnsData(params.aggregates_size));
         aggregate_columns_vec.push_back(MutableColumns(params.aggregates_size));
@@ -2144,7 +2296,7 @@ BlocksList Aggregator::prepareBlocksAndFillSingleLevel(AggregatedDataVariants & 
             aggregate_columns_vec,                                                                     \
             final_aggregate_columns_vec,                                                               \
             data_variants.aggregates_pool,                                                             \
-            final_);                                                                                   \
+            final_, data_variants.type, data_variants.result_keys_allocator);                                                                                   \
         break;                                                                                         \
     }
 
@@ -2832,6 +2984,11 @@ Block MergingBuckets::getData(size_t concurrency_index)
         return {};
 
     FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_aggregate_merge_failpoint);
+    if (!data.empty() && (data[0]->type == AggregatedDataVariants::Type::key64 ||
+        data[0]->type == AggregatedDataVariants::Type::key64_two_level))
+    {
+        return getDataForTwoLevelBatch(concurrency_index);
+    }
 
     return is_two_level ? getDataForTwoLevel(concurrency_index) : getDataForSingleLevel();
 }
@@ -2898,6 +3055,102 @@ Block MergingBuckets::getDataForTwoLevel(size_t concurrency_index)
         if (likely(block))
             return block;
     }
+}
+
+Block MergingBuckets::getDataForTwoLevelBatch(size_t concurrency_index)
+{
+    assert(concurrency_index < two_level_parallel_merge_data.size());
+    auto & two_level_merge_data = *two_level_parallel_merge_data[concurrency_index];
+
+    Block out_block = popBlocksListFront(two_level_merge_data);
+    if (likely(out_block))
+        return out_block;
+
+    if (current_bucket_num >= NUM_BUCKETS)
+        return {};
+    // while (true)
+    // {
+    //     auto local_current_bucket_num = current_bucket_num.fetch_add(1);
+    //     if (unlikely(local_current_bucket_num >= NUM_BUCKETS))
+    //         return {};
+
+    //     doLevelMerge(local_current_bucket_num, concurrency_index);
+    //     Block block = popBlocksListFront(two_level_merge_data);
+    //     if (likely(block))
+    //         return block;
+    // }
+
+    RUNTIME_CHECK(concurrency_index == 0);
+    RUNTIME_CHECK(data.size() == 1);
+    RUNTIME_CHECK(data[0]->type == AggregatedDataVariants::Type::key64 ||
+        data[0]->type == AggregatedDataVariants::Type::key64_two_level);
+
+#define M(NAME, IS_TWO_LEVEL)                                              \
+    case AggregationMethodType(NAME):                                      \
+    {                                                                      \
+        auto & method = *ToAggregationMethodPtr(NAME, data[0]->aggregation_method_impl); \
+        using Method = std::decay_t<decltype(method)>; \
+        if constexpr (std::is_same_v<typename Method::Data, AggregatedDataWithUInt64Key> || std::is_same_v<typename Method::Data, AggregatedDataWithUInt64KeyTwoLevel>) \
+        { \
+            RUNTIME_CHECK_MSG(method.data.size() == data[0]->result_keys_allocator.total_rows, \
+                    "method.data.size: {}, tot: {}", method.data.size(), data[0]->result_keys_allocator.total_rows); \
+            const auto & params = aggregator.getParams(); \
+            const auto rows = method.data.size(); \
+            size_t block_count = (rows + params.max_block_size - 1) / params.max_block_size; \
+            std::vector<MutableColumns> key_columns_vec; \
+            size_t convert_key_size = final ? params.keys_size - params.key_ref_agg_func.size() : params.keys_size; \
+            Block header = aggregator.getHeader(true); \
+            LOG_TRACE(log, "gjt debug method.data.size: {}, tot: {}, batch size: {}, block_count: {}", \
+                    method.data.size(), data[0]->result_keys_allocator.total_rows, data[0]->result_keys_allocator.batch_agg_states.size(), block_count); \
+            for (size_t j = 0; j < block_count; ++j) \
+            { \
+                auto block_rows = params.max_block_size; \
+                if (j == (block_count - 1) && rows % block_rows != 0) \
+                { \
+                    block_rows = rows % block_rows; \
+                } \
+                key_columns_vec.push_back(MutableColumns(convert_key_size)); \
+                auto & key_columns = key_columns_vec.back(); \
+                for (size_t i = 0; i < convert_key_size; ++i) \
+                { \
+                    key_columns[i] = header.safeGetByPosition(i).type->createColumn(); \
+                    key_columns[i]->reserve(block_rows); \
+                } \
+                RUNTIME_CHECK_MSG(data[0]->result_keys_allocator.iter < data[0]->result_keys_allocator.batch_agg_states.size(), \
+                        "iter: {}, size: {}", data[0]->result_keys_allocator.iter, data[0]->result_keys_allocator.batch_agg_states.size()); \
+                auto b = data[0]->result_keys_allocator.currentBatch(); \
+                method.insertKeyIntoColumnsBatch(b, key_columns, std::vector<size_t>{}, params.collators); \
+                data[0]->result_keys_allocator.nextBatch(); \
+            } \
+            for (size_t j = 0; j < block_count; ++j) \
+            { \
+                Block res = header.cloneEmpty(); \
+                for (size_t i = 0; i < convert_key_size; ++i) \
+                    res.getByPosition(i).column = std::move(key_columns_vec[j][i]); \
+                two_level_merge_data.push_back(res); \
+            } \
+        } \
+        else \
+        { \
+            RUNTIME_CHECK_MSG(false, "unexpected method  type"); \
+        } \
+        break;                                                             \
+    }
+
+        switch (data[0]->type)
+        {
+            M(key64, false)
+            M(key64_two_level, false)
+        default:
+            break;
+        }
+
+#undef M
+
+        current_bucket_num = NUM_BUCKETS;
+        if (two_level_merge_data.empty())
+            return {};
+        return popBlocksListFront(two_level_merge_data);
 }
 
 void MergingBuckets::doLevelMerge(Int32 bucket_num, size_t concurrency_index)

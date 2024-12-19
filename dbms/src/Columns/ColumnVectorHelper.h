@@ -52,6 +52,14 @@ public:
                    reinterpret_cast<char *>(this) + sizeof(*this))
             ->push_back_raw(ptr);
     }
+
+    template <size_t ELEMENT_SIZE>
+    void insertRawDataMany(size_t num, const char * ptr)
+    {
+        return reinterpret_cast<PODArrayBase<ELEMENT_SIZE, 4096, Allocator<false>, 15, 16> *>(
+                   reinterpret_cast<char *>(this) + sizeof(*this))
+            ->push_back_raw_many(num, ptr);
+    }
 };
 
 } // namespace DB

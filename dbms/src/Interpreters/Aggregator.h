@@ -164,6 +164,17 @@ struct AggregationMethodOneNumber
         auto * column = static_cast<ColumnVectorHelper *>(key_columns[0]);
         column->insertRawData<sizeof(FieldType)>(key_holder);
     }
+
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumnsBatch(
+        const std::pair<void*, size_t> & keys_info,
+        MutableColumns & key_columns,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        auto * column = static_cast<ColumnVectorHelper *>(key_columns[0].get());
+        column->insertRawDataMany<sizeof(FieldType)>(keys_info.second, reinterpret_cast<char *>(keys_info.first));
+    }
 };
 
 /// For the case where there is one string key.
@@ -211,6 +222,15 @@ struct AggregationMethodString
         const TiDB::TiDBCollators &)
     {
         static_cast<ColumnString *>(key_columns[0])->insertData(key.data, key.size);
+    }
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumnsBatch(
+        const std::pair<void*, size_t> & ,
+        MutableColumns & ,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        RUNTIME_CHECK_MSG(false, "not impl for insertKeyIntoColumnsBatch");
     }
 };
 
@@ -261,6 +281,15 @@ struct AggregationMethodStringNoCache
         // Add last zero byte.
         static_cast<ColumnString *>(key_columns[0])->insertData(key.data, key.size);
     }
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumnsBatch(
+        const std::pair<void*, size_t> & ,
+        MutableColumns & ,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        RUNTIME_CHECK_MSG(false, "not impl for insertKeyIntoColumnsBatch");
+    }
 };
 
 template <bool bin_padding, typename TData>
@@ -309,6 +338,15 @@ struct AggregationMethodOneKeyStringNoCache
         static_cast<ColumnString *>(key_columns[0])->insertData(key.data, key.size);
     }
     ALWAYS_INLINE static inline void initAggKeys(size_t, IColumn *) {}
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumnsBatch(
+        const std::pair<void*, size_t> & ,
+        MutableColumns & ,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        RUNTIME_CHECK_MSG(false, "not impl for insertKeyIntoColumnsBatch");
+    }
 };
 
 /*
@@ -459,6 +497,15 @@ struct AggregationMethodFastPathTwoKeysNoCache
             pos = insertAggKeyIntoColumn<Key2Desc>(pos, key_columns[1], index);
         }
     }
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumnsBatch(
+        const std::pair<void*, size_t> & ,
+        MutableColumns & ,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        RUNTIME_CHECK_MSG(false, "not impl for insertKeyIntoColumnsBatch");
+    }
 };
 
 
@@ -508,6 +555,15 @@ struct AggregationMethodFixedString
     {
         static_cast<ColumnFixedString *>(key_columns[0])->insertData(key.data, key.size);
     }
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumnsBatch(
+        const std::pair<void*, size_t> & ,
+        MutableColumns & ,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        RUNTIME_CHECK_MSG(false, "not impl for insertKeyIntoColumnsBatch");
+    }
 };
 
 /// Same as above but without cache
@@ -555,6 +611,15 @@ struct AggregationMethodFixedStringNoCache
         const TiDB::TiDBCollators &)
     {
         static_cast<ColumnFixedString *>(key_columns[0])->insertData(key.data, key.size);
+    }
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumnsBatch(
+        const std::pair<void*, size_t> & ,
+        MutableColumns & ,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        RUNTIME_CHECK_MSG(false, "not impl for insertKeyIntoColumnsBatch");
     }
 };
 
@@ -660,6 +725,15 @@ struct AggregationMethodKeysFixed
             }
         }
     }
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumnsBatch(
+        const std::pair<void*, size_t> & ,
+        MutableColumns & ,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        RUNTIME_CHECK_MSG(false, "not impl for insertKeyIntoColumnsBatch");
+    }
 };
 
 /** Aggregates by concatenating serialized key values.
@@ -714,8 +788,48 @@ struct AggregationMethodSerialized
         for (size_t i = 0; i < key_columns.size(); ++i)
             pos = key_columns[i]->deserializeAndInsertFromArena(pos, collators.empty() ? nullptr : collators[i]);
     }
+    // Insert the key from the hash table into columns.
+    static void insertKeyIntoColumnsBatch(
+        const std::pair<void*, size_t> & ,
+        MutableColumns & ,
+        const Sizes & /*key_sizes*/,
+        const TiDB::TiDBCollators &)
+    {
+        RUNTIME_CHECK_MSG(false, "not impl for insertKeyIntoColumnsBatch");
+    }
 };
 
+struct ResultKeysAllocator
+{
+    size_t batch_size = 1024;
+
+    const size_t one_agg_state_size = 8; // TODO
+
+    std::vector<std::pair<void *, size_t>> batch_agg_states{};
+    Arena * aggregates_pool = nullptr;
+    size_t total_rows = 0;
+
+    // todo fixed type
+    AggregateDataPtr allocate()
+    {
+        if (batch_agg_states.empty() || batch_agg_states.back().second == batch_size)
+        {
+            auto * batch_agg_states_ptr = aggregates_pool->alloc(one_agg_state_size * batch_size);
+            RUNTIME_CHECK(batch_agg_states_ptr);
+            batch_agg_states.emplace_back(batch_agg_states_ptr, 0);
+        }
+        auto & last_ele = batch_agg_states.back();
+        total_rows++;
+        return static_cast<AggregateDataPtr>(last_ele.first) + last_ele.second++ * one_agg_state_size;
+    }
+
+    size_t iter = 0;
+    ALWAYS_INLINE inline std::pair<void *, size_t> currentBatch()
+    {
+        return batch_agg_states[iter];
+    }
+    ALWAYS_INLINE inline void nextBatch() { iter++; }
+};
 
 class Aggregator;
 
@@ -754,6 +868,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     /** Specialization for the case when there are no keys.
       */
     AggregatedDataWithoutKey without_key = nullptr;
+    ResultKeysAllocator result_keys_allocator{};
 
     using AggregationMethod_key8 = AggregationMethodOneNumber<UInt8, AggregatedDataWithUInt8Key, false>;
     using AggregationMethod_key16 = AggregationMethodOneNumber<UInt16, AggregatedDataWithUInt16Key, false>;
@@ -929,7 +1044,7 @@ struct AggregatedDataVariants : private boost::noncopyable
     void destroyAggregationMethodImpl();
 
     AggregatedDataVariants()
-        : aggregates_pools(1, std::make_shared<Arena>())
+        : aggregates_pools(2, std::make_shared<Arena>())
         , aggregates_pool(aggregates_pools.back().get())
     {}
     bool inited() const { return type != Type::EMPTY; }
@@ -1152,6 +1267,7 @@ public:
 
 private:
     Block getDataForSingleLevel();
+    Block getDataForTwoLevelBatch(size_t concurrency_index);
 
     Block getDataForTwoLevel(size_t concurrency_index);
 
@@ -1451,14 +1567,18 @@ protected:
         Method & method,
         Arena * aggregates_pool,
         AggProcessInfo & agg_process_info,
-        TiDB::TiDBCollators & collators) const;
+        TiDB::TiDBCollators & collators,
+    AggregatedDataVariants::Type type,
+    ResultKeysAllocator & result_keys_allocator) const;
 
     template <bool collect_hit_rate, bool only_loopup, bool enable_prefetch, typename Method>
     void executeImplByRow(
         Method & method,
         typename Method::State & state,
         Arena * aggregates_pool,
-        AggProcessInfo & agg_process_info) const;
+        AggProcessInfo & agg_process_info,
+    AggregatedDataVariants::Type type,
+    ResultKeysAllocator & result_keys_allocator) const;
 
     template <bool only_lookup, typename Method>
     typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType emplaceOrFindKey(
@@ -1519,6 +1639,19 @@ protected:
         bool final) const;
 
     template <typename Method, typename Table, bool skip_convert_key>
+    void convertToBlocksImpl(
+        Method & method,
+        Table & data,
+        const Sizes & key_sizes,
+        std::vector<MutableColumns> & key_columns_vec,
+        std::vector<AggregateColumnsData> & aggregate_columns_vec,
+        std::vector<MutableColumns> & final_aggregate_columns_vec,
+        Arena * arena,
+        bool final,
+    AggregatedDataVariants::Type type,
+    ResultKeysAllocator & result_keys_allocator) const;
+
+    template <typename Method, typename Table, bool skip_convert_key>
     void convertToBlockImplFinal(
         Method & method,
         Table & data,
@@ -1535,6 +1668,15 @@ protected:
         std::vector<std::vector<IColumn *>> && key_columns_vec,
         std::vector<MutableColumns> & final_aggregate_columns_vec,
         Arena * arena) const;
+    template <typename Method, typename Table, bool skip_convert_key>
+    void convertToBlocksImplFinal(
+        Method & method,
+        Table & data,
+        const Sizes & key_sizes,
+        std::vector<std::vector<IColumn *>> && key_columns_vec,
+        std::vector<MutableColumns> & final_aggregate_columns_vec,
+        Arena * arena,
+    ResultKeysAllocator & result_keys_allocator) const;
 
     template <typename Method, typename Table, bool skip_convert_key>
     void convertToBlockImplNotFinal(
