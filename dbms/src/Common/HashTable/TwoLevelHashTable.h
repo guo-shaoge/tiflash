@@ -97,6 +97,21 @@ protected:
     }
 
 public:
+
+    size_t getBufferSizeInCells() const
+    {
+        size_t res = 0;
+        for (const auto & impl : impls)
+            res += impl.getBufferSizeInCells();
+        return res;
+    }
+
+    void ALWAYS_INLINE prefetch(size_t hashval) const
+    {
+        size_t buck = getBucketFromHash(hashval);
+        impls[buck].prefetch(hashval);
+    }
+
     using key_type = typename Impl::key_type;
     using mapped_type = typename Impl::mapped_type;
     using value_type = typename Impl::value_type;
