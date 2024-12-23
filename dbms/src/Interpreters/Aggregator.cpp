@@ -1037,12 +1037,12 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
         
         size_t i = agg_process_info.start_row;
         const size_t end = *processed_rows - agg_process_info.start_row + 1;
-        const size_t prefetch_step = 16;
+        // const size_t prefetch_step = 16;
         while (i < end)
         {
-            const size_t prefetch_idx = i + prefetch_step;
-            if likely (prefetch_idx < end)
-                __builtin_prefetch(places[prefetch_idx]);
+            // const size_t prefetch_idx = i + prefetch_step;
+            // if likely (prefetch_idx < end)
+            //     __builtin_prefetch(places[prefetch_idx]);
 
             for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
                  ++inst)
