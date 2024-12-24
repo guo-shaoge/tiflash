@@ -954,7 +954,7 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
     std::vector<size_t> hashvals;
     if constexpr (enable_prefetch)
     {
-        const auto hashvals_size = std::min(prefetch_step, rows);
+        const auto hashvals_size = rows;
         hashvals.resize(hashvals_size);
         for (size_t i = agg_process_info.start_row; i < agg_process_info.start_row + hashvals_size; ++i)
         {
@@ -964,7 +964,7 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
 
     size_t i = agg_process_info.start_row;
     const size_t end = agg_process_info.end_row;
-    const size_t mini_batch = 256;
+    const size_t mini_batch = end - i;
     while (i < end)
     {
         size_t batch_size = mini_batch;
@@ -978,19 +978,22 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
             AggregateDataPtr aggregate_data = nullptr;
             if constexpr (enable_prefetch)
             {
-                const auto prefetch_hash_idx = j % prefetch_step;
-                const size_t hashval = hashvals[prefetch_hash_idx];
                 const size_t prefetch_idx = j + prefetch_step;
                 if likely (prefetch_idx < end)
-                {
-                    const auto new_hashval
-                        = state.getHash(method.data, prefetch_idx, *aggregates_pool, sort_key_containers);
-                    method.data.prefetch(new_hashval);
-                    hashvals[prefetch_hash_idx] = new_hashval;
-                }
+                    method.data.prefetch(hashvals[prefetch_idx]);
+                // const auto prefetch_hash_idx = j % prefetch_step;
+                // const size_t hashval = hashvals[prefetch_hash_idx];
+                // const size_t prefetch_idx = j + prefetch_step;
+                // if likely (prefetch_idx < end)
+                // {
+                //     const auto new_hashval
+                //         = state.getHash(method.data, prefetch_idx, *aggregates_pool, sort_key_containers);
+                //     method.data.prefetch(new_hashval);
+                //     hashvals[prefetch_hash_idx] = new_hashval;
+                // }
 
                 auto emplace_result_holder
-                    = emplaceOrFindKey<only_lookup>(method, state, j, *aggregates_pool, sort_key_containers, hashval);
+                    = emplaceOrFindKey<only_lookup>(method, state, j, *aggregates_pool, sort_key_containers, hashvals[j]);
 
                 HANDLE_AGG_EMPLACE_RESULT
             }
