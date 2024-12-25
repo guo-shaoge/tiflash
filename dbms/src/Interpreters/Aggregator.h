@@ -1464,9 +1464,7 @@ protected:
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(
         Method & method,
         typename Method::State & state,
-        size_t index,
-        Arena & aggregates_pool,
-        std::vector<std::string> & sort_key_containers,
+        typename Method::State::Derived::KeyHolderType && key_holder,
         size_t hashval) const;
 
     template <bool only_lookup, typename Method>

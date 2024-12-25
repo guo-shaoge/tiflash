@@ -120,7 +120,7 @@ public:
     bool isFound() const { return found; }
 };
 
-template <typename Derived, typename Value, typename Mapped, bool consecutive_keys_optimization>
+template <typename TDerived, typename Value, typename Mapped, bool consecutive_keys_optimization>
 class HashMethodBase
 {
 public:
@@ -128,6 +128,7 @@ public:
     using FindResult = FindResultImpl<Mapped>;
     static constexpr bool has_mapped = !std::is_same<Mapped, VoidMapped>::value;
     using Cache = LastElementCache<Value, consecutive_keys_optimization>;
+    using Derived = TDerived;
 
     // Emplace key without hashval, and this method doesn't support prefetch.
     template <typename Data>
@@ -141,6 +142,7 @@ public:
         return emplaceImpl(key_holder, data);
     }
 
+    // TODO remove
     template <typename Data>
     ALWAYS_INLINE inline EmplaceResult emplaceKey(
         Data & data,
@@ -150,6 +152,15 @@ public:
         size_t hashval)
     {
         auto key_holder = static_cast<Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
+        return emplaceImpl(key_holder, data, hashval);
+    }
+
+    template <typename KeyHolder, typename Data>
+    ALWAYS_INLINE inline EmplaceResult emplaceKey(
+        Data & data,
+        KeyHolder && key_holder,
+        size_t hashval)
+    {
         return emplaceImpl(key_holder, data, hashval);
     }
 
@@ -164,6 +175,7 @@ public:
         return findKeyImpl(keyHolderGetKey(key_holder), data);
     }
 
+    // TODO remove
     template <typename Data>
     ALWAYS_INLINE inline FindResult findKey(
         Data & data,
@@ -173,6 +185,15 @@ public:
         size_t hashval)
     {
         auto key_holder = static_cast<Derived &>(*this).getKeyHolder(row, &pool, sort_key_containers);
+        return findKeyImpl(keyHolderGetKey(key_holder), data, hashval);
+    }
+
+    template <typename KeyHolder, typename Data>
+    ALWAYS_INLINE inline FindResult findKey(
+        Data & data,
+        KeyHolder && key_holder,
+        size_t hashval)
+    {
         return findKeyImpl(keyHolderGetKey(key_holder), data, hashval);
     }
 
