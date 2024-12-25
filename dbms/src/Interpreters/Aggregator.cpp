@@ -798,6 +798,10 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
 
     std::vector<size_t> hashvals;
     std::vector<typename Method::State::KeyHolderType> key_holders;
+
+    /// Optimization for special case when there are no aggregate functions.
+    if (params.aggregates_size == 0)
+    {
     if constexpr (enable_prefetch)
     {
         hashvals.resize(prefetch_step);
@@ -813,10 +817,6 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
             hashvals[i % prefetch_step] = hashval;
         }
     }
-
-    /// Optimization for special case when there are no aggregate functions.
-    if (params.aggregates_size == 0)
-    {
         /// For all rows.
         AggregateDataPtr place = aggregates_pool->alloc(0);
 #define HANDLE_AGG_EMPLACE_RESULT                                                                           \
@@ -968,6 +968,21 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
     size_t i = agg_process_info.start_row;
     const size_t end = agg_process_info.start_row + rows;
     const size_t mini_batch = end;
+    if constexpr (enable_prefetch)
+    {
+        hashvals.resize(state.total_rows);
+        key_holders.resize(state.total_rows);
+        for (size_t i = agg_process_info.start_row;
+             i < agg_process_info.start_row + rows;
+             ++i)
+        {
+            auto key_holder = static_cast<typename Method::State::Derived *>(&state)->getKeyHolder(i, aggregates_pool, sort_key_containers);
+            const size_t hashval = method.data.hash(keyHolderGetKey(key_holder));
+
+            key_holders[i ] = std::move(key_holder);
+            hashvals[i ] = hashval;
+        }
+    }
     // i is the begin row index of each mini batch.
     while (i < end)
     {
@@ -982,19 +997,22 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
             AggregateDataPtr aggregate_data = nullptr;
             if constexpr (enable_prefetch)
             {
-                auto [key_holder, hashval] = getCurrentHashAndDoPrefetch(
-                    j,
-                    end,
-                    prefetch_step,
-                    method,
-                    state,
-                    aggregates_pool,
-                    sort_key_containers,
-                    hashvals,
-                    key_holders);
+                // auto [key_holder, hashval] = getCurrentHashAndDoPrefetch(
+                //     j,
+                //     end,
+                //     prefetch_step,
+                //     method,
+                //     state,
+                //     aggregates_pool,
+                //     sort_key_containers,
+                //     hashvals,
+                //     key_holders);
+
+                if likely (j + 16 < end)
+                    method.data.prefetch(hashvals[j + 16]);
 
                 auto emplace_result_holder
-                    = emplaceOrFindKey<only_lookup>(method, state, std::move(key_holder), hashval);
+                    = emplaceOrFindKey<only_lookup>(method, state, std::move(key_holders[j]), hashvals[j]);
 
                 HANDLE_AGG_EMPLACE_RESULT
             }
