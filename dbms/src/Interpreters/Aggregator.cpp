@@ -746,8 +746,8 @@ std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::Res
 
 template <typename Method>
 ALWAYS_INLINE inline std::pair<typename Method::State::Derived::KeyHolderType, size_t> getCurrentHashAndDoPrefetch(
-    size_t row_idx,
-    size_t end_idx,
+    size_t cur_row_idx,
+    size_t end_row_idx,
     size_t prefetch_step,
     Method & method,
     typename Method::State & state,
@@ -758,23 +758,23 @@ ALWAYS_INLINE inline std::pair<typename Method::State::Derived::KeyHolderType, s
 {
     assert(hashvals.size() == prefetch_step);
 
-    const auto prefetch_hash_idx = row_idx % prefetch_step;
-    const size_t prefetch_idx = row_idx + prefetch_step;
+    const auto hashvals_idx = cur_row_idx % prefetch_step;
+    const size_t prefetch_row_idx = cur_row_idx + prefetch_step;
 
-    const size_t cur_hashval = hashvals[prefetch_hash_idx];
-    auto cur_key_holder = key_holders[prefetch_hash_idx];
+    const size_t cur_hashval = hashvals[hashvals_idx];
+    auto cur_key_holder = std::move(key_holders[hashvals_idx]);
 
-    if likely (prefetch_idx < end_idx)
+    if likely (prefetch_row_idx < end_row_idx)
     {
-        auto key_holder = static_cast<typename Method::State::Derived *>(&state)->getKeyHolder(row_idx, aggregates_pool, sort_key_containers);
-        key_holders[prefetch_hash_idx] = std::move(key_holder);
-
+        auto key_holder = static_cast<typename Method::State::Derived *>(&state)->getKeyHolder(prefetch_row_idx, aggregates_pool, sort_key_containers);
         const size_t new_hashval = method.data.hash(keyHolderGetKey(key_holder));
-        hashvals[prefetch_hash_idx] = new_hashval;
+
+        key_holders[hashvals_idx] = std::move(key_holder);
+        hashvals[hashvals_idx] = new_hashval;
 
         method.data.prefetch(new_hashval);
     }
-    return {std::move(cur_key_holder), cur_hashval};
+    return {cur_key_holder, cur_hashval};
 }
 
 template <bool collect_hit_rate, bool only_lookup, bool enable_prefetch, typename Method>
@@ -807,9 +807,9 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
              ++i)
         {
             auto key_holder = static_cast<typename Method::State::Derived *>(&state)->getKeyHolder(i, aggregates_pool, sort_key_containers);
-            key_holders[i % prefetch_step] = std::move(key_holder);
-
             const size_t hashval = method.data.hash(keyHolderGetKey(key_holder));
+
+            key_holders[i % prefetch_step] = std::move(key_holder);
             hashvals[i % prefetch_step] = hashval;
         }
     }
