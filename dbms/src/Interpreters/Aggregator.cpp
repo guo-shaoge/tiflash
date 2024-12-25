@@ -967,7 +967,7 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
 
     size_t i = agg_process_info.start_row;
     const size_t end = agg_process_info.start_row + rows;
-    const size_t mini_batch = 256;
+    const size_t mini_batch = end;
     // i is the begin row index of each mini batch.
     while (i < end)
     {
