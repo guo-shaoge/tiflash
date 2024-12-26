@@ -967,7 +967,7 @@ ALWAYS_INLINE void Aggregator::executeImplByRow(
 
     size_t i = agg_process_info.start_row;
     const size_t end = agg_process_info.start_row + rows;
-    const size_t mini_batch = end;
+    const size_t mini_batch = 256;
     if constexpr (enable_prefetch)
     {
         hashvals.resize(state.total_rows);
