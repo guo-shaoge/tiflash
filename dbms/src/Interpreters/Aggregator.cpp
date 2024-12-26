@@ -1842,8 +1842,8 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
     }
 
     size_t data_index = 0;
-    const auto rows = data.size();
-    std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[rows]);
+    // const auto rows = data.size();
+    // std::unique_ptr<AggregateDataPtr[]> places(new AggregateDataPtr[rows]);
 
     data.forEachValue([&](const auto & key [[maybe_unused]], auto & mapped) {
         size_t key_columns_vec_index = data_index / params.max_block_size;
@@ -1852,19 +1852,20 @@ void NO_INLINE Aggregator::convertToBlocksImplFinal(
             agg_keys_helpers[key_columns_vec_index]
                 ->insertKeyIntoColumns(key, key_columns_vec[key_columns_vec_index], key_sizes_ref, params.collators);
         }
-        places[data_index] = mapped;
+        // places[data_index] = mapped;
+        insertAggregatesIntoColumns(mapped, final_aggregate_columns_vec[key_columns_vec_index], arena);
         ++data_index;
     });
 
-    size_t prefetch_idx = 16;
-    for (size_t i = 0; i < rows; ++i)
-    {
-        if (prefetch_idx < rows)
-            __builtin_prefetch(places[prefetch_idx++]);
+    // size_t prefetch_idx = 16;
+    // for (size_t i = 0; i < rows; ++i)
+    // {
+    //     if (prefetch_idx < rows)
+    //         __builtin_prefetch(places[prefetch_idx++]);
 
-        size_t key_columns_vec_index = i / params.max_block_size;
-        insertAggregatesIntoColumns(places[i], final_aggregate_columns_vec[key_columns_vec_index], arena);
-    }
+    //     size_t key_columns_vec_index = i / params.max_block_size;
+    //     insertAggregatesIntoColumns(places[i], final_aggregate_columns_vec[key_columns_vec_index], arena);
+    // }
 }
 
 template <typename Method, typename Table, bool skip_convert_key>
