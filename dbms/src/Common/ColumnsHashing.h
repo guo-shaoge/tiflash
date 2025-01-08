@@ -388,14 +388,14 @@ struct KeySerializedBatchHandlerBase
         batch_row_idx += len;
     }
 
-    ALWAYS_INLINE inline SerializedKeyHolder getKeyHolder(ssize_t row) const
+    ALWAYS_INLINE inline SerializedKeyHolder getKeyHolderBatch(ssize_t row, Arena * pool) const
     {
         // Make sure init() must be called before getKeyHolder().
         assert(batch_size > 256 && batch_size == pos.size() && ori_pos.size() == pos.size() && real_byte_size.size() == pos.size());
         assert(row < batch_row_idx + batch_size);
 
         const auto idx = row % batch_size;
-        return SerializedKeyHolder{ori_pos[idx], real_byte_size[idx]};
+        return SerializedKeyHolder{StringRef{ori_pos[idx], real_byte_size[idx]}, pool};
     }
 };
 
@@ -403,10 +403,10 @@ struct KeySerializedBatchHandlerBase
 template <typename Key1Desc, typename Key2Desc, typename Value, typename Mapped, size_t batch_size = 0>
 struct HashMethodFastPathTwoKeysSerialized
     : public columns_hashing_impl::
-          HashMethodBase<HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped>, Value, Mapped, false>,
+          HashMethodBase<HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped, batch_size>, Value, Mapped, false>,
           KeySerializedBatchHandlerBase<batch_size>
 {
-    using Self = HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped>;
+    using Self = HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped, batch_size>;
     using Base = columns_hashing_impl::HashMethodBase<Self, Value, Mapped, false>;
     using BatchHandlerBase = KeySerializedBatchHandlerBase<batch_size>;
     using KeyHolderType = SerializedKeyHolder;
@@ -442,7 +442,7 @@ struct HashMethodFastPathTwoKeysSerialized
     {
         if constexpr (batch_size > 0)
         {
-            return BatchHandlerBase::getKeyHolder(row);
+            return BatchHandlerBase::getKeyHolderBatch(row, pool);
         }
         else
         {
@@ -671,10 +671,10 @@ struct HashMethodKeysFixed
   */
 template <typename Value, typename Mapped, size_t batch_size = 0>
 struct HashMethodSerialized
-    : public columns_hashing_impl::HashMethodBase<HashMethodSerialized<Value, Mapped>, Value, Mapped, false>,
+    : public columns_hashing_impl::HashMethodBase<HashMethodSerialized<Value, Mapped, batch_size>, Value, Mapped, false>,
           KeySerializedBatchHandlerBase<batch_size>
 {
-    using Self = HashMethodSerialized<Value, Mapped>;
+    using Self = HashMethodSerialized<Value, Mapped, batch_size>;
     using Base = columns_hashing_impl::HashMethodBase<Self, Value, Mapped, false>;
     using BatchHandlerBase = KeySerializedBatchHandlerBase<batch_size>;
     using KeyHolderType = SerializedKeyHolder;
@@ -711,7 +711,7 @@ struct HashMethodSerialized
         const
     {
         if constexpr (batch_size > 0)
-            return BatchHandlerBase::getKeyHolderBatch(row);
+            return BatchHandlerBase::getKeyHolderBatch(row, pool);
         else
             return SerializedKeyHolder{
                 serializeKeysToPoolContiguous(row, keys_size, key_columns, collators, sort_key_containers, *pool),
