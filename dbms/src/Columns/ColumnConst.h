@@ -112,9 +112,27 @@ public:
         return res;
     }
 
+    void countSerializeByteSizeUnique(
+        PaddedPODArray<size_t> & /* byte_size */,
+        const TiDB::TiDBCollatorPtr & /* collator */) const override
+    {
+        throw Exception(
+            "Method countSerializeByteSizeUnique is not supported for " + getName(),
+            ErrorCodes::NOT_IMPLEMENTED);
+    }
     void countSerializeByteSize(PaddedPODArray<size_t> & /* byte_size */) const override
     {
         throw Exception("Method countSerializeByteSize is not supported for " + getName(), ErrorCodes::NOT_IMPLEMENTED);
+    }
+
+    void countSerializeByteSizeUniqueForColumnArray(
+        PaddedPODArray<size_t> & /* byte_size */,
+        const IColumn::Offsets & /* array_offsets */,
+        const TiDB::TiDBCollatorPtr & /* collaotr */) const override
+    {
+        throw Exception(
+            "Method countSerializeByteSizeUniqueForColumnArray is not supported for " + getName(),
+            ErrorCodes::NOT_IMPLEMENTED);
     }
     void countSerializeByteSizeForColumnArray(
         PaddedPODArray<size_t> & /* byte_size */,
@@ -125,6 +143,16 @@ public:
             ErrorCodes::NOT_IMPLEMENTED);
     }
 
+    void serializeToPosUnique(
+        PaddedPODArray<char *> & /* pos */,
+        size_t /* start */,
+        size_t /* length */,
+        bool /* has_null */,
+        const TiDB::TiDBCollatorPtr & /* collator */,
+        String * /* sort_key_container */) const override
+    {
+        throw Exception("Method serializeToPosUnique is not supported for " + getName(), ErrorCodes::NOT_IMPLEMENTED);
+    }
     void serializeToPos(
         PaddedPODArray<char *> & /* pos */,
         size_t /* start */,
@@ -132,6 +160,20 @@ public:
         bool /* has_null */) const override
     {
         throw Exception("Method serializeToPos is not supported for " + getName(), ErrorCodes::NOT_IMPLEMENTED);
+    }
+
+    void serializeToPosUniqueForColumnArray(
+        PaddedPODArray<char *> & /* pos */,
+        size_t /* start */,
+        size_t /* length */,
+        bool /* has_null */,
+        const IColumn::Offsets & /* array_offsets */,
+        const TiDB::TiDBCollatorPtr & /* collator */,
+        String * /* sort_key_container */) const override
+    {
+        throw Exception(
+            "Method serializeToPosUniqueForColumnArray is not supported for " + getName(),
+            ErrorCodes::NOT_IMPLEMENTED);
     }
     void serializeToPosForColumnArray(
         PaddedPODArray<char *> & /* pos */,
@@ -145,14 +187,34 @@ public:
             ErrorCodes::NOT_IMPLEMENTED);
     }
 
-    void deserializeAndInsertFromPos(PaddedPODArray<char *> & /* pos */, bool /* use_nt_align_buffer */) override
+    void deserializeAndInsertFromPosUnique(
+        PaddedPODArray<const char *> & /* pos */,
+        bool /* use_nt_align_buffer */,
+        const TiDB::TiDBCollatorPtr & /* collator */) override
+    {
+        throw Exception(
+            "Method deserializeAndInsertFromPosUnique is not supported for " + getName(),
+            ErrorCodes::NOT_IMPLEMENTED);
+    }
+    void deserializeAndInsertFromPos(PaddedPODArray<const char *> & /* pos */, bool /* use_nt_align_buffer */) override
     {
         throw Exception(
             "Method deserializeAndInsertFromPos is not supported for " + getName(),
             ErrorCodes::NOT_IMPLEMENTED);
     }
+
+    void deserializeAndInsertFromPosUniqueForColumnArray(
+        PaddedPODArray<const char *> & /* pos */,
+        const IColumn::Offsets & /* array_offsets */,
+        bool /* use_nt_align_buffer */,
+        const TiDB::TiDBCollatorPtr & /* collator */) override
+    {
+        throw Exception(
+            "Method deserializeAndInsertFromPosUniqueForColumnArray is not supported for " + getName(),
+            ErrorCodes::NOT_IMPLEMENTED);
+    }
     void deserializeAndInsertFromPosForColumnArray(
-        PaddedPODArray<char *> & /* pos */,
+        PaddedPODArray<const char *> & /* pos */,
         const IColumn::Offsets & /* array_offsets */,
         bool /* use_nt_align_buffer */) override
     {

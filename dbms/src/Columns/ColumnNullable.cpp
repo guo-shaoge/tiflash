@@ -282,12 +282,27 @@ const char * ColumnNullable::deserializeAndInsertFromArena(const char * pos, con
     return pos;
 }
 
+void ColumnNullable::countSerializeByteSizeUnique(
+    PaddedPODArray<size_t> & byte_size,
+    const TiDB::TiDBCollatorPtr & collator) const
+{
+    getNullMapColumn().countSerializeByteSizeUnique(byte_size, collator);
+    getNestedColumn().countSerializeByteSizeUnique(byte_size, collator);
+}
 void ColumnNullable::countSerializeByteSize(PaddedPODArray<size_t> & byte_size) const
 {
     getNullMapColumn().countSerializeByteSize(byte_size);
     getNestedColumn().countSerializeByteSize(byte_size);
 }
 
+void ColumnNullable::countSerializeByteSizeUniqueForColumnArray(
+    PaddedPODArray<size_t> & byte_size,
+    const IColumn::Offsets & array_offsets,
+    const TiDB::TiDBCollatorPtr & collator) const
+{
+    getNullMapColumn().countSerializeByteSizeUniqueForColumnArray(byte_size, array_offsets, collator);
+    getNestedColumn().countSerializeByteSizeUniqueForColumnArray(byte_size, array_offsets, collator);
+}
 void ColumnNullable::countSerializeByteSizeForColumnArray(
     PaddedPODArray<size_t> & byte_size,
     const IColumn::Offsets & array_offsets) const
@@ -296,12 +311,37 @@ void ColumnNullable::countSerializeByteSizeForColumnArray(
     getNestedColumn().countSerializeByteSizeForColumnArray(byte_size, array_offsets);
 }
 
+void ColumnNullable::serializeToPosUnique(
+    PaddedPODArray<char *> & pos,
+    size_t start,
+    size_t length,
+    bool has_null,
+    const TiDB::TiDBCollatorPtr & collator,
+    String * sort_key_container) const
+{
+    getNullMapColumn().serializeToPosUnique(pos, start, length, has_null, collator, sort_key_container);
+    getNestedColumn().serializeToPosUnique(pos, start, length, has_null, collator, sort_key_container);
+}
 void ColumnNullable::serializeToPos(PaddedPODArray<char *> & pos, size_t start, size_t length, bool has_null) const
 {
     getNullMapColumn().serializeToPos(pos, start, length, has_null);
     getNestedColumn().serializeToPos(pos, start, length, has_null);
 }
 
+void ColumnNullable::serializeToPosUniqueForColumnArray(
+    PaddedPODArray<char *> & pos,
+    size_t start,
+    size_t length,
+    bool has_null,
+    const IColumn::Offsets & array_offsets,
+    const TiDB::TiDBCollatorPtr & collator,
+    String * sort_key_container) const
+{
+    getNullMapColumn()
+        .serializeToPosUniqueForColumnArray(pos, start, length, has_null, array_offsets, collator, sort_key_container);
+    getNestedColumn()
+        .serializeToPosUniqueForColumnArray(pos, start, length, has_null, array_offsets, collator, sort_key_container);
+}
 void ColumnNullable::serializeToPosForColumnArray(
     PaddedPODArray<char *> & pos,
     size_t start,
@@ -313,14 +353,33 @@ void ColumnNullable::serializeToPosForColumnArray(
     getNestedColumn().serializeToPosForColumnArray(pos, start, length, has_null, array_offsets);
 }
 
-void ColumnNullable::deserializeAndInsertFromPos(PaddedPODArray<char *> & pos, bool use_nt_align_buffer)
+void ColumnNullable::deserializeAndInsertFromPosUnique(
+    PaddedPODArray<const char *> & pos,
+    bool use_nt_align_buffer,
+    const TiDB::TiDBCollatorPtr & collator)
+{
+    getNullMapColumn().deserializeAndInsertFromPosUnique(pos, use_nt_align_buffer, collator);
+    getNestedColumn().deserializeAndInsertFromPosUnique(pos, use_nt_align_buffer, collator);
+}
+void ColumnNullable::deserializeAndInsertFromPos(PaddedPODArray<const char *> & pos, bool use_nt_align_buffer)
 {
     getNullMapColumn().deserializeAndInsertFromPos(pos, use_nt_align_buffer);
     getNestedColumn().deserializeAndInsertFromPos(pos, use_nt_align_buffer);
 }
 
+void ColumnNullable::deserializeAndInsertFromPosUniqueForColumnArray(
+    PaddedPODArray<const char *> & pos,
+    const IColumn::Offsets & array_offsets,
+    bool use_nt_align_buffer,
+    const TiDB::TiDBCollatorPtr & collator)
+{
+    getNullMapColumn()
+        .deserializeAndInsertFromPosUniqueForColumnArray(pos, array_offsets, use_nt_align_buffer, collator);
+    getNestedColumn()
+        .deserializeAndInsertFromPosUniqueForColumnArray(pos, array_offsets, use_nt_align_buffer, collator);
+}
 void ColumnNullable::deserializeAndInsertFromPosForColumnArray(
-    PaddedPODArray<char *> & pos,
+    PaddedPODArray<const char *> & pos,
     const IColumn::Offsets & array_offsets,
     bool use_nt_align_buffer)
 {

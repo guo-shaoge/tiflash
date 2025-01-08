@@ -44,6 +44,23 @@ private:
 
     ColumnArray(const ColumnArray &) = default;
 
+    template <bool ensure_unique>
+    void countSerializeByteSizeImpl(PaddedPODArray<size_t> & byte_size, const TiDB::TiDBCollatorPtr & collator) const;
+
+    template <bool has_null, bool ensure_unique>
+    void serializeToPosImpl(
+        PaddedPODArray<char *> & pos,
+        size_t start,
+        size_t length,
+        const TiDB::TiDBCollatorPtr & collator,
+        String * sort_key_container) const;
+
+    template <bool ensure_unique>
+    void deserializeAndInsertFromPosImpl(
+        PaddedPODArray<const char *> & pos,
+        bool use_nt_align_buffer,
+        const TiDB::TiDBCollatorPtr & collator);
+
 public:
     /** Create immutable column using immutable arguments. This arguments may be shared with other columns.
       * Use IColumn::mutate in order to make mutable column and mutate shared nested columns.
@@ -82,7 +99,19 @@ public:
         String &) const override;
     const char * deserializeAndInsertFromArena(const char * pos, const TiDB::TiDBCollatorPtr &) override;
 
+    void countSerializeByteSizeUnique(PaddedPODArray<size_t> & byte_size, const TiDB::TiDBCollatorPtr & collator)
+        const override;
     void countSerializeByteSize(PaddedPODArray<size_t> & byte_size) const override;
+
+    void countSerializeByteSizeUniqueForColumnArray(
+        PaddedPODArray<size_t> & /* byte_size */,
+        const IColumn::Offsets & /* array_offsets */,
+        const TiDB::TiDBCollatorPtr & /* collator */) const override
+    {
+        throw Exception(
+            "Method countSerializeByteSizeUniqueForColumnArray is not supported for " + getName(),
+            ErrorCodes::NOT_IMPLEMENTED);
+    }
     void countSerializeByteSizeForColumnArray(
         PaddedPODArray<size_t> & /* byte_size */,
         const IColumn::Offsets & /* array_offsets */) const override
@@ -92,10 +121,28 @@ public:
             ErrorCodes::NOT_IMPLEMENTED);
     }
 
+    void serializeToPosUnique(
+        PaddedPODArray<char *> & pos,
+        size_t start,
+        size_t length,
+        bool has_null,
+        const TiDB::TiDBCollatorPtr & collator,
+        String * sort_key_container) const override;
     void serializeToPos(PaddedPODArray<char *> & pos, size_t start, size_t length, bool has_null) const override;
-    template <bool has_null>
-    void serializeToPosImpl(PaddedPODArray<char *> & pos, size_t start, size_t length) const;
 
+    void serializeToPosUniqueForColumnArray(
+        PaddedPODArray<char *> & /* pos */,
+        size_t /* start */,
+        size_t /* length */,
+        bool /* has_null */,
+        const IColumn::Offsets & /* array_offsets */,
+        const TiDB::TiDBCollatorPtr & /* collator */,
+        String * /* sort_key_container */) const override
+    {
+        throw Exception(
+            "Method serializeToPosUniqueForColumnArray is not supported for " + getName(),
+            ErrorCodes::NOT_IMPLEMENTED);
+    }
     void serializeToPosForColumnArray(
         PaddedPODArray<char *> & /* pos */,
         size_t /* start */,
@@ -108,9 +155,24 @@ public:
             ErrorCodes::NOT_IMPLEMENTED);
     }
 
-    void deserializeAndInsertFromPos(PaddedPODArray<char *> & pos, bool use_nt_align_buffer) override;
+    void deserializeAndInsertFromPosUnique(
+        PaddedPODArray<const char *> & pos,
+        bool use_nt_align_buffer,
+        const TiDB::TiDBCollatorPtr & collator) override;
+    void deserializeAndInsertFromPos(PaddedPODArray<const char *> & pos, bool use_nt_align_buffer) override;
+
+    void deserializeAndInsertFromPosUniqueForColumnArray(
+        PaddedPODArray<const char *> & /* pos */,
+        const IColumn::Offsets & /* array_offsets */,
+        bool /* use_nt_align_buffer */,
+        const TiDB::TiDBCollatorPtr & /* collator */) override
+    {
+        throw Exception(
+            "Method deserializeAndInsertFromPosUniqueForColumnArray is not supported for " + getName(),
+            ErrorCodes::NOT_IMPLEMENTED);
+    }
     void deserializeAndInsertFromPosForColumnArray(
-        PaddedPODArray<char *> & /* pos */,
+        PaddedPODArray<const char *> & /* pos */,
         const IColumn::Offsets & /* array_offsets */,
         bool /* use_nt_align_buffer */) override
     {
