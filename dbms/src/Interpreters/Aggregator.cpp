@@ -46,9 +46,6 @@ extern const char random_fail_in_resize_callback[];
 extern const char force_agg_prefetch[];
 } // namespace FailPoints
 
-static constexpr size_t agg_prefetch_step = 16;
-static constexpr size_t agg_mini_batch = 256;
-
 #define AggregationMethodName(NAME) AggregatedDataVariants::AggregationMethod_##NAME
 #define AggregationMethodNameTwoLevel(NAME) AggregatedDataVariants::AggregationMethod_##NAME##_two_level
 #define AggregationMethodType(NAME) AggregatedDataVariants::Type::NAME
@@ -680,6 +677,10 @@ void NO_INLINE Aggregator::executeImpl(
 
     if constexpr (Method::State::is_serialized_key)
     {
+        // For key_serialized, memory allocation and key serialization will be batch-wise.
+        // Need to init batch handler.
+        state.initBatchHandler(agg_process_info.start_row);
+
         executeImplMiniBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
     }
     else if constexpr (Method::Data::is_string_hash_map)
@@ -742,7 +743,7 @@ std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::Res
 }
 
 template <typename Method>
-ALWAYS_INLINE inline void prepareBatch(
+ALWAYS_INLINE inline void prepareNextBatch(
     size_t row_idx,
     size_t end_row,
     std::vector<size_t> & hashvals,
@@ -754,12 +755,18 @@ ALWAYS_INLINE inline void prepareBatch(
 {
     assert(hashvals.size() == key_holders.size());
 
+    if constexpr (Method::State::is_serialized_key)
+    {
+        assert(hashvals.size() == state.getBatchSize());
+        state.prepareNextBatch(aggregates_pool);
+    }
+
     for (size_t i = row_idx, j = 0; i < row_idx + hashvals.size() && i < end_row; ++i, ++j)
     {
         key_holders[j] = static_cast<typename Method::State::Derived *>(&state)->getKeyHolder(
-            i,
-            aggregates_pool,
-            sort_key_containers);
+                i,
+                aggregates_pool,
+                sort_key_containers);
         hashvals[j] = method.data.hash(keyHolderGetKey(key_holders[j]));
     }
 }
@@ -866,7 +873,7 @@ void Aggregator::handleMiniBatchImpl(
             batch_size = end - i;
 
         if constexpr (enable_prefetch)
-            prepareBatch(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
+            prepareNextBatch(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
 
         const auto cur_batch_end = i + batch_size;
         // j is the row index of Column.
