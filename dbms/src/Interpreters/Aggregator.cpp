@@ -758,9 +758,9 @@ ALWAYS_INLINE inline void setupHashVals(
     for (size_t i = row_idx, j = 0; i < row_idx + hashvals.size() && i < end_row; ++i, ++j)
     {
         key_holders[j] = static_cast<typename Method::State::Derived *>(&state)->getKeyHolder(
-                i,
-                aggregates_pool,
-                sort_key_containers);
+            i,
+            aggregates_pool,
+            sort_key_containers);
         hashvals[j] = method.data.hash(keyHolderGetKey(key_holders[j]));
     }
 }
@@ -876,7 +876,8 @@ void Aggregator::handleMiniBatchImpl(
         }
 
         if constexpr (enable_prefetch)
-            setupHashVals<enable_prefetch>(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
+            setupHashVals<
+                enable_prefetch>(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
 
         const auto cur_batch_end = i + batch_size;
         // j is the row index of Column.

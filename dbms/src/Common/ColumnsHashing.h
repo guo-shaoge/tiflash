@@ -361,7 +361,9 @@ struct KeySerializedBatchHandlerBase
     size_t prepareNextBatch(const ColumnRawPtrs & key_columns, Arena * pool, const TiDB::TiDBCollators & collators)
     {
         // Make sure init() must be called before prepareNextBatch().
-        assert(batch_size >= 256 && batch_size == pos.size() && ori_pos.size() == pos.size() && real_byte_size.size() == pos.size());
+        assert(
+            batch_size >= 256 && batch_size == pos.size() && ori_pos.size() == pos.size()
+            && real_byte_size.size() == pos.size());
 
         const auto len = std::min(batch_size, key_columns[0]->size() - batch_row_idx);
         if unlikely (len <= 0)
@@ -380,7 +382,13 @@ struct KeySerializedBatchHandlerBase
         }
 
         for (size_t i = 0; i < key_columns.size(); ++i)
-            key_columns[i]->serializeToPosUnique(pos, batch_row_idx, len, false, collators.empty() ? nullptr : collators[i], &sort_key_container);
+            key_columns[i]->serializeToPosUnique(
+                pos,
+                batch_row_idx,
+                len,
+                false,
+                collators.empty() ? nullptr : collators[i],
+                &sort_key_container);
 
         for (size_t i = 0; i < len; ++i)
             real_byte_size[i] = pos[i] - ori_pos[i];
@@ -393,7 +401,9 @@ struct KeySerializedBatchHandlerBase
     ALWAYS_INLINE inline ArenaKeyHolder getKeyHolderBatch(ssize_t row, Arena * pool) const
     {
         // Make sure init() must be called before getKeyHolder().
-        assert(batch_size >= 256 && batch_size == pos.size() && ori_pos.size() == pos.size() && real_byte_size.size() == pos.size());
+        assert(
+            batch_size >= 256 && batch_size == pos.size() && ori_pos.size() == pos.size()
+            && real_byte_size.size() == pos.size());
         assert(static_cast<size_t>(row) < batch_row_idx + batch_size);
 
         const auto idx = row % batch_size;
@@ -404,9 +414,12 @@ struct KeySerializedBatchHandlerBase
 /// For the case when there are 2 keys.
 template <typename Key1Desc, typename Key2Desc, typename Value, typename Mapped, size_t batch_size = 0>
 struct HashMethodFastPathTwoKeysSerialized
-    : public columns_hashing_impl::
-          HashMethodBase<HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped, batch_size>, Value, Mapped, false>,
-          KeySerializedBatchHandlerBase<batch_size>
+    : public columns_hashing_impl::HashMethodBase<
+          HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped, batch_size>,
+          Value,
+          Mapped,
+          false>
+    , KeySerializedBatchHandlerBase<batch_size>
 {
     using Self = HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped, batch_size>;
     using Base = columns_hashing_impl::HashMethodBase<Self, Value, Mapped, false>;
@@ -422,13 +435,16 @@ struct HashMethodFastPathTwoKeysSerialized
     Key2Desc key_2_desc;
     TiDB::TiDBCollators collators;
 
-    HashMethodFastPathTwoKeysSerialized(const ColumnRawPtrs & key_columns_, const Sizes &, const TiDB::TiDBCollators & collators_)
+    HashMethodFastPathTwoKeysSerialized(
+        const ColumnRawPtrs & key_columns_,
+        const Sizes &,
+        const TiDB::TiDBCollators & collators_)
         : key_columns(key_columns_)
         , key_1_desc(key_columns_[0])
         , key_2_desc(key_columns_[1])
         , collators(collators_)
     {}
-    
+
     void initBatchHandler(size_t start_row)
     {
         if constexpr (enable_batch)
@@ -450,7 +466,6 @@ struct HashMethodFastPathTwoKeysSerialized
         }
         else
         {
-            RUNTIME_CHECK_MSG(false, "gjt debug getKeyHolder false");
             StringRef key1;
             StringRef key2;
             size_t alloc_size = key_1_desc.getKey(row, key1) + key_2_desc.getKey(row, key2);
@@ -676,8 +691,8 @@ struct HashMethodKeysFixed
   */
 template <typename Value, typename Mapped, size_t batch_size = 0>
 struct HashMethodSerialized
-    : public columns_hashing_impl::HashMethodBase<HashMethodSerialized<Value, Mapped, batch_size>, Value, Mapped, false>,
-          KeySerializedBatchHandlerBase<batch_size>
+    : public columns_hashing_impl::HashMethodBase<HashMethodSerialized<Value, Mapped, batch_size>, Value, Mapped, false>
+    , KeySerializedBatchHandlerBase<batch_size>
 {
     using Self = HashMethodSerialized<Value, Mapped, batch_size>;
     using Base = columns_hashing_impl::HashMethodBase<Self, Value, Mapped, false>;
@@ -721,7 +736,6 @@ struct HashMethodSerialized
             return BatchHandlerBase::getKeyHolderBatch(row, pool);
         else
         {
-            RUNTIME_CHECK_MSG(false, "gjt debug getKeyHolder false");
             return SerializedKeyHolder{
                 serializeKeysToPoolContiguous(row, keys_size, key_columns, collators, sort_key_containers, *pool),
                 pool};

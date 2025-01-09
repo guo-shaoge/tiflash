@@ -361,8 +361,8 @@ struct AggregationMethodFastPathTwoKeysNoCache
         : data(other.data)
     {}
 
-    using State
-        = ColumnsHashing::HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, typename Data::value_type, Mapped, agg_mini_batch>;
+    using State = ColumnsHashing::
+        HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, typename Data::value_type, Mapped, agg_mini_batch>;
     template <bool only_lookup>
     struct EmplaceOrFindKeyResult
     {
