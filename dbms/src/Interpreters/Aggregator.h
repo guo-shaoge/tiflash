@@ -53,7 +53,7 @@ template <typename Method>
 class AggHashTableToBlocksBlockInputStream;
 
 static constexpr size_t agg_prefetch_step = 16;
-static constexpr size_t agg_mini_batch = 256;
+static constexpr size_t agg_mini_batch = 65536;
 
 /** Different data structures that can be used for aggregation
   * For efficiency, the aggregation data itself is put into the pool.
