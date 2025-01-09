@@ -250,7 +250,8 @@ public:
         const TiDB::TiDBCollatorPtr & collator,
         String & sort_key_container) const override
     {
-        size_t string_size = sizeAt(n);
+        // size_t string_size = sizeAt(n);
+        auto string_size = static_cast<UInt32>(sizeAt(n));
         size_t offset = offsetAt(n);
         const void * src = &chars[offset];
 
@@ -261,7 +262,7 @@ public:
             // Skip last zero byte.
             auto sort_key
                 = collator->sortKeyFastPath(reinterpret_cast<const char *>(src), string_size - 1, sort_key_container);
-            string_size = sort_key.size;
+            string_size = static_cast<UInt32>(sort_key.size);
             src = sort_key.data;
         }
         res.size = sizeof(string_size) + string_size;
@@ -274,7 +275,8 @@ public:
 
     inline const char * deserializeAndInsertFromArena(const char * pos, const TiDB::TiDBCollatorPtr & collator) override
     {
-        const size_t string_size = *reinterpret_cast<const size_t *>(pos);
+        // const size_t string_size = *reinterpret_cast<const size_t *>(pos);
+        const UInt32 string_size = *reinterpret_cast<const UInt32 *>(pos);
         pos += sizeof(string_size);
         if (likely(collator != nullptr))
             insertData(pos, string_size);

@@ -450,6 +450,7 @@ struct HashMethodFastPathTwoKeysSerialized
         }
         else
         {
+            RUNTIME_CHECK_MSG(false, "gjt debug getKeyHolder false");
             StringRef key1;
             StringRef key2;
             size_t alloc_size = key_1_desc.getKey(row, key1) + key_2_desc.getKey(row, key2);
@@ -719,9 +720,12 @@ struct HashMethodSerialized
         if constexpr (enable_batch)
             return BatchHandlerBase::getKeyHolderBatch(row, pool);
         else
+        {
+            RUNTIME_CHECK_MSG(false, "gjt debug getKeyHolder false");
             return SerializedKeyHolder{
                 serializeKeysToPoolContiguous(row, keys_size, key_columns, collators, sort_key_containers, *pool),
                 pool};
+        }
     }
 
 protected:
