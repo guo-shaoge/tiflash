@@ -742,8 +742,8 @@ std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::Res
     }
 }
 
-template <typename Method>
-ALWAYS_INLINE inline void prepareNextBatch(
+template <bool enable_prefetch, typename Method>
+ALWAYS_INLINE inline void setupHashVals(
     size_t row_idx,
     size_t end_row,
     std::vector<size_t> & hashvals,
@@ -754,12 +754,6 @@ ALWAYS_INLINE inline void prepareNextBatch(
     typename Method::State & state)
 {
     assert(hashvals.size() == key_holders.size());
-
-    if constexpr (Method::State::is_serialized_key)
-    {
-        assert(hashvals.size() == state.getBatchSize());
-        state.prepareNextBatch(aggregates_pool);
-    }
 
     for (size_t i = row_idx, j = 0; i < row_idx + hashvals.size() && i < end_row; ++i, ++j)
     {
@@ -865,6 +859,7 @@ void Aggregator::handleMiniBatchImpl(
     std::vector<size_t> hashvals(agg_mini_batch);
     std::vector<typename Method::State::KeyHolderType> key_holders(agg_mini_batch);
 
+    Arena temp_batch_pool;
     // i is the begin row index of each mini batch.
     while (i < end)
     {
@@ -872,8 +867,16 @@ void Aggregator::handleMiniBatchImpl(
         if unlikely (i + batch_size > end)
             batch_size = end - i;
 
+        size_t batch_mem_size = 0;
+        if constexpr (Method::State::is_serialized_key)
+        {
+            // todo
+            // assert(hashvals.size() == state.getBatchSize());
+            batch_mem_size = state.prepareNextBatch(&temp_batch_pool);
+        }
+
         if constexpr (enable_prefetch)
-            prepareNextBatch(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
+            setupHashVals<enable_prefetch>(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
 
         const auto cur_batch_end = i + batch_size;
         // j is the row index of Column.
@@ -956,6 +959,9 @@ void Aggregator::handleMiniBatchImpl(
                 places[index_relative_to_start_row] = aggregate_data;
             processed_rows = j;
         }
+
+        if constexpr (Method::State::is_serialized_key)
+            temp_batch_pool.rollback(batch_mem_size);
 
         if unlikely (!processed_rows.has_value())
             break;
