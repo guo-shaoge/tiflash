@@ -1469,6 +1469,15 @@ protected:
         AggProcessInfo & agg_process_info,
         Arena * aggregates_pool) const;
 
+template <bool enable_prefetch, typename Method>
+void executeImplMethodStringByColCKMap(
+        Method & method,
+        typename Method::State & state,
+        TiDB::TiDBCollators & collators,
+        const ColumnRawPtrs & key_columns,
+        Arena * pool,
+        AggProcessInfo & agg_process_info) const;
+
     template <bool only_lookup, typename Method>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(
         Method & method,

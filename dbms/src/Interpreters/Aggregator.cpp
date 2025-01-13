@@ -679,9 +679,13 @@ void NO_INLINE Aggregator::executeImpl(
     {
         // For key_serialized, memory allocation and key serialization will be batch-wise.
         // Need to init batch handler.
-        state.initBatchHandler(agg_process_info.start_row);
+        // state.initBatchHandler(agg_process_info.start_row);
+        // executeImplMiniBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
 
-        executeImplMiniBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+        if (disable_prefetch)
+            executeImplMethodStringByColCKMap<false>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
+        else
+            executeImplMethodStringByColCKMap<true>(method, state, collators, agg_process_info.key_columns, aggregates_pool, agg_process_info);
     }
     else if constexpr (Method::Data::is_string_hash_map)
     {
@@ -992,6 +996,112 @@ void Aggregator::handleMiniBatchImpl(
 
     if likely (processed_rows)
         agg_process_info.start_row = *processed_rows + 1;
+}
+
+template <bool enable_prefetch, typename Method>
+void Aggregator::executeImplMethodStringByColCKMap(
+        Method & method,
+        typename Method::State & ,
+        TiDB::TiDBCollators & collators,
+        const ColumnRawPtrs & key_columns,
+        Arena * pool,
+        AggProcessInfo & agg_process_info) const
+{
+    LOG_DEBUG(log, "gjt debug executeImplMethodStringByColCKMap");
+    size_t max_one_row_size = 0;
+    for (const auto & key_column : key_columns)
+    {
+        max_one_row_size += key_column->getMaxOneRowSerializeSize();
+    }
+
+    size_t rows = agg_process_info.end_row - agg_process_info.start_row;
+    auto * buffer = pool->alignedAlloc(rows * max_one_row_size, 16);
+    std::vector<size_t> slice_sizes(rows, 0);
+    String sort_key_containers;
+
+    for (size_t i = 0; i < key_columns.size(); ++i)
+    {
+        key_columns[i]->batchSerialize(buffer, max_one_row_size, slice_sizes, collators[i], sort_key_containers);
+    }
+
+    std::vector<AggregateDataPtr> places(rows, nullptr);
+    size_t row_offset = 0;
+
+    if constexpr (enable_prefetch)
+    {
+        std::vector<size_t> hashvals(rows, 0);
+        std::vector<StringRef> keys;
+        keys.reserve(rows);
+        for (size_t i = 0; i < rows; ++i)
+        {
+            StringRef key{buffer + row_offset, slice_sizes[i]};
+            keys.push_back(key);
+            row_offset += max_one_row_size;
+
+            hashvals[i] = method.data.hash(key);
+        }
+
+        size_t prefetch_idx = 16;
+        for (size_t i = 0; i < rows; ++i)
+        {
+            typename Method::Data::LookupResult it;
+            bool inserted = false;
+
+            if (prefetch_idx < rows)
+                method.data.prefetch(hashvals[prefetch_idx++]);
+
+            method.data.emplace(keys[i], it, inserted, hashvals[i]);
+            if (inserted)
+            {
+                auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                createAggregateStates(agg_state);
+                it->getMapped() = agg_state;
+            }
+            // auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
+            //     // TODO maybe batch alloc
+            //     auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+            //     ctor(key, agg_state);
+            // });
+            places[i] = it->getMapped();
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < rows; ++i)
+        {
+            StringRef key{buffer + row_offset, slice_sizes[i]};
+            row_offset += max_one_row_size;
+
+            typename Method::Data::LookupResult it;
+            bool inserted = false;
+            method.data.emplace(key, it, inserted);
+            if (inserted)
+            {
+                auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+                createAggregateStates(agg_state);
+                it->getMapped() = agg_state;
+            }
+            // auto iter = method.data.lazy_emplace(key, [&](const auto & ctor) {
+            //     // TODO maybe batch alloc
+            //     auto * agg_state = pool->alignedAlloc(total_size_of_aggregate_states, align_aggregate_states);
+            //     ctor(key, agg_state);
+            // });
+            places[i] = it->getMapped();
+        }
+    }
+
+    for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data(); inst->that;
+            ++inst)
+    {
+        inst->batch_that->addBatch(
+                agg_process_info.start_row,
+                rows,
+                &places[0],
+                inst->state_offset,
+                inst->batch_arguments,
+                pool);
+    }
+    agg_process_info.start_row = rows;
 }
 
 void NO_INLINE

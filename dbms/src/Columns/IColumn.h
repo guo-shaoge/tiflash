@@ -341,6 +341,21 @@ public:
 
     virtual void flushNTAlignBuffer() = 0;
 
+    virtual void batchSerialize(
+            char *,
+            size_t,
+            std::vector<size_t> &,
+            TiDB::TiDBCollatorPtr &,
+            String &) const
+    {
+        RUNTIME_CHECK_MSG(false, "{} doesn't support batchSerialize", getName());
+    }
+
+    virtual size_t getMaxOneRowSerializeSize() const
+    {
+        RUNTIME_CHECK_MSG(false, "{} doesn't support getMaxOneRowSerializeSize", getName());
+    }
+
     /// Update state of hash function with value of n-th element.
     /// On subsequent calls of this method for sequence of column values of arbitary types,
     ///  passed bytes to hash must identify sequence of values unambiguously.
