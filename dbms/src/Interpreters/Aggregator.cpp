@@ -884,10 +884,7 @@ void Aggregator::handleMiniBatchImpl(
 
         size_t batch_mem_size = 0;
         if constexpr (Method::State::is_serialized_key)
-        {
-            assert(hashvals.size() == state.getBatchSize());
             batch_mem_size = state.prepareNextBatch(&temp_batch_pool);
-        }
 
         if constexpr (enable_prefetch)
             setupHashVals(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
