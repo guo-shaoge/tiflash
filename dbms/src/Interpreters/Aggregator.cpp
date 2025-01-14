@@ -46,9 +46,6 @@ extern const char random_fail_in_resize_callback[];
 extern const char force_agg_prefetch[];
 } // namespace FailPoints
 
-static constexpr size_t agg_prefetch_step = 16;
-static constexpr size_t agg_mini_batch = 256;
-
 #define AggregationMethodName(NAME) AggregatedDataVariants::AggregationMethod_##NAME
 #define AggregationMethodNameTwoLevel(NAME) AggregatedDataVariants::AggregationMethod_##NAME##_two_level
 #define AggregationMethodType(NAME) AggregatedDataVariants::Type::NAME
@@ -680,7 +677,18 @@ void NO_INLINE Aggregator::executeImpl(
 
     if constexpr (Method::State::is_serialized_key)
     {
-        executeImplMiniBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+        // For key_serialized, memory allocation and key serialization will be batch-wise.
+        // Need to init batch handler.
+        state.initBatchHandler(agg_process_info.start_row);
+
+        if (disable_prefetch)
+            executeImplMiniBatch<collect_hit_rate, only_lookup, false>(
+                method,
+                state,
+                aggregates_pool,
+                agg_process_info);
+        else
+            executeImplMiniBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
     }
     else if constexpr (Method::Data::is_string_hash_map)
     {
@@ -742,7 +750,7 @@ std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::Res
 }
 
 template <typename Method>
-ALWAYS_INLINE inline void prepareBatch(
+ALWAYS_INLINE inline void setupHashVals(
     size_t row_idx,
     size_t end_row,
     std::vector<size_t> & hashvals,
@@ -867,16 +875,22 @@ void Aggregator::handleMiniBatchImpl(
         key_holders.resize(agg_mini_batch);
     }
 
+    Arena temp_batch_pool;
     // i is the begin row index of each mini batch.
     while (i < end)
     {
-        if constexpr (enable_prefetch)
-        {
-            if unlikely (i + mini_batch_size > end)
-                mini_batch_size = end - i;
+        if unlikely (i + mini_batch_size > end)
+            mini_batch_size = end - i;
 
-            prepareBatch(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
+        size_t batch_mem_size = 0;
+        if constexpr (Method::State::is_serialized_key)
+        {
+            assert(hashvals.size() == state.getBatchSize());
+            batch_mem_size = state.prepareNextBatch(&temp_batch_pool);
         }
+
+        if constexpr (enable_prefetch)
+            setupHashVals(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
 
         const auto cur_batch_end = i + mini_batch_size;
         // j is the row index of Column.
@@ -960,6 +974,9 @@ void Aggregator::handleMiniBatchImpl(
                 places[index_relative_to_start_row] = aggregate_data;
             processed_rows = j;
         }
+
+        if constexpr (Method::State::is_serialized_key)
+            temp_batch_pool.rollback(batch_mem_size);
 
         if unlikely (!processed_rows.has_value())
             break;
