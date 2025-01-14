@@ -351,7 +351,7 @@ struct KeySerializedBatchHandlerBase
 
         byte_size.resize_fill_zero(key_columns[0]->size());
         for (size_t i = 0; i < key_columns.size(); ++i)
-            key_columns[i]->countSerializeByteSizeUnique(byte_size, collators.empty() ? nullptr : collators[i]);
+            key_columns[i]->countSerializeByteSizeForCmp(byte_size, collators.empty() ? nullptr : collators[i]);
 
         pos.resize_fill_zero(batch_size);
         ori_pos.resize_fill_zero(batch_size);
@@ -386,7 +386,7 @@ struct KeySerializedBatchHandlerBase
         }
 
         for (size_t i = 0; i < key_columns.size(); ++i)
-            key_columns[i]->serializeToPosUnique(
+            key_columns[i]->serializeToPosForCmp(
                 pos,
                 batch_row_idx,
                 len,
