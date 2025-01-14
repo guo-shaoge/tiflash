@@ -863,14 +863,14 @@ void Aggregator::handleMiniBatchImpl(
     size_t i = agg_process_info.start_row;
     const size_t end = agg_process_info.start_row + rows;
 
-    size_t mini_batch_size = rows;
+    // todo
+        // mini batch will only be used when HashTable is big(a.k.a enable_prefetch is true),
+        // which can reduce cache miss of agg data.
+    size_t mini_batch_size = agg_mini_batch;
     std::vector<size_t> hashvals;
     std::vector<typename Method::State::KeyHolderType> key_holders;
     if constexpr (enable_prefetch)
     {
-        // mini batch will only be used when HashTable is big(a.k.a enable_prefetch is true),
-        // which can reduce cache miss of agg data.
-        mini_batch_size = agg_mini_batch;
         hashvals.resize(agg_mini_batch);
         key_holders.resize(agg_mini_batch);
     }
