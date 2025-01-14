@@ -290,7 +290,8 @@ public:
 
     inline const char * deserializeAndInsertFromArena(const char * pos, const TiDB::TiDBCollatorPtr & collator) override
     {
-        const size_t string_size = *reinterpret_cast<const size_t *>(pos);
+        // const size_t string_size = *reinterpret_cast<const size_t *>(pos);
+        const size_t string_size = *reinterpret_cast<const UInt32 *>(pos);
         pos += sizeof(string_size);
         if (likely(collator != nullptr))
             insertData(pos, string_size);
