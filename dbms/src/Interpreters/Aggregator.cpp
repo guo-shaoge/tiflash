@@ -875,16 +875,19 @@ void Aggregator::handleMiniBatchImpl(
         key_holders.resize(agg_mini_batch);
     }
 
-    Arena temp_batch_pool;
+    // Arena temp_batch_pool;
     // i is the begin row index of each mini batch.
     while (i < end)
     {
         if unlikely (i + mini_batch_size > end)
             mini_batch_size = end - i;
 
-        size_t batch_mem_size = 0;
+        // size_t batch_mem_size = 0;
         if constexpr (Method::State::is_serialized_key)
-            batch_mem_size = state.prepareNextBatch(&temp_batch_pool);
+        {
+            // batch_mem_size = state.prepareNextBatch(&temp_batch_pool);
+            state.prepareNextBatch(aggregates_pool);
+        }
 
         if constexpr (enable_prefetch)
             setupHashVals(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
@@ -972,8 +975,8 @@ void Aggregator::handleMiniBatchImpl(
             processed_rows = j;
         }
 
-        if constexpr (Method::State::is_serialized_key)
-            temp_batch_pool.rollback(batch_mem_size);
+        // if constexpr (Method::State::is_serialized_key)
+        //     temp_batch_pool.rollback(batch_mem_size);
 
         if unlikely (!processed_rows.has_value())
             break;

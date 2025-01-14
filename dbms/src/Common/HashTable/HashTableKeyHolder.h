@@ -155,18 +155,18 @@ inline void ALWAYS_INLINE keyHolderPersistKey(DB::SerializedKeyHolder &&) {}
 
 inline void ALWAYS_INLINE keyHolderDiscardKey(DB::SerializedKeyHolder & holder)
 {
-    //[[maybe_unused]] void * new_head = holder.pool.rollback(holder.key.size);
-    //assert(new_head == holder.key.data);
-    holder.pool->rollback(holder.key.size);
-    holder.key.data = nullptr;
-    holder.key.size = 0;
+    // //[[maybe_unused]] void * new_head = holder.pool.rollback(holder.key.size);
+    // //assert(new_head == holder.key.data);
+    // holder.pool->rollback(holder.key.size);
+    // holder.key.data = nullptr;
+    // holder.key.size = 0;
 }
 
 inline void ALWAYS_INLINE keyHolderDiscardKey(DB::SerializedKeyHolder && holder)
 {
-    //[[maybe_unused]] void * new_head = holder.pool.rollback(holder.key.size);
-    //assert(new_head == holder.key.data);
-    holder.pool->rollback(holder.key.size);
-    holder.key.data = nullptr;
-    holder.key.size = 0;
+    // //[[maybe_unused]] void * new_head = holder.pool.rollback(holder.key.size);
+    // //assert(new_head == holder.key.data);
+    // holder.pool->rollback(holder.key.size);
+    // holder.key.data = nullptr;
+    // holder.key.size = 0;
 }

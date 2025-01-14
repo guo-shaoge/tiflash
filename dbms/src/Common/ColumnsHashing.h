@@ -402,13 +402,13 @@ struct KeySerializedBatchHandlerBase
         return mem_size;
     }
 
-    ALWAYS_INLINE inline ArenaKeyHolder getKeyHolderBatch(ssize_t row, Arena * pool) const
+    ALWAYS_INLINE inline SerializedKeyHolder getKeyHolderBatch(ssize_t row, Arena * pool) const
     {
         assertInit();
         assert(static_cast<size_t>(row) < batch_row_idx + batch_size);
 
         const auto idx = row % batch_size;
-        return ArenaKeyHolder{StringRef{ori_pos[idx], real_byte_size[idx]}, pool};
+        return SerializedKeyHolder{StringRef{ori_pos[idx], real_byte_size[idx]}, pool};
     }
 };
 
@@ -426,7 +426,8 @@ struct HashMethodFastPathTwoKeysSerialized
     using Base = columns_hashing_impl::HashMethodBase<Self, Value, Mapped, false>;
     using BatchHandlerBase = KeySerializedBatchHandlerBase<batch_size>;
     static constexpr bool enable_batch = batch_size > 0;
-    using KeyHolderType = typename std::conditional<enable_batch, ArenaKeyHolder, SerializedKeyHolder>::type;
+    // using KeyHolderType = typename std::conditional<enable_batch, ArenaKeyHolder, SerializedKeyHolder>::type;
+    using KeyHolderType = SerializedKeyHolder;
 
     static constexpr bool is_serialized_key = true;
 
@@ -698,7 +699,8 @@ struct HashMethodSerialized
     using Base = columns_hashing_impl::HashMethodBase<Self, Value, Mapped, false>;
     using BatchHandlerBase = KeySerializedBatchHandlerBase<batch_size>;
     static constexpr bool enable_batch = batch_size > 0;
-    using KeyHolderType = typename std::conditional<enable_batch, ArenaKeyHolder, SerializedKeyHolder>::type;
+    // using KeyHolderType = typename std::conditional<enable_batch, ArenaKeyHolder, SerializedKeyHolder>::type;
+    using KeyHolderType = SerializedKeyHolder;
 
     static constexpr bool is_serialized_key = true;
 
