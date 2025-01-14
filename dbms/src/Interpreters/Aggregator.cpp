@@ -678,11 +678,7 @@ void NO_INLINE Aggregator::executeImpl(
     const bool disable_prefetch = (method.data.getBufferSizeInBytes() < prefetch_threshold);
 #endif
 
-    if constexpr (Method::State::is_serialized_key)
-    {
-        executeImplMiniBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-    }
-    else if constexpr (Method::Data::is_string_hash_map)
+    if constexpr (Method::Data::is_string_hash_map)
     {
         // StringHashMap doesn't support prefetch.
         executeImplMiniBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
