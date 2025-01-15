@@ -370,7 +370,11 @@ struct KeySerializedBatchHandlerBase
         real_byte_size.resize(batch_size);
     }
 
-    size_t prepareNextBatch(const ColumnRawPtrs & key_columns, Arena * pool, size_t batch_size, const TiDB::TiDBCollators & collators)
+    size_t prepareNextBatch(
+        const ColumnRawPtrs & key_columns,
+        Arena * pool,
+        size_t batch_size,
+        const TiDB::TiDBCollators & collators)
     {
         santityCheck();
         resize(batch_size);
@@ -419,11 +423,8 @@ struct KeySerializedBatchHandlerBase
 /// For the case when there are 2 keys.
 template <typename Key1Desc, typename Key2Desc, typename Value, typename Mapped>
 struct HashMethodFastPathTwoKeysSerialized
-    : public columns_hashing_impl::HashMethodBase<
-          HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped>,
-          Value,
-          Mapped,
-          false>
+    : public columns_hashing_impl::
+          HashMethodBase<HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped>, Value, Mapped, false>
     , KeySerializedBatchHandlerBase
 {
     using Self = HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, Value, Mapped>;

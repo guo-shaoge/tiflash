@@ -772,10 +772,7 @@ ALWAYS_INLINE inline void setupHashVals(
         if constexpr (Method::State::is_serialized_key)
             key_holders[j] = state.getKeyHolderBatch(j, aggregates_pool);
         else
-            key_holders[j] = state.getKeyHolder(
-                i,
-                aggregates_pool,
-                sort_key_containers);
+            key_holders[j] = state.getKeyHolder(i, aggregates_pool, sort_key_containers);
         hashvals[j] = method.data.hash(keyHolderGetKey(key_holders[j]));
     }
 }
@@ -894,7 +891,15 @@ void Aggregator::handleMiniBatchImpl(
             if constexpr (Method::State::is_serialized_key)
                 batch_mem_size = state.prepareNextBatch(mini_batch_size, &temp_batch_pool);
 
-            setupHashVals(i, mini_batch_size, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
+            setupHashVals(
+                i,
+                mini_batch_size,
+                hashvals,
+                key_holders,
+                aggregates_pool,
+                sort_key_containers,
+                method,
+                state);
         }
 
         const auto cur_batch_end = i + mini_batch_size;
@@ -909,8 +914,7 @@ void Aggregator::handleMiniBatchImpl(
                 if likely (k + agg_prefetch_step < hashvals.size())
                     method.data.prefetch(hashvals[k + agg_prefetch_step]);
 
-                emplace_result_holder
-                    = emplaceOrFindKey<only_lookup>(method, state, key_holders[k], hashvals[k]);
+                emplace_result_holder = emplaceOrFindKey<only_lookup>(method, state, key_holders[k], hashvals[k]);
             }
             else
             {
