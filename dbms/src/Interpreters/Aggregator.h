@@ -393,7 +393,8 @@ struct AggregationMethodFastPathTwoKeysNoCache
     ALWAYS_INLINE static inline const char * insertAggKeyIntoColumnString(const char * pos, IColumn * key_column)
     {
         /// still need to insert data to key because spill may will use this
-        const size_t string_size = *reinterpret_cast<const size_t *>(pos);
+        // const size_t string_size = *reinterpret_cast<const size_t *>(pos);
+        const auto string_size = *reinterpret_cast<const UInt32 *>(pos);
         pos += sizeof(string_size);
         static_cast<ColumnString *>(key_column)->insertData(pos, string_size);
         return pos + string_size;
