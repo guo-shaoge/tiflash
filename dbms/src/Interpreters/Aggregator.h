@@ -768,7 +768,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         = AggregationMethodOneKeyStringNoCache<false, AggregatedDataWithShortStringKey>;
     using AggregationMethod_one_key_short_strbinpadding
         = AggregationMethodOneKeyStringNoCache<true, AggregatedDataWithShortStringKey>;
-    using AggregationMethod_key_fixed_short_string = AggregationMethodFixedStringNoCache<AggregatedDataWithShortStringKey>;
+    using AggregationMethod_key_short_fixed_string = AggregationMethodFixedStringNoCache<AggregatedDataWithShortStringKey>;
     using AggregationMethod_key_string = AggregationMethodStringNoCache<AggregatedDataWithStringKey>;
     using AggregationMethod_one_key_strbin
         = AggregationMethodOneKeyStringNoCache<false, AggregatedDataWithStringKey>;
@@ -791,7 +791,7 @@ struct AggregatedDataVariants : private boost::noncopyable
         = AggregationMethodOneKeyStringNoCache<false, AggregatedDataWithShortStringKeyTwoLevel>;
     using AggregationMethod_one_key_short_strbinpadding_two_level
         = AggregationMethodOneKeyStringNoCache<true, AggregatedDataWithShortStringKeyTwoLevel>;
-    using AggregationMethod_key_fixed_short_string_two_level
+    using AggregationMethod_key_short_fixed_string_two_level
         = AggregationMethodFixedStringNoCache<AggregatedDataWithShortStringKeyTwoLevel>;
     using AggregationMethod_key_string_two_level
         = AggregationMethodStringNoCache<AggregatedDataWithStringKeyTwoLevel>;
@@ -1250,7 +1250,7 @@ public:
             bool empty_result_for_aggregation_by_empty_set_,
             const SpillConfig & spill_config_,
             UInt64 max_block_size_,
-            bool key_string_is_short_ = true,
+            bool key_string_is_short_ = false,
             const TiDB::TiDBCollators & collators_ = TiDB::dummy_collators)
             : src_header(src_header_)
             , keys(keys_)
