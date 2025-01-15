@@ -317,7 +317,8 @@ struct KeyDescStringBin
         key = {chars + last_offset, offsets[row] - last_offset - 1};
         key = fn_handle_key(key);
 
-        return key.size + sizeof(key.size);
+        // return key.size + sizeof(key.size);
+        return key.size + sizeof(UInt32);
     }
 
     ALWAYS_INLINE inline AllocSize getKey(ssize_t row, StringRef & ref) const
