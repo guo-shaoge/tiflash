@@ -282,6 +282,22 @@ Block Aggregator::Params::getHeader(
     return materializeBlock(res);
 }
 
+AggregatedDataVariants::Type switchToShortStringMethod(AggregatedDataVariants::Type ori_method)
+{
+    switch (ori_method)
+    {
+        case AggregatedDataVariants::Type::key_string:
+            return AggregatedDataVariants::Type::key_short_string;
+        case AggregatedDataVariants::Type::key_fixed_string:
+            return AggregatedDataVariants::Type::key_short_fixed_string;
+        case AggregatedDataVariants::Type::one_key_strbin:
+            return AggregatedDataVariants::Type::one_key_short_strbin;
+        case AggregatedDataVariants::Type::one_key_strbinpadding:
+            return AggregatedDataVariants::Type::one_key_short_strbinpadding;
+        default:
+            return ori_method;
+    }
+}
 
 Aggregator::Aggregator(
     const Params & params_,
@@ -334,6 +350,8 @@ Aggregator::Aggregator(
     }
 
     method_chosen = chooseAggregationMethod();
+    if (params.key_string_is_short)
+        method_chosen = switchToShortStringMethod(method_chosen);
     RUNTIME_CHECK_MSG(method_chosen != AggregatedDataVariants::Type::EMPTY, "Invalid aggregation method");
     agg_spill_context = std::make_shared<AggSpillContext>(
         concurrency,

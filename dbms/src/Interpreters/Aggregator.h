@@ -763,12 +763,18 @@ struct AggregatedDataVariants : private boost::noncopyable
     using AggregationMethod_key32 = AggregationMethodOneNumber<UInt32, AggregatedDataWithUInt64Key>;
     using AggregationMethod_key64 = AggregationMethodOneNumber<UInt64, AggregatedDataWithUInt64Key>;
     using AggregationMethod_key_int256 = AggregationMethodOneNumber<Int256, AggregatedDataWithInt256Key>;
-    using AggregationMethod_key_string = AggregationMethodStringNoCache<AggregatedDataWithShortStringKey>;
-    using AggregationMethod_one_key_strbin
+    using AggregationMethod_key_short_string = AggregationMethodStringNoCache<AggregatedDataWithShortStringKey>;
+    using AggregationMethod_one_key_short_strbin
         = AggregationMethodOneKeyStringNoCache<false, AggregatedDataWithShortStringKey>;
-    using AggregationMethod_one_key_strbinpadding
+    using AggregationMethod_one_key_short_strbinpadding
         = AggregationMethodOneKeyStringNoCache<true, AggregatedDataWithShortStringKey>;
-    using AggregationMethod_key_fixed_string = AggregationMethodFixedStringNoCache<AggregatedDataWithShortStringKey>;
+    using AggregationMethod_key_fixed_short_string = AggregationMethodFixedStringNoCache<AggregatedDataWithShortStringKey>;
+    using AggregationMethod_key_string = AggregationMethodStringNoCache<AggregatedDataWithStringKey>;
+    using AggregationMethod_one_key_strbin
+        = AggregationMethodOneKeyStringNoCache<false, AggregatedDataWithStringKey>;
+    using AggregationMethod_one_key_strbinpadding
+        = AggregationMethodOneKeyStringNoCache<true, AggregatedDataWithStringKey>;
+    using AggregationMethod_key_fixed_string = AggregationMethodFixedStringNoCache<AggregatedDataWithStringKey>;
     using AggregationMethod_keys16 = AggregationMethodKeysFixed<AggregatedDataWithUInt16Key, false, false>;
     using AggregationMethod_keys32 = AggregationMethodKeysFixed<AggregatedDataWithUInt32Key>;
     using AggregationMethod_keys64 = AggregationMethodKeysFixed<AggregatedDataWithUInt64Key>;
@@ -779,14 +785,22 @@ struct AggregatedDataVariants : private boost::noncopyable
     using AggregationMethod_key64_two_level = AggregationMethodOneNumber<UInt64, AggregatedDataWithUInt64KeyTwoLevel>;
     using AggregationMethod_key_int256_two_level
         = AggregationMethodOneNumber<Int256, AggregatedDataWithInt256KeyTwoLevel>;
-    using AggregationMethod_key_string_two_level
+    using AggregationMethod_key_short_string_two_level
         = AggregationMethodStringNoCache<AggregatedDataWithShortStringKeyTwoLevel>;
-    using AggregationMethod_one_key_strbin_two_level
+    using AggregationMethod_one_key_short_strbin_two_level
         = AggregationMethodOneKeyStringNoCache<false, AggregatedDataWithShortStringKeyTwoLevel>;
-    using AggregationMethod_one_key_strbinpadding_two_level
+    using AggregationMethod_one_key_short_strbinpadding_two_level
         = AggregationMethodOneKeyStringNoCache<true, AggregatedDataWithShortStringKeyTwoLevel>;
-    using AggregationMethod_key_fixed_string_two_level
+    using AggregationMethod_key_fixed_short_string_two_level
         = AggregationMethodFixedStringNoCache<AggregatedDataWithShortStringKeyTwoLevel>;
+    using AggregationMethod_key_string_two_level
+        = AggregationMethodStringNoCache<AggregatedDataWithStringKeyTwoLevel>;
+    using AggregationMethod_one_key_strbin_two_level
+        = AggregationMethodOneKeyStringNoCache<false, AggregatedDataWithStringKeyTwoLevel>;
+    using AggregationMethod_one_key_strbinpadding_two_level
+        = AggregationMethodOneKeyStringNoCache<true, AggregatedDataWithStringKeyTwoLevel>;
+    using AggregationMethod_key_fixed_string_two_level
+        = AggregationMethodFixedStringNoCache<AggregatedDataWithStringKeyTwoLevel>;
     using AggregationMethod_keys32_two_level = AggregationMethodKeysFixed<AggregatedDataWithUInt32KeyTwoLevel>;
     using AggregationMethod_keys64_two_level = AggregationMethodKeysFixed<AggregatedDataWithUInt64KeyTwoLevel>;
     using AggregationMethod_keys128_two_level = AggregationMethodKeysFixed<AggregatedDataWithKeys128TwoLevel>;
@@ -867,6 +881,8 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(key16, false)                                         \
     M(key32, false)                                         \
     M(key64, false)                                         \
+    M(key_short_string, false)                                    \
+    M(key_short_fixed_string, false)                              \
     M(key_string, false)                                    \
     M(key_fixed_string, false)                              \
     M(keys16, false)                                        \
@@ -890,11 +906,15 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(two_keys_strbin_strbin, false)                        \
     M(two_keys_strbinpadding_num64, false)                  \
     M(two_keys_strbinpadding_strbinpadding, false)          \
+    M(one_key_short_strbin, false)                                \
+    M(one_key_short_strbinpadding, false)                         \
     M(one_key_strbin, false)                                \
     M(one_key_strbinpadding, false)                         \
     M(key32_two_level, true)                                \
     M(key64_two_level, true)                                \
     M(key_int256_two_level, true)                           \
+    M(key_short_string_two_level, true)                           \
+    M(key_short_fixed_string_two_level, true)                     \
     M(key_string_two_level, true)                           \
     M(key_fixed_string_two_level, true)                     \
     M(keys32_two_level, true)                               \
@@ -910,6 +930,8 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(two_keys_strbin_strbin_two_level, true)               \
     M(two_keys_strbinpadding_num64_two_level, true)         \
     M(two_keys_strbinpadding_strbinpadding_two_level, true) \
+    M(one_key_short_strbin_two_level, true)                       \
+    M(one_key_short_strbinpadding_two_level, true) \
     M(one_key_strbin_two_level, true)                       \
     M(one_key_strbinpadding_two_level, true)
 
@@ -1048,6 +1070,8 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(key32)                                           \
     M(key64)                                           \
     M(key_int256)                                      \
+    M(key_short_string)                                      \
+    M(key_short_fixed_string)                                \
     M(key_string)                                      \
     M(key_fixed_string)                                \
     M(keys32)                                          \
@@ -1063,6 +1087,8 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(two_keys_strbin_strbin)                          \
     M(two_keys_strbinpadding_num64)                    \
     M(two_keys_strbinpadding_strbinpadding)            \
+    M(one_key_short_strbin)                                  \
+    M(one_key_short_strbinpadding) \
     M(one_key_strbin)                                  \
     M(one_key_strbinpadding)
 
@@ -1110,6 +1136,8 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(key32_two_level)                                \
     M(key64_two_level)                                \
     M(key_int256_two_level)                           \
+    M(key_short_string_two_level)                           \
+    M(key_short_fixed_string_two_level)                     \
     M(key_string_two_level)                           \
     M(key_fixed_string_two_level)                     \
     M(keys32_two_level)                               \
@@ -1125,6 +1153,8 @@ struct AggregatedDataVariants : private boost::noncopyable
     M(two_keys_strbin_strbin_two_level)               \
     M(two_keys_strbinpadding_num64_two_level)         \
     M(two_keys_strbinpadding_strbinpadding_two_level) \
+    M(one_key_short_strbin_two_level)                       \
+    M(one_key_short_strbinpadding_two_level) \
     M(one_key_strbin_two_level)                       \
     M(one_key_strbinpadding_two_level)
 };
@@ -1203,6 +1233,9 @@ public:
         SpillConfig spill_config;
 
         UInt64 max_block_size;
+        // By default, use StringHashMap, which is optimized for short string.
+        const bool key_string_is_short;
+
         TiDB::TiDBCollators collators;
 
         Params(
@@ -1217,6 +1250,7 @@ public:
             bool empty_result_for_aggregation_by_empty_set_,
             const SpillConfig & spill_config_,
             UInt64 max_block_size_,
+            bool key_string_is_short_ = true,
             const TiDB::TiDBCollators & collators_ = TiDB::dummy_collators)
             : src_header(src_header_)
             , keys(keys_)
@@ -1228,6 +1262,7 @@ public:
             , empty_result_for_aggregation_by_empty_set(empty_result_for_aggregation_by_empty_set_)
             , spill_config(spill_config_)
             , max_block_size(max_block_size_)
+            , key_string_is_short(key_string_is_short_)
             , collators(collators_)
             , group_by_two_level_threshold(group_by_two_level_threshold_)
             , group_by_two_level_threshold_bytes(group_by_two_level_threshold_bytes_)
