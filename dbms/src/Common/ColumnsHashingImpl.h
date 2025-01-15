@@ -141,7 +141,7 @@ public:
     }
 
     template <typename KeyHolder, typename Data>
-    ALWAYS_INLINE inline EmplaceResult emplaceKey(Data & data, KeyHolder && key_holder, size_t hashval)
+    ALWAYS_INLINE inline EmplaceResult emplaceKey(Data & data, KeyHolder & key_holder, size_t hashval)
     {
         return emplaceImpl(key_holder, data, hashval);
     }
@@ -158,7 +158,7 @@ public:
     }
 
     template <typename KeyHolder, typename Data>
-    ALWAYS_INLINE inline FindResult findKey(Data & data, KeyHolder && key_holder, size_t hashval)
+    ALWAYS_INLINE inline FindResult findKey(Data & data, KeyHolder & key_holder, size_t hashval)
     {
         return findKeyImpl(keyHolderGetKey(key_holder), data, hashval);
     }

@@ -677,18 +677,22 @@ void NO_INLINE Aggregator::executeImpl(
 
     if constexpr (Method::State::is_serialized_key)
     {
-        // For key_serialized, memory allocation and key serialization will be batch-wise.
-        // Need to init batch handler.
-        state.initBatchHandler(agg_process_info.start_row);
-
         if (disable_prefetch)
+        {
             executeImplMiniBatch<collect_hit_rate, only_lookup, false>(
                 method,
                 state,
                 aggregates_pool,
                 agg_process_info);
+        }
         else
+        {
+            // For key_serialized, memory allocation and key serialization will be batch-wise.
+            // Need to init batch handler.
+            state.initBatchHandler(agg_process_info.start_row);
+
             executeImplMiniBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+        }
     }
     else if constexpr (Method::Data::is_string_hash_map)
     {
@@ -708,19 +712,19 @@ void NO_INLINE Aggregator::executeImpl(
     }
 }
 
-template <bool only_lookup, typename Method>
+template <bool only_lookup, typename Method, typename KeyHolder>
 std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> Aggregator::emplaceOrFindKey(
     Method & method,
     typename Method::State & state,
-    typename Method::State::Derived::KeyHolderType && key_holder,
+    KeyHolder & key_holder,
     size_t hashval) const
 {
     try
     {
         if constexpr (only_lookup)
-            return state.template findKey(method.data, std::move(key_holder), hashval);
+            return state.template findKey(method.data, key_holder, hashval);
         else
-            return state.template emplaceKey(method.data, std::move(key_holder), hashval);
+            return state.template emplaceKey(method.data, key_holder, hashval);
     }
     catch (ResizeException &)
     {
@@ -752,22 +756,26 @@ std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::Res
 template <typename Method>
 ALWAYS_INLINE inline void setupHashVals(
     size_t row_idx,
-    size_t end_row,
+    size_t cur_batch_size,
     std::vector<size_t> & hashvals,
-    std::vector<typename Method::State::Derived::KeyHolderType> & key_holders,
+    std::vector<typename Method::State::Derived::BatchKeyHolderType> & key_holders,
     Arena * aggregates_pool,
     std::vector<String> & sort_key_containers,
     Method & method,
     typename Method::State & state)
 {
     assert(hashvals.size() == key_holders.size());
+    assert(hashvals.size() == cur_batch_size);
 
-    for (size_t i = row_idx, j = 0; i < row_idx + hashvals.size() && i < end_row; ++i, ++j)
+    for (size_t i = row_idx, j = 0; i < row_idx + cur_batch_size; ++i, ++j)
     {
-        key_holders[j] = static_cast<typename Method::State::Derived *>(&state)->getKeyHolder(
-            i,
-            aggregates_pool,
-            sort_key_containers);
+        if constexpr (Method::State::is_serialized_key)
+            key_holders[j] = state.getKeyHolderBatch(j, aggregates_pool);
+        else
+            key_holders[j] = state.getKeyHolder(
+                i,
+                aggregates_pool,
+                sort_key_containers);
         hashvals[j] = method.data.hash(keyHolderGetKey(key_holders[j]));
     }
 }
@@ -863,31 +871,31 @@ void Aggregator::handleMiniBatchImpl(
     size_t i = agg_process_info.start_row;
     const size_t end = agg_process_info.start_row + rows;
 
-    // todo
-        // mini batch will only be used when HashTable is big(a.k.a enable_prefetch is true),
-        // which can reduce cache miss of agg data.
-    size_t mini_batch_size = agg_mini_batch;
+    // mini batch will only be used when HashTable is big(a.k.a enable_prefetch is true),
+    // which can reduce cache miss of agg data.
+    size_t mini_batch_size = rows;
     std::vector<size_t> hashvals;
-    std::vector<typename Method::State::KeyHolderType> key_holders;
-    if constexpr (enable_prefetch)
-    {
-        hashvals.resize(agg_mini_batch);
-        key_holders.resize(agg_mini_batch);
-    }
-
+    std::vector<typename Method::State::BatchKeyHolderType> key_holders;
     Arena temp_batch_pool;
+
     // i is the begin row index of each mini batch.
     while (i < end)
     {
-        if unlikely (i + mini_batch_size > end)
-            mini_batch_size = end - i;
-
         size_t batch_mem_size = 0;
-        if constexpr (Method::State::is_serialized_key)
-            batch_mem_size = state.prepareNextBatch(&temp_batch_pool);
-
         if constexpr (enable_prefetch)
-            setupHashVals(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
+        {
+            mini_batch_size = agg_mini_batch;
+            if unlikely (i + mini_batch_size > end)
+                mini_batch_size = end - i;
+
+            hashvals.resize(mini_batch_size);
+            key_holders.resize(mini_batch_size);
+
+            if constexpr (Method::State::is_serialized_key)
+                batch_mem_size = state.prepareNextBatch(mini_batch_size, &temp_batch_pool);
+
+            setupHashVals(i, mini_batch_size, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
+        }
 
         const auto cur_batch_end = i + mini_batch_size;
         // j is the row index of Column.
@@ -902,7 +910,7 @@ void Aggregator::handleMiniBatchImpl(
                     method.data.prefetch(hashvals[k + agg_prefetch_step]);
 
                 emplace_result_holder
-                    = emplaceOrFindKey<only_lookup>(method, state, std::move(key_holders[k]), hashvals[k]);
+                    = emplaceOrFindKey<only_lookup>(method, state, key_holders[k], hashvals[k]);
             }
             else
             {
@@ -922,13 +930,9 @@ void Aggregator::handleMiniBatchImpl(
                 if constexpr (compute_agg_data)
                 {
                     if (emplace_result.isFound())
-                    {
                         aggregate_data = emplace_result.getMapped();
-                    }
                     else
-                    {
                         agg_process_info.not_found_rows.push_back(j);
-                    }
                 }
                 else
                 {
@@ -972,7 +976,7 @@ void Aggregator::handleMiniBatchImpl(
             processed_rows = j;
         }
 
-        if constexpr (Method::State::is_serialized_key)
+        if constexpr (enable_prefetch && Method::State::is_serialized_key)
             temp_batch_pool.rollback(batch_mem_size);
 
         if unlikely (!processed_rows.has_value())

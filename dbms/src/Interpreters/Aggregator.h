@@ -362,7 +362,7 @@ struct AggregationMethodFastPathTwoKeysNoCache
     {}
 
     using State = ColumnsHashing::
-        HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, typename Data::value_type, Mapped, agg_mini_batch>;
+        HashMethodFastPathTwoKeysSerialized<Key1Desc, Key2Desc, typename Data::value_type, Mapped>;
     template <bool only_lookup>
     struct EmplaceOrFindKeyResult
     {
@@ -685,7 +685,7 @@ struct AggregationMethodSerialized
         : data(other.data)
     {}
 
-    using State = ColumnsHashing::HashMethodSerialized<typename Data::value_type, Mapped, agg_mini_batch>;
+    using State = ColumnsHashing::HashMethodSerialized<typename Data::value_type, Mapped>;
     template <bool only_lookup>
     struct EmplaceOrFindKeyResult
     {
@@ -1469,11 +1469,11 @@ protected:
         AggProcessInfo & agg_process_info,
         Arena * aggregates_pool) const;
 
-    template <bool only_lookup, typename Method>
+    template <bool only_lookup, typename Method, typename KeyHolder>
     std::optional<typename Method::template EmplaceOrFindKeyResult<only_lookup>::ResultType> emplaceOrFindKey(
         Method & method,
         typename Method::State & state,
-        typename Method::State::Derived::KeyHolderType && key_holder,
+        KeyHolder & key_holder,
         size_t hashval) const;
 
     template <bool only_lookup, typename Method>
