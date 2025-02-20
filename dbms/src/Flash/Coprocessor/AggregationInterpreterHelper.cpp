@@ -146,7 +146,6 @@ std::unique_ptr<Aggregator::Params> buildParams(
         !is_final_agg,
         spill_config,
         context.getSettingsRef().max_block_size,
-        settings.hashagg_use_magic_hash,
         has_collator ? reordered_collators : TiDB::dummy_collators);
 }
 

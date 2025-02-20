@@ -36,13 +36,7 @@ ParallelAggregatingBlockInputStream::ParallelAggregatingBlockInputStream(
     : log(Logger::get(req_id))
     , max_threads(std::min(inputs.size(), max_threads_))
     , params(params_)
-    , aggregator(
-          params,
-          req_id,
-          max_threads,
-          register_operator_spill_context,
-          /*is_auto_pass_through=*/false,
-          params.use_magic_hash)
+    , aggregator(params, req_id, max_threads, register_operator_spill_context)
     , final(final_)
     , max_buffered_bytes(max_buffered_bytes_)
     , temporary_data_merge_threads(temporary_data_merge_threads_)

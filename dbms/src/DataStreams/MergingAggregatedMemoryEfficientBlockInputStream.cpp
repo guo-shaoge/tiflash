@@ -83,13 +83,7 @@ MergingAggregatedMemoryEfficientBlockInputStream::MergingAggregatedMemoryEfficie
     size_t merging_threads_,
     const String & req_id)
     : log(Logger::get(req_id))
-    , aggregator(
-          params,
-          req_id,
-          merging_threads_,
-          [](const OperatorSpillContextPtr &) {},
-          /*is_auto_pass_through=*/false,
-          params.use_magic_hash)
+    , aggregator(params, req_id, merging_threads_, [](const OperatorSpillContextPtr &) {})
     , final(final_)
     , reading_threads(std::min(reading_threads_, inputs_.size()))
     , merging_threads(merging_threads_)
