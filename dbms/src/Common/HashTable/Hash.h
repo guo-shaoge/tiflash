@@ -132,8 +132,8 @@ inline DB::UInt32 wideIntHashCRC32(const T & x, DB::UInt32 updated_value)
         return updated_value;
     }
     static_assert(
-        DB::IsDecimal<T> || is_boost_number_v<T> || std::is_same_v<T, DB::UInt128> || std::is_same_v<T, DB::Int128>
-        || std::is_same_v<T, DB::UInt256>);
+        DB::IsDecimal<
+            T> || is_boost_number_v<T> || std::is_same_v<T, DB::UInt128> || std::is_same_v<T, DB::Int128> || std::is_same_v<T, DB::UInt256>);
     __builtin_unreachable();
 }
 
@@ -246,8 +246,8 @@ inline size_t defaultHash64(const std::enable_if_t<!is_fit_register<T>, T> & key
         return boost::multiprecision::hash_value(key);
     }
     static_assert(
-        is_boost_number_v<T> || std::is_same_v<T, DB::UInt128> || std::is_same_v<T, DB::Int128>
-        || std::is_same_v<T, DB::UInt256>);
+        is_boost_number_v<
+            T> || std::is_same_v<T, DB::UInt128> || std::is_same_v<T, DB::Int128> || std::is_same_v<T, DB::UInt256>);
     __builtin_unreachable();
 }
 

@@ -402,9 +402,6 @@ public:
     using Grower = GrowerType;
     using Allocator = AllocatorType;
 
-    static constexpr bool is_string_hash_map = false;
-    static constexpr bool is_two_level = false;
-
 protected:
     friend class const_iterator;
     friend class iterator;
@@ -854,11 +851,6 @@ public:
 
     iterator end() { return iterator(this, buf ? buf + grower.bufSize() : buf); }
 
-    void ALWAYS_INLINE prefetch(size_t hashval) const
-    {
-        const size_t place_value = grower.place(hashval);
-        __builtin_prefetch(static_cast<const void *>(&buf[place_value]));
-    }
 
 protected:
     const_iterator iteratorTo(const Cell * ptr) const { return const_iterator(this, ptr); }

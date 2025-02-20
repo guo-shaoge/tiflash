@@ -180,7 +180,7 @@ inline size_t hashLessThan8(const char * data, size_t size)
 
 struct CRC32Hash
 {
-    static size_t operator()(const StringRef & x)
+    size_t operator()(StringRef x) const
     {
         const char * pos = x.data;
         size_t size = x.size;
