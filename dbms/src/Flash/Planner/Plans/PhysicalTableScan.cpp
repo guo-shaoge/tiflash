@@ -171,6 +171,12 @@ void PhysicalTableScan::buildProjection(
     const auto & schema_project_cols
         = buildTableScanProjectionCols(tidb_table_scan.getLogicalTableID(), schema, header);
 
+    LOG_DEBUG(log, "gjt debug storage header: {}", header.dumpStructure());
+    for (const auto & col : schema)
+    {
+        LOG_DEBUG(log, "gjt debug tsc schema: {}", col.name);
+    }
+
     /// In order to keep TransformOp's schema consistent with PhysicalPlan's schema.
     /// It is worth noting that the column uses the name as the unique identifier in the Block, so the column name must also be consistent.
     ExpressionActionsPtr schema_actions = PhysicalPlanHelper::newActions(header);
