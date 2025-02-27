@@ -52,13 +52,13 @@ RemoteRequest RemoteRequest::build(
             const auto & col = table_scan.getColumns()[i];
             auto col_id = col.id;
 
-            // if (col.hasGeneratedColumnFlag())
-            // {
-            //     const auto & col_name = GeneratedColumnPlaceholderBlockInputStream::getColumnName(i);
-            //     schema.emplace_back(std::make_pair(col_name, std::move(col)));
-            // }
-            // else if (col_id == DB::TiDBPkColumnID)
-            if (col_id == DB::TiDBPkColumnID)
+            if (col.hasGeneratedColumnFlag())
+            {
+                const auto & col_name = GeneratedColumnPlaceholderBlockInputStream::getColumnName(i);
+                schema.emplace_back(std::make_pair(col_name, std::move(col)));
+            }
+            else if (col_id == DB::TiDBPkColumnID)
+            // if (col_id == DB::TiDBPkColumnID)
             {
                 ColumnInfo ci;
                 ci.tp = TiDB::TypeLongLong;
