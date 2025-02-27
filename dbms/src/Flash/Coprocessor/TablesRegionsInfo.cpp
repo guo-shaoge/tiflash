@@ -73,6 +73,7 @@ static void insertRegionInfoToTablesRegionInfo(
     const TMTContext & tmt_context)
 {
     auto & table_region_info = tables_region_infos.getOrCreateTableRegionInfoByTableID(table_id);
+    size_t i = 0;
     for (const auto & r : regions)
     {
         RegionInfo region_info(
@@ -99,13 +100,14 @@ static void insertRegionInfoToTablesRegionInfo(
         ///    is served by the same node (but still read from remote).
         bool duplicated_region = local_region_id_set.contains(region_info.region_id);
 
-        if (duplicated_region || needRemoteRead(region_info, tmt_context))
+        if (duplicated_region || needRemoteRead(region_info, tmt_context) || ((i % 2) != 0))
             table_region_info.remote_regions.push_back(region_info);
         else
         {
             table_region_info.local_regions.insert(std::make_pair(region_info.region_id, region_info));
             local_region_id_set.emplace(region_info.region_id);
         }
+        i++;
     }
 }
 
