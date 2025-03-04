@@ -628,7 +628,8 @@ AggregatedDataVariants::Type Aggregator::chooseAggregationMethod()
     if (params.keys_size == 1 && types_not_null[0]->isFixedString())
         return AggregatedDataVariants::Type::key_fixed_string;
 
-    return ChooseAggregationMethodFastPath(params.keys_size, types_not_null, params.collators);
+    // return ChooseAggregationMethodFastPath(params.keys_size, types_not_null, params.collators);
+    return AggregatedDataVariants::Type::serialized;
 }
 
 
