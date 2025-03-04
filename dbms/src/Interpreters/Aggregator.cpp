@@ -596,33 +596,34 @@ AggregatedDataVariants::Type Aggregator::chooseAggregationMethod()
     /// If single string key - will use hash table with references to it. Strings itself are stored separately in Arena.
     if (params.keys_size == 1 && types_not_null[0]->isString())
     {
-        if (params.collators.empty() || !params.collators[0])
-        {
-            // use original way. `Type::one_key_strbin` will generate empty column.
-            return AggregatedDataVariants::Type::key_string;
-        }
-        else
-        {
-            switch (params.collators[0]->getCollatorType())
-            {
-            case TiDB::ITiDBCollator::CollatorType::UTF8MB4_BIN:
-            case TiDB::ITiDBCollator::CollatorType::UTF8_BIN:
-            case TiDB::ITiDBCollator::CollatorType::LATIN1_BIN:
-            case TiDB::ITiDBCollator::CollatorType::ASCII_BIN:
-            {
-                return AggregatedDataVariants::Type::one_key_strbinpadding;
-            }
-            case TiDB::ITiDBCollator::CollatorType::BINARY:
-            {
-                return AggregatedDataVariants::Type::one_key_strbin;
-            }
-            default:
-            {
-                // for CI COLLATION, use original way
-                return AggregatedDataVariants::Type::key_string;
-            }
-            }
-        }
+        return AggregatedDataVariants::Type::key_string;
+        // if (params.collators.empty() || !params.collators[0])
+        // {
+        //     // use original way. `Type::one_key_strbin` will generate empty column.
+        //     return AggregatedDataVariants::Type::key_string;
+        // }
+        // else
+        // {
+        //     switch (params.collators[0]->getCollatorType())
+        //     {
+        //     case TiDB::ITiDBCollator::CollatorType::UTF8MB4_BIN:
+        //     case TiDB::ITiDBCollator::CollatorType::UTF8_BIN:
+        //     case TiDB::ITiDBCollator::CollatorType::LATIN1_BIN:
+        //     case TiDB::ITiDBCollator::CollatorType::ASCII_BIN:
+        //     {
+        //         return AggregatedDataVariants::Type::one_key_strbinpadding;
+        //     }
+        //     case TiDB::ITiDBCollator::CollatorType::BINARY:
+        //     {
+        //         return AggregatedDataVariants::Type::one_key_strbin;
+        //     }
+        //     default:
+        //     {
+        //         // for CI COLLATION, use original way
+        //         return AggregatedDataVariants::Type::key_string;
+        //     }
+        //     }
+        // }
     }
 
     if (params.keys_size == 1 && types_not_null[0]->isFixedString())
