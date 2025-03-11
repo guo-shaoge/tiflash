@@ -49,7 +49,7 @@ extern const char force_magic_hash[];
 } // namespace FailPoints
 
 static constexpr size_t agg_prefetch_step = 16;
-static constexpr size_t agg_mini_batch = 256;
+static constexpr size_t agg_mini_batch = 1024;
 
 #define AggregationMethodName(NAME) AggregatedDataVariants::AggregationMethod_##NAME
 #define AggregationMethodNameTwoLevel(NAME) AggregatedDataVariants::AggregationMethod_##NAME##_two_level
