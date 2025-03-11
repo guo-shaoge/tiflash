@@ -888,14 +888,11 @@ void Aggregator::handleOneBatch(
     size_t mini_batch_size = rows;
     std::vector<size_t> hashvals;
     std::vector<typename Method::State::KeyHolderType> key_holders;
-    if constexpr (enable_prefetch)
-    {
         // mini batch will only be used when HashTable is big(a.k.a enable_prefetch is true),
         // which can reduce cache miss of agg data.
         mini_batch_size = agg_mini_batch;
         hashvals.resize(agg_mini_batch);
         key_holders.resize(agg_mini_batch);
-    }
 
     // i is the begin row index of each mini batch.
     while (i < end)
