@@ -891,16 +891,16 @@ void Aggregator::handleOneBatch(
         // mini batch will only be used when HashTable is big(a.k.a enable_prefetch is true),
         // which can reduce cache miss of agg data.
         mini_batch_size = agg_mini_batch;
-        hashvals.resize(agg_mini_batch);
-        key_holders.resize(agg_mini_batch);
+        // hashvals.resize(agg_mini_batch);
+        // key_holders.resize(agg_mini_batch);
 
     // i is the begin row index of each mini batch.
     while (i < end)
     {
-        if constexpr (enable_prefetch)
-        {
             if unlikely (i + mini_batch_size > end)
                 mini_batch_size = end - i;
+        if constexpr (enable_prefetch)
+        {
 
             prepareBatch(i, end, hashvals, key_holders, aggregates_pool, sort_key_containers, method, state);
         }
