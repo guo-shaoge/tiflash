@@ -871,7 +871,7 @@ public:
         UInt64 max_block_size;
         TiDB::TiDBCollators collators;
 
-        bool use_magic_hash;
+        size_t use_magic_hash;
 
         Params(
             const Block & src_header_,
@@ -885,7 +885,7 @@ public:
             bool empty_result_for_aggregation_by_empty_set_,
             const SpillConfig & spill_config_,
             UInt64 max_block_size_,
-            bool use_magic_hash_,
+            size_t use_magic_hash_,
             const TiDB::TiDBCollators & collators_ = TiDB::dummy_collators)
             : src_header(src_header_)
             , keys(keys_)
@@ -942,7 +942,7 @@ public:
         size_t concurrency,
         const RegisterOperatorSpillContext & register_operator_spill_context,
         bool is_auto_pass_through_,
-        bool use_magic_hash_);
+        size_t use_magic_hash_);
 
     /// Aggregate the source. Get the result in the form of one of the data structures.
     void execute(const BlockInputStreamPtr & stream, AggregatedDataVariants & result, size_t thread_num);
@@ -1101,7 +1101,7 @@ protected:
     size_t group_by_two_level_threshold_bytes = 0;
 
     const bool is_auto_pass_through;
-    const bool use_magic_hash;
+    const size_t use_magic_hash;
 
     /// For external aggregation.
     AggSpillContextPtr agg_spill_context;

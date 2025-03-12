@@ -294,7 +294,7 @@ Aggregator::Aggregator(
     size_t concurrency,
     const RegisterOperatorSpillContext & register_operator_spill_context,
     bool is_auto_pass_through_,
-    bool use_magic_hash_)
+    size_t use_magic_hash_)
     : params(params_)
     , log(Logger::get(req_id))
     , is_cancelled([]() { return false; })
@@ -392,12 +392,7 @@ enum class AggFastPathType
 AggregatedDataVariants::Type Aggregator::chooseAggregationMethod()
 {
     auto method = chooseAggregationMethodInner();
-#ifndef NDEBUG
-    bool tmp_use_magic_hash = this->use_magic_hash;
-    fiu_do_on(FailPoints::force_magic_hash, { tmp_use_magic_hash = true; });
-#else
-    const bool tmp_use_magic_hash = this->use_magic_hash;
-#endif
+    const bool tmp_use_magic_hash = false;
     if (tmp_use_magic_hash)
     {
         switch (method)
@@ -645,7 +640,7 @@ void Aggregator::executeImplInner(
     static constexpr bool batch_get_key_holder = Method::State::can_batch_get_key_holder && enable_batch_get_key_holder;
     if constexpr (batch_get_key_holder)
     {
-        state.initBatchHandler(agg_process_info.start_row, agg_mini_batch);
+        state.initBatchHandler(agg_process_info.start_row, this->use_magic_hash);
         result.batch_get_key_holder = true;
     }
     using KeyHolderType = typename std::conditional<
@@ -881,7 +876,7 @@ void Aggregator::handleOneBatch(
     {
         // mini batch will only be used when HashTable is big(because reduce cache miss of agg data),
         // or when need to get key batch-wise.
-        mini_batch_size = agg_mini_batch;
+        mini_batch_size = this->use_magic_hash;
     }
 
     // i is the begin row index of each mini batch.
