@@ -510,13 +510,14 @@ protected:
         // However, the situation where start_row != 0 will only occur when spilling happens,
         // so there is no need to consider the performance impact of repeatedly calling countSerializeByteSizeForCmp.
         processed_row_idx = start_row;
-        byte_size.resize_fill_zero(key_columns[0]->size());
-        RUNTIME_CHECK(!byte_size.empty());
-        for (size_t i = 0; i < key_columns.size(); ++i)
-            key_columns[i]->countSerializeByteSizeForCmp(
-                byte_size,
-                nullptr,
-                collators.empty() ? nullptr : collators[i]);
+        // byte_size.resize_fill_zero(key_columns[0]->size());
+        // RUNTIME_CHECK(!byte_size.empty());
+        // for (size_t i = 0; i < key_columns.size(); ++i)
+        //     key_columns[i]->countSerializeByteSizeForCmp(
+        //         byte_size,
+        //         nullptr,
+        //         collators.empty() ? nullptr : collators[i]);
+        byte_size.resize_fill(key_columns[0]->size(), 40);
     }
 
     void prepareNextBatch(
