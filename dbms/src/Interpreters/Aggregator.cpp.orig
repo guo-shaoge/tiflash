@@ -991,21 +991,21 @@ void Aggregator::handleOneBatch(
             break;
 
         const size_t processed_size = *processed_rows - i + 1;
-        // if constexpr (compute_agg_data)
-        // {
-        //     for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data();
-        //          inst->that;
-        //          ++inst)
-        //     {
-        //         inst->batch_that->addBatch(
-        //             i,
-        //             processed_size,
-        //             places.get() + i - agg_process_info.start_row,
-        //             inst->state_offset,
-        //             inst->batch_arguments,
-        //             aggregates_pool);
-        //     }
-        // }
+        if constexpr (compute_agg_data)
+        {
+            for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data();
+                 inst->that;
+                 ++inst)
+            {
+                inst->batch_that->addBatch(
+                    i,
+                    processed_size,
+                    places.get() + i - agg_process_info.start_row,
+                    inst->state_offset,
+                    inst->batch_arguments,
+                    aggregates_pool);
+            }
+        }
 
         if unlikely (processed_size != mini_batch_size)
             break;
@@ -1014,24 +1014,7 @@ void Aggregator::handleOneBatch(
     }
 
     if likely (processed_rows)
-    {
-        if constexpr (compute_agg_data)
-        {
-            for (AggregateFunctionInstruction * inst = agg_process_info.aggregate_functions_instructions.data();
-                 inst->that;
-                 ++inst)
-            {
-                inst->batch_that->addBatch(
-                    0,
-                    *processed_rows + 1,
-                    places.get(),
-                    inst->state_offset,
-                    inst->batch_arguments,
-                    aggregates_pool);
-            }
-        }
         agg_process_info.start_row = *processed_rows + 1;
-    }
 }
 
 void NO_INLINE
