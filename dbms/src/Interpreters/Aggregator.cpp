@@ -49,7 +49,7 @@ extern const char force_magic_hash[];
 } // namespace FailPoints
 
 static constexpr size_t agg_prefetch_step = 16;
-static constexpr size_t agg_mini_batch = 1024;
+// static constexpr size_t agg_mini_batch = 1024;
 
 #define AggregationMethodName(NAME) AggregatedDataVariants::AggregationMethod_##NAME
 #define AggregationMethodNameTwoLevel(NAME) AggregatedDataVariants::AggregationMethod_##NAME##_two_level
@@ -640,6 +640,7 @@ void Aggregator::executeImplInner(
     static constexpr bool batch_get_key_holder = Method::State::can_batch_get_key_holder && enable_batch_get_key_holder;
     if constexpr (batch_get_key_holder)
     {
+        LOG_DEBUG(log, "gjt debug mini batch: {}", this->use_magic_hash);
         state.initBatchHandler(agg_process_info.start_row, this->use_magic_hash);
         result.batch_get_key_holder = true;
     }
