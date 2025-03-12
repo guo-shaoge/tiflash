@@ -609,7 +609,8 @@ void NO_INLINE Aggregator::executeImpl(
                 /*enable_agg_batch_get_key_holder=*/true>(method, result, agg_process_info, collators);
     }
 #else
-    const bool disable_prefetch = (method.data.getBufferSizeInBytes() < prefetch_threshold);
+    // const bool disable_prefetch = (method.data.getBufferSizeInBytes() < prefetch_threshold);
+    const bool disable_prefetch = true;
     if (disable_prefetch)
         executeImplInner<
             collect_hit_rate,
