@@ -911,10 +911,10 @@ void ColumnString::serializeToPosImpl(
             }
         }
 
-        UInt32 str_size = sizeAt(start + i);
         const void * src = &chars[offsetAt(start + i)];
         if constexpr (need_decode_collator)
         {
+            UInt32 str_size = sizeAt(start + i);
             auto sort_key
                 = derived_collator->sortKey(reinterpret_cast<const char *>(src), str_size - 1, *sort_key_container);
             // For terminating zero.
@@ -922,16 +922,17 @@ void ColumnString::serializeToPosImpl(
 
             tiflash_compiler_builtin_memcpy(pos[i], &str_size, sizeof(UInt32));
             pos[i] += sizeof(UInt32);
-            inline_memcpy(pos[i], sort_key.data, sort_key.size);
+            memcpy(pos[i], sort_key.data, sort_key.size);
             pos[i] += sort_key.size;
             *(pos[i]) = '\0';
             pos[i] += 1;
         }
         else
         {
+            const UInt32 str_size = sizeAt(start + i);
             tiflash_compiler_builtin_memcpy(pos[i], &str_size, sizeof(UInt32));
             pos[i] += sizeof(UInt32);
-            inline_memcpy(pos[i], src, str_size);
+            memcpy(pos[i], src, str_size);
             pos[i] += str_size;
         }
     }
