@@ -504,7 +504,7 @@ private:
 protected:
     bool inited() const { return !byte_size.empty(); }
 
-    void init(size_t start_row, const ColumnRawPtrs & key_columns, const TiDB::TiDBCollators & collators)
+    void init(size_t start_row, const ColumnRawPtrs & key_columns, const TiDB::TiDBCollators &)
     {
         // When start_row is not 0, byte_size will be re-initialized for the same block.
         // However, the situation where start_row != 0 will only occur when spilling happens,
@@ -517,7 +517,7 @@ protected:
         //         byte_size,
         //         nullptr,
         //         collators.empty() ? nullptr : collators[i]);
-        byte_size.resize_fill(key_columns[0]->size(), 40);
+        byte_size.resize_fill(key_columns[0]->size(), 12);
     }
 
     void prepareNextBatch(
@@ -533,16 +533,22 @@ protected:
             return;
 
         assert(processed_row_idx + cur_batch_size <= byte_size.size());
-        size_t mem_size = 0;
-        for (size_t i = processed_row_idx; i < processed_row_idx + cur_batch_size; ++i)
-            mem_size += byte_size[i];
+        size_t mem_size = 12 * cur_batch_size;
+        // for (size_t i = processed_row_idx; i < processed_row_idx + cur_batch_size; ++i)
+        //     mem_size += byte_size[i];
 
         auto * ptr = static_cast<char *>(pool->alignedAlloc(mem_size, 16, /*free_empty_head_chunk=*/true));
+        // for (size_t i = 0; i < cur_batch_size; ++i)
+        // {
+        //     pos[i] = ptr;
+        //     ori_pos[i] = ptr;
+        //     ptr += byte_size[i + processed_row_idx];
+        // }
         for (size_t i = 0; i < cur_batch_size; ++i)
         {
             pos[i] = ptr;
             ori_pos[i] = ptr;
-            ptr += byte_size[i + processed_row_idx];
+            ptr += 12;
         }
 
         for (size_t i = 0; i < key_columns.size(); ++i)
@@ -555,8 +561,8 @@ protected:
                 collators.empty() ? nullptr : collators[i],
                 &sort_key_container);
 
-        for (size_t i = 0; i < cur_batch_size; ++i)
-            real_byte_size[i] = pos[i] - ori_pos[i];
+        // for (size_t i = 0; i < cur_batch_size; ++i)
+        //     real_byte_size[i] = pos[i] - ori_pos[i];
 
         processed_row_idx += cur_batch_size;
     }
@@ -567,7 +573,7 @@ public:
     {
         santityCheck();
         assert(i < ori_pos.size());
-        return ArenaKeyHolder{StringRef{ori_pos[i], real_byte_size[i]}, pool};
+        return ArenaKeyHolder{StringRef{ori_pos[i], 12}, pool};
     }
 };
 
