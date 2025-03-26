@@ -17,6 +17,7 @@
 #include <Common/HashTable/HashMap.h>
 #include <Common/HashTable/HashSet.h>
 #include <Core/Block.h>
+#include <Common/HashTable/PhHashTable.h>
 
 namespace DB
 {
@@ -187,6 +188,9 @@ struct ConcurrentMapsTemplate
     // TODO: add more cases like Aggregator
 };
 
+template <typename Key, typename Mapped, typename Hash>
+using PhHashMap = PhHashTable<Key, Mapped, Hash>;
+
 template <typename Mapped>
 struct MapsTemplate
 {
@@ -194,7 +198,7 @@ struct MapsTemplate
     using key8Type = HashMap<UInt8, Mapped, TrivialHash, HashTableFixedGrower<8>>;
     using key16Type = HashMap<UInt16, Mapped, TrivialHash, HashTableFixedGrower<16>>;
     using key32Type = HashMap<UInt32, Mapped, HashCRC32<UInt32>>;
-    using key64Type = HashMap<UInt64, Mapped, HashCRC32<UInt64>>;
+    using key64Type = PhHashMap<UInt64, Mapped, HashCRC32<UInt64>>;
     using key_stringType = HashMapWithSavedHash<StringRef, Mapped>;
     using key_strbinpaddingType = HashMapWithSavedHash<StringRef, Mapped>;
     using key_strbinType = HashMapWithSavedHash<StringRef, Mapped>;
