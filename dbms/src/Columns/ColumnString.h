@@ -478,30 +478,48 @@ public:
             selector.size(),
             num_rows);
 
+        // // for (size_t i = 0; i < num_rows; ++i)
+        // //     static_cast<Derived &>(*columns[selector[i]]).insertFrom(*this, i);
+
+        // std::vector<std::vector<size_t>> selector_info;
+        // selector_info.resize(columns.size());
+
+        // for (size_t i = 0; i < columns.size(); ++i)
+        //     selector_info[i].reserve(num_rows / 4);
+
         // for (size_t i = 0; i < num_rows; ++i)
-        //     static_cast<Derived &>(*columns[selector[i]]).insertFrom(*this, i);
+        //     selector_info[selector[i]].push_back(i);
 
-        std::vector<std::vector<size_t>> selector_info;
-        selector_info.resize(columns.size());
+        // for (size_t i = 0; i < columns.size(); ++i)
+        //     columns[i]->reserve(selector_info[i].size());
 
-        for (size_t i = 0; i < columns.size(); ++i)
-            selector_info[i].reserve(num_rows / 4);
+        // for (size_t i = 0; i < columns.size(); ++i)
+        // {
+        //     auto & col = static_cast<ColumnString &>(*columns[i]);
+        //     const auto & info = selector_info[i];
+        //     for (size_t j = 0; j < info.size(); ++j)
+        //     {
+        //         if unlikely (j + 16 < info.size())
+        //             __builtin_prefetch(&chars[offsetAt(info[j + 16])]);
+        //         col.insertFrom(*this, info[j]);
+        //     }
+        // }
 
-        for (size_t i = 0; i < num_rows; ++i)
-            selector_info[selector[i]].push_back(i);
-
-        for (size_t i = 0; i < columns.size(); ++i)
-            columns[i]->reserve(selector_info[i].size());
-
-        for (size_t i = 0; i < columns.size(); ++i)
+        size_t batch_col_idx = 0;
+        const size_t batch_size = 64;
+        
+        while (batch_col_idx < columns.size())
         {
-            auto & col = static_cast<ColumnString &>(*columns[i]);
-            const auto & info = selector_info[i];
-            for (size_t j = 0; j < info.size(); ++j)
+            const size_t batch_end = batch_col_idx + batch_size;
+
+            for (size_t i = 0; i < num_rows; ++i)
             {
-                if unlikely (j + 16 < info.size())
-                    __builtin_prefetch(&chars[offsetAt(info[j + 16])]);
-                col.insertFrom(*this, info[j]);
+                if (!(selector[i] >= batch_col_idx && selector[i] < batch_end))
+                    continue;
+
+                static_cast<ColumnString &>(*columns[selector[i]]).insertFrom(*this, i);
+
+                batch_col_idx += batch_size;
             }
         }
     }
