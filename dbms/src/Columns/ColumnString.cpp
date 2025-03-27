@@ -1572,11 +1572,7 @@ void ColumnString::scatterTo(ScatterColumns & columns, const Selector & selector
     for (size_t i = 0; i < num_rows; ++i)
     {
         if likely (i + prefetch_step < selector.size())
-        {
-            __builtin_prefetch(&static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).chars);
-            __builtin_prefetch(&static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).offsets);
-            __builtin_prefetch(static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).getDataAt(size() - 1).data);
-        }
+            static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).prefetch();
         static_cast<ColumnString &>(*columns[selector[i]]).insertFrom(*this, i);
     }
 

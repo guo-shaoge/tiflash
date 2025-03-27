@@ -192,6 +192,11 @@ public:
 
     StringRef getDataAt(size_t n) const override { return StringRef(&chars[offsetAt(n)], sizeAt(n) - 1); }
 
+    void prefetch() const
+    {
+        __builtin_prefetch(chars.end().base());
+    }
+
     StringRef getDataAtWithTerminatingZero(size_t n) const override
     {
         return StringRef(&chars[offsetAt(n)], sizeAt(n));
