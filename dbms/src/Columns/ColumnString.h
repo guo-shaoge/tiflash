@@ -470,7 +470,40 @@ public:
 
     void scatterTo(ScatterColumns & columns, const Selector & selector) const override
     {
-        scatterToImpl<ColumnString>(columns, selector);
+        size_t num_rows = size();
+
+        RUNTIME_CHECK_MSG(
+            num_rows == selector.size(),
+            "Size of selector: {} doesn't match size of column: {}",
+            selector.size(),
+            num_rows);
+
+        // for (size_t i = 0; i < num_rows; ++i)
+        //     static_cast<Derived &>(*columns[selector[i]]).insertFrom(*this, i);
+
+        std::vector<std::vector<size_t>> selector_info;
+        selector_info.resize(columns.size());
+
+        for (size_t i = 0; i < columns.size(); ++i)
+            selector_info[i].reserve(num_rows / 4);
+
+        for (size_t i = 0; i < num_rows; ++i)
+            selector_info[selector[i]].push_back(i);
+
+        for (size_t i = 0; i < columns.size(); ++i)
+            columns[i]->reserve(selector_info[i].size());
+
+        for (size_t i = 0; i < columns.size(); ++i)
+        {
+            auto & col = static_cast<ColumnString &>(*columns[i]);
+            const auto & info = selector_info[i];
+            for (size_t j = 0; j < info.size(); ++j)
+            {
+                if unlikely (j + 16 < info.size())
+                    __builtin_prefetch(&chars[offsetAt(info[j + 16])]);
+                col.insertFrom(*this, info[j]);
+            }
+        }
     }
 
     void scatterTo(ScatterColumns & columns, const Selector & selector, const BlockSelective & selective) const override
