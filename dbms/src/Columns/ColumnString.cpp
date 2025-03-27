@@ -1539,49 +1539,46 @@ void ColumnString::scatterTo(ScatterColumns & columns, const Selector & selector
             selector.size(),
             num_rows);
 
-    size_t num_columns = columns.size();
+    // size_t num_columns = columns.size();
 
-    // 1. 预转换 Derived 指针，避免每次 static_cast
-    std::vector<ColumnString *> derived_columns(num_columns);
-    for (size_t i = 0; i < num_columns; ++i)
-        derived_columns[i] = static_cast<ColumnString *>(columns[i].get());
+    // // 1. 预转换 Derived 指针，避免每次 static_cast
+    // std::vector<ColumnString *> derived_columns(num_columns);
+    // for (size_t i = 0; i < num_columns; ++i)
+    //     derived_columns[i] = static_cast<ColumnString *>(columns[i].get());
 
-    // 2. 按 selector 分桶，提高缓存命中率
-    std::vector<std::vector<size_t>> row_buckets(num_columns);
-    for (size_t i = 0; i < num_columns; ++i)
-        row_buckets[i].reserve(num_rows / columns.size());
-    for (size_t i = 0; i < num_rows; ++i)
-        row_buckets[selector[i]].push_back(i);
-    for (size_t i = 0; i < num_columns; ++i)
-        columns[i]->reserve(row_buckets[i].size());
+    // // 2. 按 selector 分桶，提高缓存命中率
+    // std::vector<std::vector<size_t>> row_buckets(num_columns);
+    // for (size_t i = 0; i < num_columns; ++i)
+    //     row_buckets[i].reserve(num_rows / columns.size());
+    // for (size_t i = 0; i < num_rows; ++i)
+    //     row_buckets[selector[i]].push_back(i);
+    // for (size_t i = 0; i < num_columns; ++i)
+    //     columns[i]->reserve(row_buckets[i].size());
 
-    // 3. 批量插入，提高性能
-    for (size_t col = 0; col < num_columns; ++col)
-    {
-        ColumnString *column = derived_columns[col];
-        for (size_t row_idx : row_buckets[col])
-            column->insertFrom(*this, row_idx);
-    }
+    // // 3. 批量插入，提高性能
+    // for (size_t col = 0; col < num_columns; ++col)
+    // {
+    //     ColumnString *column = derived_columns[col];
+    //     for (size_t row_idx : row_buckets[col])
+    //         column->insertFrom(*this, row_idx);
+    // }
 
 
 
     // // for (size_t i = 0; i < num_rows; ++i)
     // //     static_cast<Derived &>(*columns[selector[i]]).insertFrom(*this, i);
-    
-    // for (size_t i = 0; i < columns.size(); ++i)
-    //     columns[i]->reserve(num_rows/4);
 
-    // constexpr size_t prefetch_step = 16;
-    // for (size_t i = 0; i < num_rows; ++i)
-    // {
-    //     if likely (i + prefetch_step < selector.size())
-    //     {
-    //         __builtin_prefetch(&static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).chars);
-    //         __builtin_prefetch(&static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).offsets);
-    //         __builtin_prefetch(static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).getDataAt(size() - 1).data);
-    //     }
-    //     static_cast<ColumnString &>(*columns[selector[i]]).insertFrom(*this, i);
-    // }
+    constexpr size_t prefetch_step = 16;
+    for (size_t i = 0; i < num_rows; ++i)
+    {
+        if likely (i + prefetch_step < selector.size())
+        {
+            __builtin_prefetch(&static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).chars);
+            __builtin_prefetch(&static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).offsets);
+            __builtin_prefetch(static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).getDataAt(size() - 1).data);
+        }
+        static_cast<ColumnString &>(*columns[selector[i]]).insertFrom(*this, i);
+    }
 
     // // 1. 直接遍历 selector，减少缓存开销
     // constexpr size_t BATCH_SIZE = 8; // 批量处理，提高 cache 效率
