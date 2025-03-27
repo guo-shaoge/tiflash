@@ -1529,6 +1529,133 @@ void ColumnString::updateWeakHash32(
     updateWeakHash32Impl(info, LoopOneColumnWithHashInfo<false>);
 }
 
+void ColumnString::scatterTo(ScatterColumns & columns, const Selector & selector) const
+{
+    size_t num_rows = size();
+
+    RUNTIME_CHECK_MSG(
+            num_rows == selector.size(),
+            "Size of selector: {} doesn't match size of column: {}",
+            selector.size(),
+            num_rows);
+
+    // // for (size_t i = 0; i < num_rows; ++i)
+    // //     static_cast<Derived &>(*columns[selector[i]]).insertFrom(*this, i);
+    
+    for (size_t i = 0; i < columns.size(); ++i)
+        columns[i]->reserve(num_rows/4);
+
+    constexpr size_t prefetch_step = 16;
+    for (size_t i = 0; i < num_rows; ++i)
+    {
+        if likely (i + prefetch_step < selector.size())
+            __builtin_prefetch(static_cast<ColumnString &>(*columns[selector[i + prefetch_step]]).getDataAt(size() - 1).data);
+        static_cast<ColumnString &>(*columns[selector[i]]).insertFrom(*this, i);
+    }
+
+    // // 1. 直接遍历 selector，减少缓存开销
+    // constexpr size_t BATCH_SIZE = 8; // 批量处理，提高 cache 效率
+    // size_t i = 0;
+
+    // // 2. 分批处理，减少 insertFrom 的调用开销
+    // for (; i + BATCH_SIZE <= num_rows; i += BATCH_SIZE)
+    // {
+    //     auto & col0 = static_cast<ColumnString &>(*columns[selector[i + 0]]);
+    //     auto & col1 = static_cast<ColumnString &>(*columns[selector[i + 1]]);
+    //     auto & col2 = static_cast<ColumnString &>(*columns[selector[i + 2]]);
+    //     auto & col3 = static_cast<ColumnString &>(*columns[selector[i + 3]]);
+    //     auto & col4 = static_cast<ColumnString &>(*columns[selector[i + 4]]);
+    //     auto & col5 = static_cast<ColumnString &>(*columns[selector[i + 5]]);
+    //     auto & col6 = static_cast<ColumnString &>(*columns[selector[i + 6]]);
+    //     auto & col7 = static_cast<ColumnString &>(*columns[selector[i + 7]]);
+
+    //     col0.insertFrom(*this, i + 0);
+    //     col1.insertFrom(*this, i + 1);
+    //     col2.insertFrom(*this, i + 2);
+    //     col3.insertFrom(*this, i + 3);
+    //     col4.insertFrom(*this, i + 4);
+    //     col5.insertFrom(*this, i + 5);
+    //     col6.insertFrom(*this, i + 6);
+    //     col7.insertFrom(*this, i + 7);
+    // }
+
+    // // 3. 处理剩余的元素
+    // for (; i < num_rows; ++i)
+    // {
+    //     auto & col = static_cast<ColumnString &>(*columns[selector[i]]);
+    //     col.insertFrom(*this, i);
+    // }
+
+    // const size_t batch_size = 64;
+    // assert((columns.size() % batch_size) == 0);
+
+    // std::vector<std::vector<size_t>> selector_info;
+    // selector_info.resize(batch_size);
+    // for (size_t i = 0; i < columns.size(); ++i)
+    //     selector_info[i].reserve(num_rows / 2);
+    // for (size_t i = 0; i < num_rows; ++i)
+    //     selector_info[selector[i]].push_back(i);
+
+    // for (size_t batch_idx = 0; batch_idx < columns.size(); batch_idx += batch_size)
+    // {
+    //     for (size_t col_idx = batch_idx; col_idx < batch_idx + batch_size; ++col_idx)
+    //     {
+    //         auto & col = static_cast<ColumnString &>(*columns[col_idx]);
+    //         const auto & info = selector_info[col_idx];
+    //         for (size_t j = 0; j < info.size(); ++j)
+    //         {
+    //             if unlikely (j + 8 < info.size())
+    //                 __builtin_prefetch(&chars[offsetAt(info[j + 8])]);
+    //             // col.insertFrom(*this, info[j]);
+    //             col.insertFromImpl(*this, info[j]);
+    //         }
+    //     }
+    // }
+
+    // // std::vector<std::vector<size_t>> selector_info;
+    // // selector_info.resize(columns.size());
+
+    // // for (size_t i = 0; i < columns.size(); ++i)
+    // //     selector_info[i].reserve(num_rows / 4);
+
+    // // for (size_t i = 0; i < num_rows; ++i)
+    // //     selector_info[selector[i]].push_back(i);
+
+    // // for (size_t i = 0; i < columns.size(); ++i)
+    // //     columns[i]->reserve(columns[i]->size() + selector_info[i].size());
+
+    // // for (size_t i = 0; i < columns.size(); ++i)
+    // // {
+    // //     auto & col = static_cast<ColumnString &>(*columns[i]);
+    // //     const auto & info = selector_info[i];
+    // //     for (size_t j = 0; j < info.size(); ++j)
+    // //     {
+    // //         if unlikely (j + 8 < info.size())
+    // //             __builtin_prefetch(&chars[offsetAt(info[j + 8])]);
+    // //         // col.insertFrom(*this, info[j]);
+    // //         col.insertFromImpl(*this, info[j]);
+    // //     }
+    // // }
+
+    // // size_t batch_col_idx = 0;
+    // // const size_t batch_size = 64;
+    // // 
+    // // while (batch_col_idx < columns.size())
+    // // {
+    // //     const size_t batch_end = batch_col_idx + batch_size;
+
+    // //     for (size_t i = 0; i < num_rows; ++i)
+    // //     {
+    // //         if (!(selector[i] >= batch_col_idx && selector[i] < batch_end))
+    // //             continue;
+
+    // //         static_cast<ColumnString &>(*columns[selector[i]]).insertFrom(*this, i);
+
+    // //         batch_col_idx += batch_size;
+    // //     }
+    // // }
+}
+
 void ColumnString::updateWeakHash32(
     WeakHash32 & hash,
     const TiDB::TiDBCollatorPtr & collator,
