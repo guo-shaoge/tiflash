@@ -43,6 +43,21 @@ public:
 
     using TwoLevelHashTable<Key, Mapped, Hash, Grower, Allocator, ImplTable<Key, Mapped, Hash>>::TwoLevelHashTable;
 
+    size_t ctrlCmpTimes() const
+    {
+        size_t collisions = 0;
+        for (auto i = 0u; i < this->NUM_BUCKETS; ++i)
+            collisions += this->impls[i].ctrlCmpTimes();
+        return collisions;
+    }
+    size_t keyCmpTimes() const
+    {
+        size_t collisions = 0;
+        for (auto i = 0u; i < this->NUM_BUCKETS; ++i)
+            collisions += this->impls[i].keyCmpTimes();
+        return collisions;
+    }
+
     template <typename Func>
     void ALWAYS_INLINE forEachMapped(Func && func)
     {

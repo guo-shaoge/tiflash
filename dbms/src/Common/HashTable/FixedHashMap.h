@@ -136,6 +136,7 @@ public:
 
     using Base::Base;
 
+    size_t getCollisions() const { return 0; }
     template <typename Func>
     void ALWAYS_INLINE mergeToViaEmplace(Self & that, Func && func)
     {

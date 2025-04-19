@@ -58,8 +58,39 @@ static constexpr size_t agg_mini_batch = 256;
 #define ToAggregationMethodPtr(NAME, ptr) (reinterpret_cast<AggregationMethodName(NAME) *>(ptr))
 #define ToAggregationMethodPtrTwoLevel(NAME, ptr) (reinterpret_cast<AggregationMethodNameTwoLevel(NAME) *>(ptr))
 
+template <typename Method>
+void logHTCollision(Method & method)
+{
+    if constexpr (Method::Data::is_phmap)
+    {
+        LOG_DEBUG(Logger::get(), "gjt debug ctrl_cmp_times: {}, key_cmp_times: {}",
+                method.data.ctrlCmpTimes(),
+                method.data.keyCmpTimes());
+    }
+    else
+    {
+        LOG_DEBUG(Logger::get(), "gjt debug collision: {}",
+                method.data.getCollisions());
+    }
+}
+
 AggregatedDataVariants::~AggregatedDataVariants()
 {
+#define M(NAME, IS_TWO_LEVEL) \
+    case (AggregationMethodType(NAME)): \
+    { \
+        logHTCollision(*ToAggregationMethodPtr(NAME, this->aggregation_method_impl)); \
+        break; \
+    };
+
+    switch (this->type)
+    {
+        APPLY_FOR_AGGREGATED_VARIANTS(M)
+    default:
+        break;
+    }
+#undef M
+
     if (aggregator && !aggregator->all_aggregates_has_trivial_destructor)
     {
         try

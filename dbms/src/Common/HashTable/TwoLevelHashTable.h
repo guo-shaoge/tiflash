@@ -62,6 +62,7 @@ public:
 
     static constexpr bool is_string_hash_map = false;
     static constexpr bool is_two_level = true;
+    static constexpr bool is_phmap = ImplTable::is_phmap;
 
     size_t hash(const Key & x) const { return Hash::operator()(x); }
 
@@ -72,6 +73,15 @@ public:
     {
         for (auto & impl : impls)
             impl.setResizeCallback(resize_callback);
+    }
+
+
+    size_t getCollisions() const
+    {
+        size_t collisions = 0;
+        for (auto & impl : impls)
+            collisions += impl.getCollisions();
+        return collisions;
     }
 
 protected:

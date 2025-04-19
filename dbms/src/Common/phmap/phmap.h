@@ -2003,6 +2003,8 @@ public:
     {
         return HashElement{hash_ref()}(key);
     }
+    size_t keyCmpTimes() const { return key_cmp_times; }
+    size_t ctrlCmpTimes() const { return ctrl_cmp_times; }
 
 protected:
     template <class K = key_type>
@@ -2012,8 +2014,10 @@ protected:
         while (true)
         {
             Group g{ctrl_ + seq.offset()};
+            ++ctrl_cmp_times;
             for (int i : g.Match((h2_t)H2(hashval)))
             {
+                ++key_cmp_times;
                 offset = seq.offset((size_t)i);
                 if (PHMAP_PREDICT_TRUE(
                         PolicyTraits::apply(EqualElement<K>{key, eq_ref()}, PolicyTraits::element(slots_ + offset))))
@@ -2569,6 +2573,8 @@ private:
         hasher{},
         key_equal{},
         allocator_type{}};
+    mutable size_t ctrl_cmp_times = 0;
+    mutable size_t key_cmp_times = 0;
 };
 
 // --------------------------------------------------------------------------

@@ -112,6 +112,8 @@ public:
 
     using Base::Base;
 
+    size_t getCollisions() const { return 0; }
+
     /// Merge every cell's value of current map into the destination map.
     ///  Func should have signature void(Mapped & dst, Mapped & src, bool emplaced).
     ///  Each filled cell in current map will invoke func once. If that map doesn't
