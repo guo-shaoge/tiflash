@@ -40,11 +40,6 @@ public:
         : SourceOp(options.exec_context, String(options.debug_tag))
         , workers(options.workers)
         , action(options.columns_to_read, options.extra_table_id_index)
-        , io_profile_info(IOProfileInfo::createForRemote(
-              profile_info_ptr,
-              /*connections=*/2,
-              {ConnectionProfileInfo::ConnectionType::InterZoneRemote,
-               ConnectionProfileInfo::ConnectionType::InnerZoneRemote}))
     {
         setHeader(action.getHeader());
     }
@@ -53,7 +48,7 @@ public:
 
     String getName() const override { return NAME; }
 
-    IOProfileInfoPtr getIOProfileInfo() const override { return io_profile_info; }
+    IOProfileInfoPtr getIOProfileInfo() const override { return IOProfileInfo::createForLocal(profile_info_ptr); }
 
 protected:
     void operateSuffixImpl() override;
@@ -88,10 +83,6 @@ private:
 
     // Count the time consumed by reading blocks in the stream of segment tasks.
     double duration_read_sec = 0;
-
-    static constexpr size_t INTER_ZONE_INDEX = 0;
-    static constexpr size_t INNER_ZONE_INDEX = 1;
-    IOProfileInfoPtr io_profile_info;
 };
 
 } // namespace DB::DM::Remote

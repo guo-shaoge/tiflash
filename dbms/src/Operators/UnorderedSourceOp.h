@@ -34,8 +34,7 @@ public:
         int extra_table_id_index_,
         const String & req_id,
         const RuntimeFilteList & runtime_filter_list_ = std::vector<RuntimeFilterPtr>{},
-        int max_wait_time_ms_ = 0,
-        bool is_disagg_ = false);
+        int max_wait_time_ms_ = 0);
 
     ~UnorderedSourceOp() override
     {
@@ -51,7 +50,7 @@ public:
 
     String getName() const override { return "UnorderedSourceOp"; }
 
-    IOProfileInfoPtr getIOProfileInfo() const override { return io_profile_info; }
+    IOProfileInfoPtr getIOProfileInfo() const override { return IOProfileInfo::createForLocal(profile_info_ptr); }
 
     // only for unit test
     // The logic order of unit test is error, it will build source_op firstly and register rf secondly.
@@ -65,7 +64,6 @@ public:
 
 protected:
     void operatePrefixImpl() override;
-    void operateSuffixImpl() override;
 
     OperatorStatus readImpl(Block & block) override;
 
@@ -78,6 +76,5 @@ private:
     int max_wait_time_ms;
 
     bool done = false;
-    IOProfileInfoPtr io_profile_info;
 };
 } // namespace DB

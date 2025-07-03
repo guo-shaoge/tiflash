@@ -208,9 +208,7 @@ public:
             /*store_address*/ "127.0.0.1",
             store->keyspace_id,
             store->physical_table_id,
-            /*pk_col_id*/ 0,
-            /*is_same_zone*/ false,
-            /*establish_disagg_task_resp_size*/ 0);
+            /*pk_col_id*/ 0);
     }
 
     void initReadNodePageCacheIfUninitialized()
@@ -722,9 +720,7 @@ try
             /*store_address*/ "127.0.0.1",
             store->keyspace_id,
             store->physical_table_id,
-            /*pk_col_id*/ 0,
-            /*is_same_zone*/ false,
-            /*establish_disagg_task_resp_size*/ 0);
+            /*pk_col_id*/ 0);
 
         auto seg_id = seg_task->segment->segmentId();
 
@@ -865,9 +861,7 @@ try
         /*store_address*/ "127.0.0.1",
         store->keyspace_id,
         store->physical_table_id,
-        /*pk_col_id*/ 0,
-        /*is_same_zone*/ false,
-        /*establish_disagg_task_resp_size*/ 0);
+        /*pk_col_id*/ 0);
     const auto & cfs = seg_task->read_snapshot->delta->getMemTableSetSnapshot()->getColumnFiles();
     ASSERT_EQ(cfs.size(), 1);
     const auto & cf = cfs.front();
