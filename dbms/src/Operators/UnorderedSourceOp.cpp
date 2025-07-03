@@ -98,4 +98,29 @@ void UnorderedSourceOp::operatePrefixImpl()
         }
     });
 }
+void UnorderedSourceOp::operateSuffixImpl()
+{
+        // If io_profile_info is local, it means this table scan only read local data.
+    // So no need to update connection info, because connection info indicate it's a remote table scan,
+    // like CoprocessorReader or read delta data from WN.
+    // if (!io_profile_info->is_local)
+    // {
+        std::call_once(task_pool->getRemoteConnectionInfoFlag(), [&]() {
+                RUNTIME_CHECK(task_pool->getRemoteConnectionInfo().empty(), task_pool->getRemoteConnectionInfo().size());
+            // auto & connection_infos = io_profile_info->connection_profile_infos;
+            // RUNTIME_CHECK(connection_infos.size() == 2, connection_infos.size());
+
+            // auto pool_connection_info_opt = task_pool->getRemoteConnectionInfo();
+            // RUNTIME_CHECK(
+            //     pool_connection_info_opt.has_value() || (task_pool->getTotalReadTasks() == 0),
+            //     pool_connection_info_opt.has_value(),
+            //     task_pool->getTotalReadTasks());
+            // if (pool_connection_info_opt)
+            // {
+            //     connection_infos[0] = pool_connection_info_opt->first;
+            //     connection_infos[1] = pool_connection_info_opt->second;
+            // }
+        });
+    // }
+}
 } // namespace DB

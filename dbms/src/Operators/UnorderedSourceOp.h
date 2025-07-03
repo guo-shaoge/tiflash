@@ -64,6 +64,7 @@ public:
 
 protected:
     void operatePrefixImpl() override;
+    void operateSuffixImpl() override;
 
     OperatorStatus readImpl(Block & block) override;
 
