@@ -249,7 +249,7 @@ void LocalAdmissionController::fetchTokensFromGAC(
                 tiflash_resource_group,
                 type_gac_req_ru_consumption_delta,
                 info.resource_group_name)
-                .Set(info.ru_consumption_delta);
+                .Increment(info.ru_consumption_delta);
         }
     }
 
