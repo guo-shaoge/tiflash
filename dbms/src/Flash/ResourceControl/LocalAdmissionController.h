@@ -459,13 +459,13 @@ public:
     void consumeCPUResource(const std::string & name, double ru, uint64_t cpu_time_in_ns)
     {
         consumeResource(name, ru, cpu_time_in_ns);
-        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_compute_ru_consumption, name).Set(ru);
+        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_compute_ru_consumption, name).Add(ru);
     }
 
     void consumeBytesResource(const std::string & name, double ru)
     {
         consumeResource(name, ru, 0);
-        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_storage_ru_consumption, name).Set(ru);
+        GET_RESOURCE_GROUP_METRIC(tiflash_resource_group, type_storage_ru_consumption, name).Add(ru);
     }
 
     uint64_t estWaitDuraMS(const std::string & name) const
