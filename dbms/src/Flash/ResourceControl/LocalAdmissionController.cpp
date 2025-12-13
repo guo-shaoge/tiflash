@@ -127,7 +127,10 @@ void ResourceGroup::endRequestWithoutLock()
 bool ResourceGroup::shouldReportRUConsumption(const SteadyClock::time_point & now) const
 {
     std::lock_guard lock(mu);
+    // todo remove this log later.
     const auto elapsed = now - last_request_gac_timepoint;
+        LOG_DEBUG(log, "shouldReportRUConsumption check at now: {}, last: {}, elapsed: {}, delta", now.time_since_epoch().count(), last_request_gac_timepoint.time_since_epoch().count(),
+            std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(), ru_consumption_delta);
     RUNTIME_CHECK(elapsed.count() >= 0, elapsed.count());
     if (elapsed >= LocalAdmissionController::DEFAULT_TARGET_PERIOD)
     {
@@ -599,7 +602,7 @@ LocalAdmissionController::doRequestGAC(const TokenBucketRequestPBVec & last_roun
             }
             catch(const std::exception& e)
             {
-                LOG_ERROR(log, "request to GAC failed: {}, will retry later", e.what());
+                LOG_ERROR(log, "request to GAC failed: {}, {}, will retry later", req.ShortDebugString(),e.what());
                 return TokenBucketRequestPBVec(local_gac_requests.begin() + i, local_gac_requests.end());
             }
             LOG_DEBUG(log, "request to GAC done, req: {}. resp: {}", req.ShortDebugString(), resp.ShortDebugString());
