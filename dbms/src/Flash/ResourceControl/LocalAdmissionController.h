@@ -535,7 +535,7 @@ private:
         {
             {
                 // todo remove this log later.
-                LOG_DEBUG(log, "resource group {}/{} low token triggered", keyspace_id, name);
+                // LOG_DEBUG(log, "resource group {}/{} low token triggered", keyspace_id, name);
                 std::lock_guard lock(mu);
                 keyspace_low_token_resource_groups.insert({keyspace_id, name});
             }
