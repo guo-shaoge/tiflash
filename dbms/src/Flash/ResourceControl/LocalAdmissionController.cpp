@@ -19,7 +19,6 @@
 
 namespace DB
 {
-using TokenBucketRequestPBVec = std::vector<resource_manager::TokenBucketsRequest>;
 void ResourceGroup::initStaticTokenBucket(int64_t capacity)
 {
     std::lock_guard lock(mu);

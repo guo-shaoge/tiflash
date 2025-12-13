@@ -480,6 +480,8 @@ public:
 #ifndef DBMS_PUBLIC_GTEST
 private:
 #endif
+    using TokenBucketRequestPBVec = std::vector<resource_manager::TokenBucketsRequest>;
+
     static const std::string GAC_RESOURCE_GROUP_ETCD_PATH;
     static const std::string GAC_KEYSPACE_RESOURCE_GROUP_ETCD_PATH;
     static constexpr auto NETWORK_EXCEPTION_RETRY_DURATION_SEC = 3;
