@@ -155,8 +155,6 @@ void ResourceGroup::updateNormalMode(double add_tokens, double new_capacity, con
     std::lock_guard lock(mu);
     endRequestWithoutLock();
 
-    LOG_DEBUG(log, "before updateNormalMode: {}", bucket->toString());
-
     bucket_mode = TokenBucketMode::normal_mode;
     if (new_capacity <= 0.0)
     {
@@ -193,8 +191,6 @@ void ResourceGroup::updateTrickleMode(
 
     std::lock_guard lock(mu);
     endRequestWithoutLock();
-
-    LOG_DEBUG(log, "before updateTrickleMode: {}", bucket->toString());
 
     if (new_capacity <= 0.0)
     {
@@ -554,7 +550,7 @@ LocalAdmissionController::doRequestGAC(const TokenBucketRequestPBVec & last_roun
             local_gac_requests = last_round_failed_requests;
             need_handle_prev_req = false;
         }
-        if (local_gac_requests.empty())
+        if likely (local_gac_requests.empty())
         {
             std::unique_lock<std::mutex> lock(gac_requests_mu);
             gac_requests_cv.wait(lock, [this]() { return stopped.load() || !gac_requests.empty(); });
@@ -671,6 +667,7 @@ std::vector<std::pair<KeyspaceID, std::string>> LocalAdmissionController::handle
         // when the acquire_token_req is only for report RU consumption or GAC got error(like nan token).
         if (one_resp.granted_r_u_tokens().empty())
         {
+            // todo remove this log later.
             LOG_ERROR(log, "{} empty granted_r_u_tokens()", err_msg);
             resource_group->endRequest();
             continue;
