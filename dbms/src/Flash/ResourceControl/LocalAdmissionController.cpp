@@ -735,7 +735,7 @@ std::vector<std::pair<KeyspaceID, std::string>> LocalAdmissionController::handle
         if unlikely (fill_rate != 0)
             LOG_ERROR(log, "{} unexpected fill_rate: {} one_resp: {}", err_msg, fill_rate, one_resp.ShortDebugString());
 
-        LOG_DEBUG(log, "GAC resp: {}", one_resp.ShortDebugString()));
+        LOG_DEBUG(log, "GAC resp: {}", one_resp.ShortDebugString());
         if (trickle_ms == 0)
         {
             // GAC has enough tokens for LAC.
