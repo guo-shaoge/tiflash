@@ -155,6 +155,8 @@ void ResourceGroup::updateNormalMode(double add_tokens, double new_capacity, con
     std::lock_guard lock(mu);
     endRequestWithoutLock();
 
+    LOG_DEBUG(log, "before updateNormalMode: {}", bucket->toString());
+
     bucket_mode = TokenBucketMode::normal_mode;
     if (new_capacity <= 0.0)
     {
@@ -191,6 +193,8 @@ void ResourceGroup::updateTrickleMode(
 
     std::lock_guard lock(mu);
     endRequestWithoutLock();
+
+    LOG_DEBUG(log, "before updateTrickleMode: {}", bucket->toString());
 
     if (new_capacity <= 0.0)
     {
@@ -731,6 +735,7 @@ std::vector<std::pair<KeyspaceID, std::string>> LocalAdmissionController::handle
         if unlikely (fill_rate != 0)
             LOG_ERROR(log, "{} unexpected fill_rate: {} one_resp: {}", err_msg, fill_rate, one_resp.ShortDebugString());
 
+        LOG_DEBUG(log, "GAC resp: {}", one_resp.ShortDebugString()));
         if (trickle_ms == 0)
         {
             // GAC has enough tokens for LAC.
