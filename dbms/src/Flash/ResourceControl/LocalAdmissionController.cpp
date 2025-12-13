@@ -151,8 +151,9 @@ double ResourceGroup::getAcquireRUNumWithoutLock(double speed, uint32_t n_sec, d
     double acquire_num = speed * n_sec * amplification;
 
     // This should not happen, but still add this to avoid stuck.
-    if unlikely (acquire_num == 0.0 && remaining_ru == 0.0)
-        acquire_num = DEFAULT_BUFFER_TOKENS;
+    if unlikely (acquire_num == 0.0)
+        if (!burstable && remaining_token <= bucket->getConfig().low_token_threshold/2)
+            acquire_num = DEFAULT_BUFFER_TOKENS;
 
     // The purpose of subtracting remaining_ru is try to ensure that the number of local tokens
     // always stays same with the amount consumed.
