@@ -387,6 +387,8 @@ void LocalAdmissionController::mainLoop()
 
         try
         {
+            // todo remove this log later.
+            LOG_DEBUG(log, "LAC mainLoop tick at {}", current_tick.time_since_epoch().count());
             while (current_tick >= cur_tick_end)
                 cur_tick_end += tick_interval;
 
@@ -549,6 +551,12 @@ LocalAdmissionController::doRequestGAC(const TokenBucketRequestPBVec & last_roun
         {
             local_gac_requests = last_round_failed_requests;
             need_handle_prev_req = false;
+            {
+                std::lock_guard lock(gac_requests_mu);
+                local_gac_requests.insert(
+                    local_gac_requests.end(), gac_requests.begin(), gac_requests.end());
+                gac_requests.clear();
+            }
         }
         if likely (local_gac_requests.empty())
         {

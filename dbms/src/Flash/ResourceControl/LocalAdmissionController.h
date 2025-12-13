@@ -169,6 +169,20 @@ private:
     {
         const auto now = SteadyClock::now();
         std::lock_guard lock(mu);
+
+        // todo remove this log later.
+        if (ru > user_ru_per_sec)
+        {
+            LOG_DEBUG(
+                log,
+                "resource group({} keyspace={}) consume resource ru={}, cpu_time_in_ns={}, bucket: {}, mode: {}",
+                name,
+                keyspace_id,
+                ru,
+                cpu_time_in_ns_,
+                bucket->toString(),
+                magic_enum::enum_name(bucket_mode));
+        }
         cpu_time_in_ns += cpu_time_in_ns_;
         ru_consumption_delta += ru;
         ru_consumption_delta_for_compute_speed += ru;
@@ -520,6 +534,8 @@ private:
         if (group->lowToken() || group->trickleModeLeaseExpire(SteadyClock::now()))
         {
             {
+                // todo remove this log later.
+                LOG_DEBUG(log, "resource group {}/{} low token triggered", keyspace_id, name);
                 std::lock_guard lock(mu);
                 keyspace_low_token_resource_groups.insert({keyspace_id, name});
             }
