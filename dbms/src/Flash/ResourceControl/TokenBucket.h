@@ -96,7 +96,7 @@ public:
 
     std::string toString() const
     {
-        return fmt::format("tokens: {}, fill_rate: {}, capacity: {}", tokens, fill_rate, capacity);
+        return fmt::format("tokens: {}, fill_rate: {}, capacity: {}, low_token_threshold: {}", tokens, fill_rate, capacity, low_token_threshold);
     }
 
     uint64_t estWaitDuraMS(uint64_t max_wait_dura_ms) const
