@@ -82,7 +82,7 @@ size_t getPercentileIndex(size_t size, double percentile) {
     }
     return index;
 }
-void analyzeRUUsage(std::vector<double>& cpu_ru_stats)
+void analyzeRUUsage(std::vector<double>& cpu_ru_stats, const LoggerPtr & log)
 {
     if (cpu_ru_stats.empty())
     {
@@ -142,7 +142,7 @@ std::optional<GACRequestInfo> ResourceGroup::buildRequestInfoIfNecessary(const S
         return {};
     }
 
-    analyzeRUUsage(cpu_ru_stats);
+    analyzeRUUsage(cpu_ru_stats, log);
     cpu_ru_stats.clear();
     
     const auto consumption_delta_info = updateRUConsumptionDeltaInfoWithoutLock();
