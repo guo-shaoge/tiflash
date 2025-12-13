@@ -542,7 +542,8 @@ static std::vector<std::pair<KeyspaceID, std::string>> extractGACReqNames(
     return res;
 }
 
-TokenBucketRequestPBVec LocalAdmissionController::doRequestGAC(const TokenBucketRequestPBVec & last_round_failed_requests)
+LocalAdmissionController::TokenBucketRequestPBVec 
+LocalAdmissionController::doRequestGAC(const TokenBucketRequestPBVec & last_round_failed_requests)
 {
     bool need_handle_prev_req = !last_round_failed_requests.empty();
     while (!stopped.load())
@@ -585,7 +586,6 @@ TokenBucketRequestPBVec LocalAdmissionController::doRequestGAC(const TokenBucket
                 LOG_ERROR(log, "request to GAC failed: {}, will retry later", e.what());
                 return TokenBucketRequestPBVec(local_gac_requests.begin() + i, local_gac_requests.end());
             }
-            
             LOG_DEBUG(log, "request to GAC done, req: {}. resp: {}", req.ShortDebugString(), resp.ShortDebugString());
 
             auto handled = handleTokenBucketsResp(resp);

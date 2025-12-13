@@ -601,7 +601,7 @@ private:
     void checkDegradeMode();
 
     // requestGACLoop related methods.
-    TokenBucketRequestPBVec doRequestGAC(const TokenBucketRequestPBVec & prev_local_gac_requests);
+    TokenBucketRequestPBVec doRequestGAC(const TokenBucketRequestPBVec & last_round_failed_requests);
 
     // watchGACLoop related methods.
     void doWatch(const std::string & etcd_path);
