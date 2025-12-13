@@ -19,6 +19,7 @@
 
 namespace DB
 {
+using TokenBucketRequestPBVec = std::vector<resource_manager::TokenBucketsRequest>;
 void ResourceGroup::initStaticTokenBucket(int64_t capacity)
 {
     std::lock_guard lock(mu);
@@ -505,11 +506,12 @@ std::optional<resource_manager::TokenBucketsRequest> LocalAdmissionController::b
 
 void LocalAdmissionController::requestGACLoop()
 {
+    TokenBucketRequestPBVec prev_local_gac_requests;
     while (!stopped.load())
     {
         try
         {
-            doRequestGAC();
+            prev_local_gac_requests = doRequestGAC(prev_local_gac_requests);
         }
         catch (...)
         {
@@ -541,23 +543,30 @@ static std::vector<std::pair<KeyspaceID, std::string>> extractGACReqNames(
     return res;
 }
 
-void LocalAdmissionController::doRequestGAC()
+TokenBucketRequestPBVec LocalAdmissionController::doRequestGAC(const TokenBucketRequestPBVec & prev_local_gac_requests)
 {
     while (!stopped.load())
     {
-        std::vector<resource_manager::TokenBucketsRequest> local_gac_requests;
+        TokenBucketRequestPBVec local_gac_requests;
+        if unlikely (!prev_local_gac_requests.empty())
+        {
+            local_gac_requests = prev_local_gac_requests;
+            prev_local_gac_requests.clear();
+        }
+        if (local_gac_requests.empty())
         {
             std::unique_lock<std::mutex> lock(gac_requests_mu);
             gac_requests_cv.wait(lock, [this]() { return stopped.load() || !gac_requests.empty(); });
             if unlikely (stopped.load())
-                return;
+                return {};
             local_gac_requests = gac_requests;
             gac_requests.clear();
         }
 
         assert(!local_gac_requests.empty());
-        for (const auto & req : local_gac_requests)
+        for (size_t i = 0; i < local_gac_requests.size(); ++i)
         {
+            const auto & req = local_gac_requests[i];
             const auto req_rg_names = extractGACReqNames(req);
             for (const auto & req_rg_name : req_rg_names)
                 GET_RESOURCE_GROUP_METRIC(
@@ -566,7 +575,17 @@ void LocalAdmissionController::doRequestGAC()
                     getResourceGroupMetricName(req_rg_name.first, req_rg_name.second))
                     .Increment();
 
-            const auto resp = cluster->pd_client->acquireTokenBuckets(req);
+            resource_manager::TokenBucketsResponse resp;
+            try
+            {
+                resp = cluster->pd_client->acquireTokenBuckets(req);
+            }
+            catch(const std::exception& e)
+            {
+                LOG_ERROR(log, "request to GAC failed: {}, will retry later", e.what());
+                return {local_gac_requests.begin() + i, local_gac_requests.end()};
+            }
+            
             LOG_DEBUG(log, "request to GAC done, req: {}. resp: {}", req.ShortDebugString(), resp.ShortDebugString());
 
             auto handled = handleTokenBucketsResp(resp);
@@ -652,6 +671,7 @@ std::vector<std::pair<KeyspaceID, std::string>> LocalAdmissionController::handle
         // when the acquire_token_req is only for report RU consumption or GAC got error(like nan token).
         if (one_resp.granted_r_u_tokens().empty())
         {
+            LOG_ERROR(log, "{} empty granted_r_u_tokens()", err_msg);
             resource_group->endRequest();
             continue;
         }
@@ -735,7 +755,6 @@ std::vector<std::pair<KeyspaceID, std::string>> LocalAdmissionController::handle
         if unlikely (fill_rate != 0)
             LOG_ERROR(log, "{} unexpected fill_rate: {} one_resp: {}", err_msg, fill_rate, one_resp.ShortDebugString());
 
-        LOG_DEBUG(log, "GAC resp: {}", one_resp.ShortDebugString());
         if (trickle_ms == 0)
         {
             // GAC has enough tokens for LAC.
