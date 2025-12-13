@@ -142,7 +142,7 @@ std::optional<GACRequestInfo> ResourceGroup::buildRequestInfoIfNecessary(const S
         return {};
     }
 
-    analyzeRUUsage(cpu_ru_stats, log, key_space_id, name);
+    analyzeRUUsage(cpu_ru_stats, log, keyspace_id, name);
     cpu_ru_stats.clear();
     
     const auto consumption_delta_info = updateRUConsumptionDeltaInfoWithoutLock();
