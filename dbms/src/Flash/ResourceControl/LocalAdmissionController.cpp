@@ -43,7 +43,7 @@ uint64_t ResourceGroup::getPriority(uint64_t max_ru_per_sec) const
         return std::numeric_limits<uint64_t>::max();
     }
 
-    if (!burstable && remaining_token <= bucket->getConfig().capacity * 0.2)
+    if (!burstable && remaining_token <= bucket->getConfig().low_token_threshold/2)
     {
         // todo remove this log later.
         LOG_DEBUG(
@@ -52,7 +52,7 @@ uint64_t ResourceGroup::getPriority(uint64_t max_ru_per_sec) const
             keyspace_id,
             name,
             remaining_token,
-            bucket->getConfig().capacity);
+            bucket->toString());
         return std::numeric_limits<uint64_t>::max();
     }
 
@@ -400,8 +400,6 @@ void LocalAdmissionController::mainLoop()
 
         try
         {
-            // todo remove this log later.
-            LOG_DEBUG(log, "LAC mainLoop tick at {}", current_tick.time_since_epoch().count());
             while (current_tick >= cur_tick_end)
                 cur_tick_end += tick_interval;
 
@@ -635,6 +633,7 @@ LocalAdmissionController::doRequestGAC(const TokenBucketRequestPBVec & last_roun
             }
         }
     }
+    return {};
 }
 
 void LocalAdmissionController::checkDegradeMode()
