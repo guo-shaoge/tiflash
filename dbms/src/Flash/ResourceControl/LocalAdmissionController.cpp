@@ -69,6 +69,70 @@ uint64_t ResourceGroup::getPriority(uint64_t max_ru_per_sec) const
     return (((static_cast<uint64_t>(user_priority_val)) << 60) | virtual_time);
 }
 
+size_t getPercentileIndex(size_t size, double percentile) {
+    if (size == 0) return 0;
+    double index_f = size * percentile / 100.0;
+    
+    // 如果 index_f 等于 size，则取 size - 1
+    size_t index = static_cast<size_t>(std::round(index_f)) - 1;
+
+    // 确保索引不小于 0 且不大于最大索引 (size - 1)
+    if (index >= size) {
+        return size - 1;
+    }
+    return index;
+}
+void analyzeRUUsage(std::vector<double>& cpu_ru_stats)
+{
+    if (cpu_ru_stats.empty())
+    {
+        return;
+    }
+
+    double min_val = *std::min_element(cpu_ru_stats.begin(), cpu_ru_stats.end());
+    double max_val = *std::max_element(cpu_ru_stats.begin(), cpu_ru_stats.end());
+
+    double sum = std::accumulate(cpu_ru_stats.begin(), cpu_ru_stats.end(), 0.0);
+    double mean_val = sum / cpu_ru_stats.size();
+
+    std::sort(cpu_ru_stats.begin(), cpu_ru_stats.end()); 
+    
+    double median_val;
+    size_t size = cpu_ru_stats.size();
+    
+    if (size % 2 == 1) {
+        // 奇数个元素：中位数是中间那个元素
+        median_val = cpu_ru_stats[size / 2];
+    } else {
+        // 偶数个元素：中位数是中间两个元素的平均值
+        // size / 2 是第二个中间元素的索引
+        // size / 2 - 1 是第一个中间元素的索引
+        median_val = (cpu_ru_stats[size / 2 - 1] + cpu_ru_stats[size / 2]) / 2.0;
+    }
+    // 5. 百分位数 (P95, P99, P999)
+    // 查找 P95
+    double p95_val = cpu_ru_stats[getPercentileIndex(size, 95.0)];
+    
+    // 查找 P99
+    double p99_val = cpu_ru_stats[getPercentileIndex(size, 99.0)];
+    
+    // 查找 P99.9
+    double p999_val = cpu_ru_stats[getPercentileIndex(size, 99.9)];
+    LOG_DEBUG(
+        log,
+        "Resource Group({} keyspace={}) RU Usage Analysis: Min={}, Max={}, Mean={}, Median={}, count:{}， 95th Percentile={}, 99th Percentile={}, 99.9th Percentile={}",
+        name,
+        keyspace_id,
+        min_val,
+        max_val,
+        mean_val,
+        median_val,
+        cpu_ru_stats.size(),
+        p95_val,
+        p99_val,
+        p999_val);
+}
+
 std::optional<GACRequestInfo> ResourceGroup::buildRequestInfoIfNecessary(const SteadyClock::time_point & now)
 {
     std::lock_guard lock(mu);
@@ -78,6 +142,9 @@ std::optional<GACRequestInfo> ResourceGroup::buildRequestInfoIfNecessary(const S
         return {};
     }
 
+    analyzeRUUsage(cpu_ru_stats);
+    cpu_ru_stats.clear();
+    
     const auto consumption_delta_info = updateRUConsumptionDeltaInfoWithoutLock();
     double report_token_consumption = consumption_delta_info.delta;
 
@@ -128,9 +195,10 @@ bool ResourceGroup::shouldReportRUConsumption(const SteadyClock::time_point & no
 {
     std::lock_guard lock(mu);
     const auto elapsed = now - last_request_gac_timepoint;
-    // todo remove this log later.
-    LOG_DEBUG(log, "shouldReportRUConsumption check at now: {}, last: {}, elapsed: {}, delta", now.time_since_epoch().count(), last_request_gac_timepoint.time_since_epoch().count(),
-        std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(), ru_consumption_delta);
+    // // todo remove this log later.
+    // LOG_DEBUG(log, "shouldReportRUConsumption check at now: {}, last: {}, elapsed: {}, delta: {}", 
+    //     now.time_since_epoch().count(), last_request_gac_timepoint.time_since_epoch().count(),
+    //     std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(), ru_consumption_delta);
     RUNTIME_CHECK(elapsed.count() >= 0, elapsed.count());
     if (elapsed >= LocalAdmissionController::DEFAULT_TARGET_PERIOD)
     {

@@ -170,6 +170,7 @@ private:
         const auto now = SteadyClock::now();
         std::lock_guard lock(mu);
 
+        cpu_ru_stats.push_back(ru);
         // todo remove this log later.
         if (ru > user_ru_per_sec)
         {
@@ -346,6 +347,8 @@ private:
     // For trickle mode.
     SteadyClock::time_point trickle_expire_timepoint;
     SteadyClock::time_point trickle_deadline;
+
+    std::vector<double> cpu_ru_stats;
 };
 
 using ResourceGroupPtr = std::shared_ptr<ResourceGroup>;
