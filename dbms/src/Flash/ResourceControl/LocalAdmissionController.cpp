@@ -127,10 +127,10 @@ void ResourceGroup::endRequestWithoutLock()
 bool ResourceGroup::shouldReportRUConsumption(const SteadyClock::time_point & now) const
 {
     std::lock_guard lock(mu);
-    // todo remove this log later.
     const auto elapsed = now - last_request_gac_timepoint;
-        LOG_DEBUG(log, "shouldReportRUConsumption check at now: {}, last: {}, elapsed: {}, delta", now.time_since_epoch().count(), last_request_gac_timepoint.time_since_epoch().count(),
-            std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(), ru_consumption_delta);
+    // todo remove this log later.
+    LOG_DEBUG(log, "shouldReportRUConsumption check at now: {}, last: {}, elapsed: {}, delta", now.time_since_epoch().count(), last_request_gac_timepoint.time_since_epoch().count(),
+        std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(), ru_consumption_delta);
     RUNTIME_CHECK(elapsed.count() >= 0, elapsed.count());
     if (elapsed >= LocalAdmissionController::DEFAULT_TARGET_PERIOD)
     {
