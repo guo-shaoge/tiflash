@@ -43,6 +43,19 @@ uint64_t ResourceGroup::getPriority(uint64_t max_ru_per_sec) const
         return std::numeric_limits<uint64_t>::max();
     }
 
+    if (!burstable && remaining_token <= bucket->getConfig().capacity * 0.2)
+    {
+        // todo remove this log later.
+        LOG_DEBUG(
+            log,
+            "resource group {}/{} low priority triggered, remaining_token={}, capacity={}",
+            keyspace_id,
+            name,
+            remaining_token,
+            bucket->getConfig().capacity);
+        return std::numeric_limits<uint64_t>::max();
+    }
+
     // This should not happens because tidb will check except for unittest(test static token bucket).
     if unlikely (user_ru_per_sec == 0)
         return std::numeric_limits<uint64_t>::max() - 1;
