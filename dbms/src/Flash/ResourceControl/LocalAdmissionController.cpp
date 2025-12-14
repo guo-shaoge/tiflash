@@ -43,18 +43,18 @@ uint64_t ResourceGroup::getPriority(uint64_t max_ru_per_sec) const
         return std::numeric_limits<uint64_t>::max();
     }
 
-    if (!burstable && remaining_token <= 200) // todo fix this magic number later.
-    {
-        // todo remove this log later.
-        LOG_DEBUG(
-            log,
-            "resource group {}/{} low priority triggered, remaining_token={}, capacity={}",
-            keyspace_id,
-            name,
-            remaining_token,
-            bucket->toString());
-        return std::numeric_limits<uint64_t>::max();
-    }
+    // if (!burstable && remaining_token <= 200) // todo fix this magic number later.
+    // {
+    //     // todo remove this log later.
+    //     LOG_DEBUG(
+    //         log,
+    //         "resource group {}/{} low priority triggered, remaining_token={}, capacity={}",
+    //         keyspace_id,
+    //         name,
+    //         remaining_token,
+    //         bucket->toString());
+    //     return std::numeric_limits<uint64_t>::max();
+    // }
 
     // This should not happens because tidb will check except for unittest(test static token bucket).
     if unlikely (user_ru_per_sec == 0)
@@ -223,7 +223,7 @@ double ResourceGroup::getAcquireRUNumWithoutLock(double speed, uint32_t n_sec, d
 
     // This should not happen, but still add this to avoid stuck.
     if unlikely (acquire_num == 0.0)
-        if (!burstable && remaining_ru <= 200) // todo fix this magic number later.
+        // if (!burstable && remaining_ru <= 200) // todo fix this magic number later.
             acquire_num = DEFAULT_BUFFER_TOKENS;
 
     // The purpose of subtracting remaining_ru is try to ensure that the number of local tokens
