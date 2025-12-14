@@ -44,17 +44,7 @@ uint64_t ResourceGroup::getPriority(uint64_t max_ru_per_sec) const
     }
 
     if (!burstable && remaining_token <= 200) // todo fix this magic number later.
-    {
-        // todo remove this log later.
-        LOG_DEBUG(
-            log,
-            "resource group {}/{} low priority triggered, remaining_token={}, capacity={}",
-            keyspace_id,
-            name,
-            remaining_token,
-            bucket->toString());
         return std::numeric_limits<uint64_t>::max();
-    }
 
     // This should not happens because tidb will check except for unittest(test static token bucket).
     if unlikely (user_ru_per_sec == 0)
@@ -759,8 +749,6 @@ std::vector<std::pair<KeyspaceID, std::string>> LocalAdmissionController::handle
         // when the acquire_token_req is only for report RU consumption or GAC got error(like nan token).
         if (one_resp.granted_r_u_tokens().empty())
         {
-            // todo remove this log later.
-            LOG_ERROR(log, "{} empty granted_r_u_tokens()", err_msg);
             resource_group->endRequest();
             continue;
         }
