@@ -710,7 +710,8 @@ private:
     void fetchTokensForAllResourceGroups();
     static std::optional<AcquireTokenInfo> buildAcquireInfo(
         const ResourceGroupPtr & resource_group,
-        bool is_periodically_fetch);
+        bool is_periodically_fetch,
+        LoggerPtr & log);
 
     // Watch GAC utilities.
     void doWatch();

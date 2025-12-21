@@ -123,7 +123,7 @@ void LocalAdmissionController::fetchTokensForAllResourceGroups()
         std::lock_guard lock(mu);
         for (const auto & resource_group : resource_groups)
         {
-            auto acquire_info = buildAcquireInfo(resource_group.second, /*is_periodically_fetch=*/true);
+            auto acquire_info = buildAcquireInfo(resource_group.second, /*is_periodically_fetch=*/true, log);
             if (acquire_info.has_value())
                 acquire_infos.push_back(acquire_info.value());
         }
@@ -143,7 +143,7 @@ void LocalAdmissionController::fetchTokensForLowTokenResourceGroups()
             auto iter = resource_groups.find(name);
             if (iter != resource_groups.end())
             {
-                auto acquire_info = buildAcquireInfo(iter->second, /*is_periodically_fetch=*/false);
+                auto acquire_info = buildAcquireInfo(iter->second, /*is_periodically_fetch=*/false, log);
                 if (acquire_info.has_value())
                     acquire_infos.push_back(acquire_info.value());
             }
@@ -157,7 +157,8 @@ void LocalAdmissionController::fetchTokensForLowTokenResourceGroups()
 
 std::optional<LocalAdmissionController::AcquireTokenInfo> LocalAdmissionController::buildAcquireInfo(
     const ResourceGroupPtr & resource_group,
-    bool is_periodically_fetch)
+    bool is_periodically_fetch,
+    LoggerPtr & log)
 {
     double token_consumption = 0.0;
     double acquire_tokens = 0.0;
@@ -200,7 +201,7 @@ std::optional<LocalAdmissionController::AcquireTokenInfo> LocalAdmissionControll
             resource_group->name,
             consumption_update_info.speed,
             acquire_tokens);
-            
+
         assert(acquire_tokens >= 0.0);
     };
 
