@@ -158,7 +158,7 @@ void LocalAdmissionController::fetchTokensForLowTokenResourceGroups()
 std::optional<LocalAdmissionController::AcquireTokenInfo> LocalAdmissionController::buildAcquireInfo(
     const ResourceGroupPtr & resource_group,
     bool is_periodically_fetch,
-    LoggerPtr & log)
+    LoggerPtr log)
 {
     double token_consumption = 0.0;
     double acquire_tokens = 0.0;

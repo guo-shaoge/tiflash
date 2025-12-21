@@ -711,7 +711,7 @@ private:
     static std::optional<AcquireTokenInfo> buildAcquireInfo(
         const ResourceGroupPtr & resource_group,
         bool is_periodically_fetch,
-        LoggerPtr & log);
+        LoggerPtr log);
 
     // Watch GAC utilities.
     void doWatch();
