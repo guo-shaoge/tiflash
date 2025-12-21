@@ -196,7 +196,15 @@ std::optional<LocalAdmissionController::AcquireTokenInfo> LocalAdmissionControll
 
         acquire_tokens
             = consumption_update_info.speed * DEFAULT_FETCH_GAC_INTERVAL.count() * ACQUIRE_RU_AMPLIFICATION;
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        // 定义分布范围 [0.0, 1.0)
+        std::uniform_real_distribution<> dis(0.0, 1.0);
 
+
+        if (dis(gen) < 0.5) {
+            acquire_tokens  = 1e-310; // gjt debug very small token to test GAC and TiFlash behavior
+        }
         LOG_DEBUG(log, "gjt debug buildAcquireInfo rg: {}, consumption_update_info.speed: {}, acquire_tokens: {}",
             resource_group->name,
             consumption_update_info.speed,
