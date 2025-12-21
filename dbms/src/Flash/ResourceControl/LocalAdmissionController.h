@@ -340,6 +340,8 @@ private:
                 return {.speed = ru_consumption_speed, .delta = ru_consumption_delta, .updated = false};
 
             ru_consumption_speed = ru_consumption_delta / elapsed.count();
+            LOG_DEBUG(log, "gjt debug updateConsumptionSpeedInfoIfNecessary: ru_consumption_delta: {}, elapsed: {}, ru_consumption_speed: {}", 
+                ru_consumption_delta, elapsed.count(), ru_consumption_speed);
             total_ru_consumption += ru_consumption_delta;
 
             info.speed = ru_consumption_speed;
