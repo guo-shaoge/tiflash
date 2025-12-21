@@ -15,7 +15,7 @@
 #include <Flash/ResourceControl/LocalAdmissionController.h>
 #include <etcd/rpc.pb.h>
 #include <pingcap/kv/Cluster.h>
-
+#include <random>
 #include <magic_enum.hpp>
 
 namespace DB
