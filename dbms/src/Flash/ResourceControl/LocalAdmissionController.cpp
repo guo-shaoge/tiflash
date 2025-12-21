@@ -172,27 +172,35 @@ std::optional<LocalAdmissionController::AcquireTokenInfo> LocalAdmissionControll
         if (resource_group->burstable)
             return;
 
-        // To avoid periodically_token_fetch after low_token_fetch immediately
-        if (is_periodically_fetch && !resource_group->needFetchToken(now, DEFAULT_FETCH_GAC_INTERVAL))
-            return;
+        // // To avoid periodically_token_fetch after low_token_fetch immediately
+        // if (is_periodically_fetch && !resource_group->needFetchToken(now, DEFAULT_FETCH_GAC_INTERVAL))
+        //     return;
 
-        // During trickle mode, no need to fetch tokens from GAC.
-        if (resource_group->inTrickleModeLease(now))
-            return;
+        // // During trickle mode, no need to fetch tokens from GAC.
+        // if (resource_group->inTrickleModeLease(now))
+        //     return;
 
-        if (resource_group->trickleModeLeaseExpire(now))
-        {
-            acquire_tokens
-                = consumption_update_info.speed * DEFAULT_FETCH_GAC_INTERVAL.count() * ACQUIRE_RU_AMPLIFICATION;
-        }
-        else
-        {
-            acquire_tokens = resource_group->getAcquireRUNum(
-                consumption_update_info.speed,
-                DEFAULT_FETCH_GAC_INTERVAL.count(),
-                ACQUIRE_RU_AMPLIFICATION);
-        }
+        // if (resource_group->trickleModeLeaseExpire(now))
+        // {
+        //     acquire_tokens
+        //         = consumption_update_info.speed * DEFAULT_FETCH_GAC_INTERVAL.count() * ACQUIRE_RU_AMPLIFICATION;
+        // }
+        // else
+        // {
+        //     acquire_tokens = resource_group->getAcquireRUNum(
+        //         consumption_update_info.speed,
+        //         DEFAULT_FETCH_GAC_INTERVAL.count(),
+        //         ACQUIRE_RU_AMPLIFICATION);
+        // }
 
+        acquire_tokens
+            = consumption_update_info.speed * DEFAULT_FETCH_GAC_INTERVAL.count() * ACQUIRE_RU_AMPLIFICATION;
+
+        LOG_DEBUG(log, "gjt debug buildAcquireInfo rg: {}, consumption_update_info.speed: {}, acquire_tokens: {}",
+            resource_group->name,
+            consumption_update_info.speed,
+            acquire_tokens);
+            
         assert(acquire_tokens >= 0.0);
     };
 
