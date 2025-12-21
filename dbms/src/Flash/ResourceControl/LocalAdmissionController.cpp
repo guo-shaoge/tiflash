@@ -232,6 +232,9 @@ void LocalAdmissionController::fetchTokensFromGAC(
         auto * single_group_req = gac_req.add_requests();
         single_group_req->set_resource_group_name(info.resource_group_name);
         assert(info.acquire_tokens > 0.0 || info.ru_consumption_delta > 0.0 || is_final_report);
+        
+        LOG_DEBUG(log, "gjt debug fetchTokensFromGAC info: {}, is_final_report: {}", info.toString(), is_final_report);
+
         if (info.acquire_tokens > 0.0 || is_final_report)
         {
             auto * ru_items = single_group_req->mutable_ru_items();
