@@ -689,10 +689,12 @@ void NO_INLINE Aggregator::executeImpl(
     }
     else
     {
-        if (disable_prefetch)
-            executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
-        else
-            executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
+        executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+
+        // if (disable_prefetch)
+        //     executeImplBatch<collect_hit_rate, only_lookup, false>(method, state, aggregates_pool, agg_process_info);
+        // else
+        //     executeImplBatch<collect_hit_rate, only_lookup, true>(method, state, aggregates_pool, agg_process_info);
     }
 }
 
@@ -2573,7 +2575,9 @@ BlocksList Aggregator::vstackBlocks(BlocksList & blocks, bool final)
     result.init(merge_method);
     result.keys_size = params.keys_size;
     result.key_sizes = key_sizes;
+    // LOG_INFO(log, "Aggregation method: `{}`", result.getMethodName());
 
+    
     for (Block & block : blocks)
     {
         if (bucket_num >= 0 && block.info.bucket_num != bucket_num)
