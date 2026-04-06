@@ -2428,7 +2428,7 @@ protected:
         return find_or_prepare_insert(key, this->hash(key));
     }
 
-    size_t prepare_insert(size_t hashval) PHMAP_ATTRIBUTE_NOINLINE
+    size_t prepare_insert(size_t hashval)
     {
         auto target = find_first_non_full(hashval);
         if (PHMAP_PREDICT_FALSE(growth_left() == 0 && !IsDeleted(ctrl_[target.offset])))
