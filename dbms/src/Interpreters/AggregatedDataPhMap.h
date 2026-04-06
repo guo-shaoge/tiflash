@@ -72,15 +72,15 @@ using TwoLevelPhHashMapWithSavedHash
 
 namespace DB
 {
-// todo: also test magic hash.
-using AggregatedDataWithUInt32KeyPhMap = PhHashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
-using AggregatedDataWithUInt64KeyPhMap = PhHashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
-using AggregatedDataWithKeys128PhMap = PhHashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
+// todo explain why phmap cannot use HashCRC32
+using AggregatedDataWithUInt32KeyPhMap = PhHashMap<UInt32, AggregateDataPtr, MagicHash<UInt32>>;
+using AggregatedDataWithUInt64KeyPhMap = PhHashMap<UInt64, AggregateDataPtr, MagicHash<UInt64>>;
+using AggregatedDataWithKeys128PhMap = PhHashMap<UInt128, AggregateDataPtr, MagicHash<UInt128>>;
 using AggregatedDataWithStringKeyPhMap = PhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
 
-using AggregatedDataWithUInt32KeyTwoLevelPhMap = TwoLevelPhHashMap<UInt32, AggregateDataPtr, HashCRC32<UInt32>>;
-using AggregatedDataWithUInt64KeyTwoLevelPhMap = TwoLevelPhHashMap<UInt64, AggregateDataPtr, HashCRC32<UInt64>>;
-using AggregatedDataWithKeys128TwoLevelPhMap = TwoLevelPhHashMap<UInt128, AggregateDataPtr, HashCRC32<UInt128>>;
+using AggregatedDataWithUInt32KeyTwoLevelPhMap = TwoLevelPhHashMap<UInt32, AggregateDataPtr, MagicHash<UInt32>>;
+using AggregatedDataWithUInt64KeyTwoLevelPhMap = TwoLevelPhHashMap<UInt64, AggregateDataPtr, MagicHash<UInt64>>;
+using AggregatedDataWithKeys128TwoLevelPhMap = TwoLevelPhHashMap<UInt128, AggregateDataPtr, MagicHash<UInt128>>;
 using AggregatedDataWithStringKeyTwoLevelPhMap
     = TwoLevelPhHashMapWithSavedHash<StringRef, AggregateDataPtr, DefaultHash<StringRef>>;
 } // namespace DB
