@@ -35,7 +35,7 @@ struct MapSlotWithSavedHashType
     {
         static_assert(
             std::is_same_v<std::decay_t<T>, value_type> || std::is_same_v<std::decay_t<T>, mutable_value_type>);
-        return x.second;
+        return x.first;
     }
 
     union
