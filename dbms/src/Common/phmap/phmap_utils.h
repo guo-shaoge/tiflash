@@ -69,7 +69,7 @@ struct phmap_mix
     inline size_t operator()(size_t) const;
 };
 
-// #ifdef ENABLE_PHMAP_MIX
+#ifdef ENABLE_PHMAP_MIX
 
 template <>
 struct phmap_mix<4>
@@ -115,22 +115,22 @@ struct phmap_mix<8>
 };
 #endif // PHMAP_HAS_UMUL128
 
-// #else
-// 
-// template <>
-// struct phmap_mix<4>
-// {
-//     inline size_t operator()(size_t a) const { return a; }
-// };
-// 
-// template <>
-// struct phmap_mix<8>
-// {
-//     // Very fast mixing (similar to Abseil)
-//     inline size_t operator()(size_t a) const { return a; }
-// };
-// 
-// #endif // ENABLE_PHMAP_MIX
+#else
+
+template <>
+struct phmap_mix<4>
+{
+    inline size_t operator()(size_t a) const { return a; }
+};
+
+template <>
+struct phmap_mix<8>
+{
+    // Very fast mixing (similar to Abseil)
+    inline size_t operator()(size_t a) const { return a; }
+};
+
+#endif // ENABLE_PHMAP_MIX
 
 // --------------------------------------------
 template <int n>
