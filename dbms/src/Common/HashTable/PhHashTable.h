@@ -199,7 +199,7 @@ public:
     template <typename Func>
     ALWAYS_INLINE inline void mergeToViaEmplace(Self & that, Func && func)
     {
-        that.reserve(2500000);
+        that.reserve(80000000);
         for (auto it = begin(), end = this->end(); it != end; ++it)
         {
             typename Self::LookupResult res_it = nullptr;
