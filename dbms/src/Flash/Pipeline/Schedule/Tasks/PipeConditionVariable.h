@@ -60,6 +60,12 @@ public:
         case NotifyType::WAIT_ON_CTE_READ:
             GET_METRIC(tiflash_pipeline_wait_on_notify_tasks, type_type_wait_on_cte_read).Increment(change);
             break;
+        case NotifyType::WAIT_ON_LOCAL_PARTITION_WRITE:
+            GET_METRIC(tiflash_pipeline_wait_on_notify_tasks, type_wait_on_local_partition_write).Increment(change);
+            break;
+        case NotifyType::WAIT_ON_LOCAL_PARTITION_READ:
+            GET_METRIC(tiflash_pipeline_wait_on_notify_tasks, type_wait_on_local_partition_read).Increment(change);
+            break;
         case NotifyType::WAIT_ON_NOTHING:
             throw Exception("task notify type should be set before register or notify");
             break;

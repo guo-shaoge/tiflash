@@ -74,17 +74,17 @@ public:
 
     void registerReadTask(size_t partition_id, TaskPtr && task, NotifyType type)
     {
-        queues[partition_id].registerPipeReadTask(std::move(task), type);
+        queues[partition_id]->registerPipeReadTask(std::move(task), type);
     }
     void registerWriteTask(size_t partition_id, TaskPtr && task, NotifyType type)
     {
-        queues[partition_id].registerPipeWriteTask(std::move(task), type);
+        queues[partition_id]->registerPipeWriteTask(std::move(task), type);
     }
 
     size_t getNumPartitions() const { return queues.size(); }
 
 private:
-    std::vector<LooseBoundedMPMCQueue<PartitionChunk>> queues;
+    std::vector<std::unique_ptr<LooseBoundedMPMCQueue<PartitionChunk>>> queues;
     std::atomic_int32_t active_producer;
 };
 

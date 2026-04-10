@@ -51,30 +51,33 @@ LocalPartitionExchange::LocalPartitionExchange(
     size_t num_producers)
     : active_producer(num_producers)
 {
-    queues.reserve(num_partitions);
+    // cannot reserve LooseBoundedMPMCQueue, since there is index
+    // queues.reserve(num_partitions);
     for (size_t i = 0; i < num_partitions; ++i)
-        queues.emplace_back(
-            queue_limits,
-            [](const PartitionChunk & chunk) -> Int64 {
-                auto total_rows = chunk.block.rows();
-                if (!chunk.selective || total_rows == 0)
-                    return chunk.block.allocatedBytes();
-                // Proportional estimate: column data is shared via COWPtr, so attribute
-                // memory based on the fraction of rows this partition holds.
-                return static_cast<Int64>(
-                    chunk.block.allocatedBytes() * chunk.selective->size() / total_rows
-                    + chunk.selective->size() * sizeof(UInt64));
-            });
+        queues.push_back(
+            std::make_unique<LooseBoundedMPMCQueue<PartitionChunk>>(
+                queue_limits,
+                [](const PartitionChunk & chunk) -> Int64 {
+                    // todo remove this callback, looks like it's meanless.
+                    auto total_rows = chunk.block.rows();
+                    if (!chunk.selective || total_rows == 0)
+                        return chunk.block.allocatedBytes();
+                    // Proportional estimate: column data is shared via COWPtr, so attribute
+                    // memory based on the fraction of rows this partition holds.
+                    return static_cast<Int64>(
+                        chunk.block.allocatedBytes() * chunk.selective->size() / total_rows
+                        + chunk.selective->size() * sizeof(UInt64));
+            }));
 }
 
 MPMCQueueResult LocalPartitionExchange::tryPush(size_t partition_id, PartitionChunk && chunk)
 {
-    return queues[partition_id].tryPush(std::move(chunk));
+    return queues[partition_id]->tryPush(std::move(chunk));
 }
 
 MPMCQueueResult LocalPartitionExchange::tryPop(size_t partition_id, PartitionChunk & chunk)
 {
-    return queues[partition_id].tryPop(chunk);
+    return queues[partition_id]->tryPop(chunk);
 }
 
 void LocalPartitionExchange::producerFinish()
@@ -84,14 +87,14 @@ void LocalPartitionExchange::producerFinish()
     if (1 == cur_value)
     {
         for (auto & queue : queues)
-            queue.finish();
+            queue->finish();
     }
 }
 
 void LocalPartitionExchange::cancel()
 {
     for (auto & queue : queues)
-        queue.cancel();
+        queue->cancel();
 }
 
 } // namespace DB
