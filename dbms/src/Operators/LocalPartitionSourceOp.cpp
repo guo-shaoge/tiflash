@@ -97,8 +97,7 @@ Block LocalPartitionSourceOp::materializeAccumulated()
             }
             else
             {
-                for (auto idx : *selective)
-                    columns[col]->insertFrom(*src_col, idx);
+                columns[col]->insertSelectiveFrom(*src_col, *selective);
             }
         }
     }

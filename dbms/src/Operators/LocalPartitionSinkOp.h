@@ -41,7 +41,11 @@ public:
         , collators(collators_)
         , partition_key_containers(partition_col_ids_.size())
         , num_partitions(sink_holder_->getNumPartitions())
-    {}
+        , selectives(num_partitions)
+    {
+        for (size_t i = 0; i < num_partitions; ++i)
+            selectives[i] = std::make_shared<PartitionSelective>();
+    }
 
     ~LocalPartitionSinkOp() override { sink_holder->finish(); }
 
@@ -58,6 +62,9 @@ private:
     TiDB::TiDBCollators collators;
     std::vector<String> partition_key_containers;
     size_t num_partitions;
+
+    // Reusable per-partition selective arrays — cleared each block, not reallocated.
+    std::vector<PartitionSelectivePtr> selectives;
 
     // Pending PartitionChunks waiting to be pushed.
     // pending_chunks[partition_id] = chunk for that partition.

@@ -34,9 +34,8 @@ OperatorStatus LocalPartitionSinkOp::writeImpl(Block && block)
 
     // 2. Build per-partition selective arrays (no column data copy).
     const auto & hash_data = hash.getData();
-    std::vector<BlockSelectivePtr> selectives(num_partitions);
     for (size_t i = 0; i < num_partitions; ++i)
-        selectives[i] = std::make_shared<BlockSelective>();
+        selectives[i]->clear();
     for (size_t i = 0; i < rows; ++i)
     {
         UInt64 partition_id = hash_data[i];

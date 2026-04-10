@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Common/LooseBoundedMPMCQueue.h>
+#include <Common/PODArray.h>
 #include <Core/BlockInfo.h>
 #include <Flash/Pipeline/Schedule/Tasks/NotifyFuture.h>
 #include <Flash/Pipeline/Schedule/Tasks/Task.h>
@@ -27,13 +28,17 @@ namespace DB
 {
 class PipelineExecutorContext;
 
+/// Selective type using PaddedPODArray for compatibility with IColumn::insertSelectiveFrom.
+using PartitionSelective = PaddedPODArray<UInt64>;
+using PartitionSelectivePtr = std::shared_ptr<PartitionSelective>;
+
 /// A chunk of data for a specific partition: the original block plus
 /// a selective vector indicating which rows belong to this partition.
 /// Column data is shared via COWPtr — no data copy at push time.
 struct PartitionChunk
 {
     Block block;
-    BlockSelectivePtr selective; /// Row indices for this partition (nullptr = all rows)
+    PartitionSelectivePtr selective; /// Row indices for this partition (nullptr = all rows)
 };
 
 /**

@@ -185,30 +185,6 @@ void AggregateContext::initConvergent()
 
     initConvergentPrefix();
 
-    if (is_pre_partitioned)
-    {
-        // Pre-partitioned mode: each thread's hash table is independent (no overlapping keys),
-        // so we convert each one separately without merge.
-        per_thread_blocks.resize(max_threads);
-        for (size_t i = 0; i < max_threads; ++i)
-        {
-            if (many_data[i]->empty())
-                continue;
-            // mergeAndConvertToBlocks with a single-element vector does no actual merge
-            // (the merge loop is `for(j=1; j<size)` which iterates zero times).
-            ManyAggregatedDataVariants single = {many_data[i]};
-            auto merging = aggregator->mergeAndConvertToBlocks(single, true, 1);
-            if (merging)
-            {
-                Block block;
-                while ((block = merging->getData(0)))
-                    per_thread_blocks[i].push_back(std::move(block));
-            }
-        }
-        status = AggStatus::convergent;
-        return;
-    }
-
     merging_buckets = aggregator->mergeAndConvertToBlocks(many_data, true, max_threads);
     status = AggStatus::convergent;
     RUNTIME_CHECK(!merging_buckets || merging_buckets->getConcurrency() > 0);
@@ -217,12 +193,6 @@ void AggregateContext::initConvergent()
 size_t AggregateContext::getConvergentConcurrency()
 {
     assert(status.load() == AggStatus::convergent);
-    if (is_pre_partitioned)
-    {
-        // Use max_threads as concurrency. Each index maps directly to one thread.
-        // Threads with no data return empty blocks immediately.
-        return max_threads;
-    }
     return merging_buckets ? merging_buckets->getConcurrency() : 1;
 }
 
@@ -241,15 +211,6 @@ Block AggregateContext::getSourceHeader() const
 Block AggregateContext::readForConvergent(size_t index)
 {
     assert(status.load() == AggStatus::convergent);
-    if (is_pre_partitioned)
-    {
-        // Direct 1:1 mapping: index corresponds to thread index.
-        if (index >= per_thread_blocks.size() || per_thread_blocks[index].empty())
-            return {};
-        Block block = std::move(per_thread_blocks[index].front());
-        per_thread_blocks[index].pop_front();
-        return block;
-    }
     if unlikely (!merging_buckets)
         return {};
     return merging_buckets->getData(index);
