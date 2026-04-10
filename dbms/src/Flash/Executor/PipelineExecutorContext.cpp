@@ -21,6 +21,7 @@
 #include <Flash/Pipeline/Schedule/TaskScheduler.h>
 #include <Flash/Pipeline/Schedule/Tasks/OneTimeNotifyFuture.h>
 #include <Operators/CTE.h>
+#include <Operators/LocalPartitionExchange.h>
 #include <Operators/SharedQueue.h>
 
 #include <exception>
@@ -179,6 +180,7 @@ void PipelineExecutorContext::cancel()
     if (is_cancelled.compare_exchange_strong(origin_value, true, std::memory_order_release))
     {
         cancelSharedQueues();
+        cancelLocalPartitionExchanges();
         cancelOneTimeFutures();
         if (likely(dag_context))
         {
@@ -232,6 +234,25 @@ void PipelineExecutorContext::cancelSharedQueues()
     }
     for (const auto & shared_queue : tmp)
         shared_queue->cancel();
+}
+
+void PipelineExecutorContext::addLocalPartitionExchange(const LocalPartitionExchangePtr & exchange)
+{
+    std::lock_guard lock(mu);
+    RUNTIME_CHECK_MSG(!isCancelled(), "query has been cancelled.");
+    assert(exchange);
+    local_partition_exchanges.push_back(exchange);
+}
+
+void PipelineExecutorContext::cancelLocalPartitionExchanges()
+{
+    std::vector<LocalPartitionExchangePtr> tmp;
+    {
+        std::lock_guard lock(mu);
+        std::swap(tmp, local_partition_exchanges);
+    }
+    for (const auto & exchange : tmp)
+        exchange->cancel();
 }
 
 void PipelineExecutorContext::addOneTimeFuture(const OneTimeNotifyFuturePtr & future)

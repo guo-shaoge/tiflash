@@ -32,6 +32,9 @@
 #include <Interpreters/Context.h>
 #include <Operators/AutoPassThroughAggregateTransform.h>
 #include <Operators/LocalAggregateTransform.h>
+#include <Operators/LocalPartitionExchange.h>
+#include <Operators/LocalPartitionSinkOp.h>
+#include <Operators/LocalPartitionSourceOp.h>
 
 namespace DB
 {
@@ -262,13 +265,97 @@ void PhysicalAggregation::buildPipelineExecGroupImpl(
     Context & context,
     size_t /*concurrency*/)
 {
-    // When got here, one of fine_grained_shuffle and auto_pass_through must be true.
-    // Because for non fine grained shuffle, AggregateBuild and AggregateConvergent will be used to build aggregation.
-    // Also auto pass through hashagg use PhysicalAggregation to build. But they cannot be true at the same time.
-    RUNTIME_CHECK(fine_grained_shuffle.enabled() != auto_pass_through_switcher.enabled());
+    RUNTIME_CHECK(
+        fine_grained_shuffle.enabled() || auto_pass_through_switcher.enabled() || use_local_partition_);
+    RUNTIME_CHECK(
+        !(fine_grained_shuffle.enabled() && auto_pass_through_switcher.enabled()));
+
+    if (use_local_partition_)
+    {
+        executeExpression(exec_context, group_builder, before_agg_actions, log);
+
+        Block before_agg_header = group_builder.getCurrentHeader();
+        size_t concurrency = group_builder.concurrency();
+
+        AggregationInterpreterHelper::fillArgColumnNumbers(aggregate_descriptions, before_agg_header);
+        SpillConfig spill_config(
+            context.getTemporaryPath(),
+            log->identifier(),
+            context.getSettingsRef().max_cached_data_bytes_in_spiller,
+            context.getSettingsRef().max_spilled_rows_per_file,
+            context.getSettingsRef().max_spilled_bytes_per_file,
+            context.getFileProvider(),
+            context.getSettingsRef().max_threads,
+            context.getSettingsRef().max_block_size);
+        // When two-level is disabled for local partition, pass before_agg_streams_size=1 so
+        // isAllowToUseTwoLevelGroupBy returns false → thresholds set to 0 → no TwoLevel conversion.
+        const bool enable_two_level = context.getSettingsRef().hashagg_local_partition_enable_two_level;
+        auto params = *AggregationInterpreterHelper::buildParams(
+            context,
+            before_agg_header,
+            enable_two_level ? concurrency : 1,
+            enable_two_level ? concurrency : 1,
+            aggregation_keys,
+            key_ref_agg_func,
+            agg_func_ref_key,
+            aggregation_collators,
+            aggregate_descriptions,
+            is_final_agg,
+            spill_config);
+
+        // Resolve aggregation key names to column positions.
+        std::vector<Int64> partition_col_ids;
+        TiDB::TiDBCollators partition_collators;
+        partition_col_ids.reserve(aggregation_keys.size());
+        partition_collators.reserve(aggregation_keys.size());
+        for (const auto & key_name : aggregation_keys)
+        {
+            partition_col_ids.push_back(before_agg_header.getPositionByName(key_name));
+            auto it = aggregation_collators.find(key_name);
+            partition_collators.push_back(it != aggregation_collators.end() ? it->second : nullptr);
+        }
+
+        // Build LocalPartitionExchange: N partitions = concurrency, N producers = concurrency.
+        auto [sink_holders, source_holders] = LocalPartitionExchange::build(
+            exec_context,
+            concurrency,
+            concurrency);
+
+        // Group 0 (current): producers → LocalPartitionSinkOp.
+        size_t producer_index = 0;
+        group_builder.transform([&](auto & builder) {
+            builder.setSinkOp(std::make_unique<LocalPartitionSinkOp>(
+                exec_context,
+                log->identifier(),
+                sink_holders[producer_index++],
+                partition_col_ids,
+                partition_collators));
+        });
+
+        // Group 1 (new): LocalPartitionSourceOp → LocalAggregateTransform.
+        group_builder.addGroup();
+        for (size_t i = 0; i < concurrency; ++i)
+        {
+            auto builder = PipelineExecBuilder{};
+            builder.setSourceOp(std::make_unique<LocalPartitionSourceOp>(
+                exec_context,
+                log->identifier(),
+                before_agg_header,
+                source_holders[i],
+                context.getSettingsRef().max_block_size));
+            builder.appendTransformOp(std::make_unique<LocalAggregateTransform>(
+                exec_context,
+                log->identifier(),
+                params,
+                nullptr));
+            group_builder.addConcurrency(std::move(builder));
+        }
+
+        executeExpression(exec_context, group_builder, expr_after_agg, log);
+        return;
+    }
 
     // Auto pass through hashagg doesn't handle empty_result_for_aggregation_by_empty_set.
-    // Also tidb shouldn't generate this kind plan because all data is aggregated into one row if keys_size == 0.
     RUNTIME_CHECK(
         fine_grained_shuffle.enabled() || (auto_pass_through_switcher.enabled() && !aggregation_keys.empty()));
 
@@ -345,7 +432,7 @@ void PhysicalAggregation::buildPipelineExecGroupImpl(
     else
     {
         throw Exception(fmt::format(
-            "fine grained shuffle({}) or auto pass through({}) should be true",
+            "fine grained shuffle({}) or auto pass through({}) or local partition should be true",
             fine_grained_shuffle.enabled(),
             auto_pass_through_switcher.enabled()));
     }
@@ -358,18 +445,27 @@ void PhysicalAggregation::buildPipeline(
     Context & context,
     PipelineExecutorContext & exec_context)
 {
-    auto aggregate_context = std::make_shared<AggregateContext>(log->identifier());
-    // fine_grained_shuffle and auto_pass_through cannot be ture at the same time.
+    // fine_grained_shuffle and auto_pass_through cannot be true at the same time.
     RUNTIME_CHECK(!(fine_grained_shuffle.enabled() && auto_pass_through_switcher.enabled()));
-    if (fine_grained_shuffle.enabled() || auto_pass_through_switcher.enabled())
+    const bool use_local_partition
+        = !fine_grained_shuffle.enabled()
+        && !auto_pass_through_switcher.enabled()
+        && context.getSettingsRef().hashagg_enable_local_partition
+        && !aggregation_keys.empty()
+        && context.getDAGContext()->final_concurrency > 1
+        && context.getSettingsRef().max_bytes_before_external_group_by == 0;
+
+    if (fine_grained_shuffle.enabled() || auto_pass_through_switcher.enabled() || use_local_partition)
     {
-        // For fine grained shuffle, Aggregate wouldn't be broken.
+        if (use_local_partition)
+            use_local_partition_ = true;
+        // Non-breaking path: child → this node (exchange + LocalAggregateTransform handled inside).
         child->buildPipeline(builder, context, exec_context);
         builder.addPlanNode(shared_from_this());
     }
     else
     {
-        // For non fine grained shuffle, Aggregate would be broken into AggregateBuild and AggregateConvergent.
+        auto aggregate_context = std::make_shared<AggregateContext>(log->identifier());
         auto agg_build = std::make_shared<PhysicalAggregationBuild>(
             executor_id,
             schema,

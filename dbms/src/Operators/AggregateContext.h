@@ -70,6 +70,9 @@ public:
 
     Block readForConvergent(size_t index);
 
+    void setPrePartitioned(bool v) { is_pre_partitioned = v; }
+    bool getPrePartitioned() const { return is_pre_partitioned; }
+
     Block getHeader() const;
 
     Block getSourceHeader() const;
@@ -121,6 +124,10 @@ private:
     // use unique_ptr to avoid false sharing.
     std::vector<std::unique_ptr<ThreadData>> threads_data;
     size_t max_threads{};
+
+    bool is_pre_partitioned = false;
+    // Per-thread converted blocks for pre-partitioned mode (no merge needed).
+    std::vector<BlocksList> per_thread_blocks;
 
     const LoggerPtr log;
 

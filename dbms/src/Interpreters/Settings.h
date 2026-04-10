@@ -346,7 +346,9 @@ struct Settings
     M(SettingUInt64, join_v2_probe_insert_batch_size, 128, "hash join v2 probe insert batch size")                                                                                                                                      \
     M(SettingBool, join_v2_enable_tagged_pointer, true, "hash join v2 enable tagged pointer") \
     M(SettingBool, hashagg_use_magic_hash, false, "whether to use magic hash for hashagg") \
-    M(SettingBool, hashagg_use_phmap, false, "whether to use phmap for hashagg")
+    M(SettingBool, hashagg_use_phmap, false, "whether to use phmap for hashagg") \
+    M(SettingBool, hashagg_enable_local_partition, false, "enable local partition for hashagg to eliminate merge phase") \
+    M(SettingBool, hashagg_local_partition_enable_two_level, true, "enable two-level hash table conversion in local partition mode; disable to skip O(N) rehash when merge is not needed")
 
 
 // clang-format on

@@ -36,6 +36,9 @@ using RegisterOperatorSpillContext = std::function<void(const std::shared_ptr<Op
 class SharedQueue;
 using SharedQueuePtr = std::shared_ptr<SharedQueue>;
 
+class LocalPartitionExchange;
+using LocalPartitionExchangePtr = std::shared_ptr<LocalPartitionExchange>;
+
 class OneTimeNotifyFuture;
 using OneTimeNotifyFuturePtr = std::shared_ptr<OneTimeNotifyFuture>;
 class DAGContext;
@@ -144,6 +147,8 @@ public:
 
     void addSharedQueue(const SharedQueuePtr & shared_queue);
 
+    void addLocalPartitionExchange(const LocalPartitionExchangePtr & exchange);
+
     void addOneTimeFuture(const OneTimeNotifyFuturePtr & future);
 
 private:
@@ -157,6 +162,8 @@ private:
     ResultQueuePtr getConsumedResultQueue();
 
     void cancelSharedQueues();
+
+    void cancelLocalPartitionExchanges();
 
     void cancelOneTimeFutures();
 
@@ -194,6 +201,8 @@ private:
     const String resource_group_name;
 
     std::vector<SharedQueuePtr> shared_queues;
+
+    std::vector<LocalPartitionExchangePtr> local_partition_exchanges;
 
     std::vector<OneTimeNotifyFuturePtr> one_time_futures;
 };

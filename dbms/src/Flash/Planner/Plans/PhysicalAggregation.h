@@ -85,5 +85,7 @@ private:
     const AutoPassThroughSwitcher auto_pass_through_switcher;
     AggregateDescriptions aggregate_descriptions;
     ExpressionActionsPtr expr_after_agg;
+
+    bool use_local_partition_ = false;
 };
 } // namespace DB
