@@ -266,11 +266,11 @@ void PhysicalAggregation::buildPipelineExecGroupImpl(
     size_t /*concurrency*/)
 {
     RUNTIME_CHECK(
-        fine_grained_shuffle.enabled() || auto_pass_through_switcher.enabled() || use_local_partition_);
+        fine_grained_shuffle.enabled() || auto_pass_through_switcher.enabled() || use_local_partition);
     RUNTIME_CHECK(
         !(fine_grained_shuffle.enabled() && auto_pass_through_switcher.enabled()));
 
-    if (use_local_partition_)
+    if (use_local_partition)
     {
         executeExpression(exec_context, group_builder, before_agg_actions, log);
 
@@ -449,7 +449,7 @@ void PhysicalAggregation::buildPipeline(
 {
     // fine_grained_shuffle and auto_pass_through cannot be true at the same time.
     RUNTIME_CHECK(!(fine_grained_shuffle.enabled() && auto_pass_through_switcher.enabled()));
-    const bool use_local_partition
+    const bool local_use_local_partition
         = !fine_grained_shuffle.enabled()
         && !auto_pass_through_switcher.enabled()
         && context.getSettingsRef().hashagg_enable_local_partition
@@ -457,10 +457,10 @@ void PhysicalAggregation::buildPipeline(
         && context.getDAGContext()->final_concurrency > 1
         && context.getSettingsRef().max_bytes_before_external_group_by == 0;
 
-    if (fine_grained_shuffle.enabled() || auto_pass_through_switcher.enabled() || use_local_partition)
+    if (fine_grained_shuffle.enabled() || auto_pass_through_switcher.enabled() || local_use_local_partition)
     {
-        if (use_local_partition)
-            use_local_partition_ = true;
+        if (local_use_local_partition)
+            use_local_partition = true;
         // Non-breaking path: child → this node (exchange + LocalAggregateTransform handled inside).
         child->buildPipeline(builder, context, exec_context);
         builder.addPlanNode(shared_from_this());

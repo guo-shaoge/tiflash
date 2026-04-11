@@ -86,6 +86,6 @@ private:
     AggregateDescriptions aggregate_descriptions;
     ExpressionActionsPtr expr_after_agg;
 
-    bool use_local_partition_ = false;
+    bool use_local_partition = false;
 };
 } // namespace DB
