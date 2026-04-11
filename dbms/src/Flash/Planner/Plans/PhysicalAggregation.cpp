@@ -277,6 +277,7 @@ void PhysicalAggregation::buildPipelineExecGroupImpl(
         Block before_agg_header = group_builder.getCurrentHeader();
         size_t concurrency = group_builder.concurrency();
 
+        // gjttodo there are some duplicated code with theose following to be cleaned
         AggregationInterpreterHelper::fillArgColumnNumbers(aggregate_descriptions, before_agg_header);
         SpillConfig spill_config(
             context.getTemporaryPath(),
@@ -356,6 +357,7 @@ void PhysicalAggregation::buildPipelineExecGroupImpl(
     }
 
     // Auto pass through hashagg doesn't handle empty_result_for_aggregation_by_empty_set.
+    // Also tidb shouldn't generate this kind plan because all data is aggregated into one row if keys_size == 0.
     RUNTIME_CHECK(
         fine_grained_shuffle.enabled() || (auto_pass_through_switcher.enabled() && !aggregation_keys.empty()));
 

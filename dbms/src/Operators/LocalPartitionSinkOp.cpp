@@ -35,7 +35,12 @@ OperatorStatus LocalPartitionSinkOp::writeImpl(Block && block)
     // 2. Build per-partition selective arrays (no column data copy).
     const auto & hash_data = hash.getData();
     for (size_t i = 0; i < num_partitions; ++i)
-        selectives[i]->clear();
+    {
+        RUNTIME_CHECK_MSG(selectives[i] == nullptr,
+                "all partition chunks in selectives should have been handled before handling a new block");
+        selectives[i] = std::make_shared<PartitionSelective>();
+    }
+
     for (size_t i = 0; i < rows; ++i)
     {
         UInt64 partition_id = hash_data[i];
@@ -46,9 +51,14 @@ OperatorStatus LocalPartitionSinkOp::writeImpl(Block && block)
 
     // 3. Build pending PartitionChunks. Block copy only copies ColumnPtrs (COWPtr),
     //    not the underlying column data.
+    RUNTIME_CHECK_MSG(pending_chunks.empty(),
+            "all pending chunks should have been flushed before handling a new block");
     pending_chunks.resize(num_partitions);
     for (size_t part = 0; part < num_partitions; ++part)
+    {
         pending_chunks[part] = PartitionChunk{block, std::move(selectives[part])};
+        selectives[part] = nullptr;
+    }
     next_pending_partition = 0;
 
     // 4. Try to push all chunks.
@@ -57,6 +67,8 @@ OperatorStatus LocalPartitionSinkOp::writeImpl(Block && block)
 
 OperatorStatus LocalPartitionSinkOp::prepareImpl()
 {
+    // Before each round of writeImpl(), prepareImpl() will be called first.
+    // And pending chunks should be flushed before the next round of writeImpl().
     return pending_chunks.empty() ? OperatorStatus::NEED_INPUT : tryFlushPendingChunks();
 }
 
