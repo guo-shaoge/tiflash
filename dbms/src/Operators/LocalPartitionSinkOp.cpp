@@ -34,12 +34,9 @@ OperatorStatus LocalPartitionSinkOp::writeImpl(Block && block)
 
     // 2. Build per-partition selective arrays (no column data copy).
     const auto & hash_data = hash.getData();
+    selectives.resize(num_partitions);
     for (size_t i = 0; i < num_partitions; ++i)
-    {
-        RUNTIME_CHECK_MSG(selectives[i] == nullptr,
-                "all partition chunks in selectives should have been handled before handling a new block");
         selectives[i] = std::make_shared<PartitionSelective>();
-    }
 
     for (size_t i = 0; i < rows; ++i)
     {

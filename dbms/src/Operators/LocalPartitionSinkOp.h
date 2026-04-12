@@ -42,10 +42,7 @@ public:
         , partition_key_containers(partition_col_ids_.size())
         , num_partitions(sink_holder_->getNumPartitions())
         , selectives(num_partitions)
-    {
-        for (size_t i = 0; i < num_partitions; ++i)
-            selectives[i] = std::make_shared<PartitionSelective>();
-    }
+    {}
 
     ~LocalPartitionSinkOp() override { sink_holder->finish(); }
 
