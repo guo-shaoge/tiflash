@@ -455,9 +455,7 @@ void PhysicalAggregation::buildPipeline(
         = !fine_grained_shuffle.enabled()
         && !auto_pass_through_switcher.enabled()
         && context.getSettingsRef().hashagg_enable_local_partition
-        && !aggregation_keys.empty()
-        && context.getDAGContext()->final_concurrency > 1
-        && context.getSettingsRef().max_bytes_before_external_group_by == 0;
+        && !aggregation_keys.empty();
     LOG_INFO(log, "gjt debug local_use_local_partition: fine graned: {}, auto pass: {}, hashagg_enable_local_partition: {}, \
             aggregation_keys.empty: {}, final_concurrency: {}, max_bytes_before_external_group_by: {}, local_use_local_partition: {}",
             fine_grained_shuffle.enabled(), auto_pass_through_switcher.enabled(), context.getSettingsRef().hashagg_enable_local_partition,
