@@ -228,7 +228,7 @@ struct HashTableCell
 
     /// When cell pointer is moved during erase, reinsert or resize operations
 
-    static constexpr bool need_to_notify_cell_during_move = true;
+    static constexpr bool need_to_notify_cell_during_move = false;
 
     static void move(HashTableCell * /* old_location */, HashTableCell * /* new_location */) {}
 };
