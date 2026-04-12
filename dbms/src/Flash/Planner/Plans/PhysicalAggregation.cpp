@@ -291,6 +291,7 @@ void PhysicalAggregation::buildPipelineExecGroupImpl(
         // When two-level is disabled for local partition, pass before_agg_streams_size=1 so
         // isAllowToUseTwoLevelGroupBy returns false → thresholds set to 0 → no TwoLevel conversion.
         const bool enable_two_level = context.getSettingsRef().hashagg_local_partition_enable_two_level;
+        LOG_INFO(log, "PhysicalAggregation hashagg_local_partition_enable_two_level: {}", enable_two_level);
         auto params = *AggregationInterpreterHelper::buildParams(
             context,
             before_agg_header,
